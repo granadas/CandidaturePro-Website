@@ -310,17 +310,15 @@
     }
 
     message.textContent = "Recherche Internet en cours…";
-    const quota = await supabaseRpc("consume_my_company_search", {});
-    if (!quota?.allowed) throw new Error(quota?.message || "Limite mensuelle de recherches atteinte.");
-
     const result = await invokeEdgeFunction("app-services", {
       action: "company_search",
       payload: { sector, city, radius }
     });
+    const quota = result.quota || {};
     const rawCompanies = Array.isArray(result.companies) ? result.companies : [];
     companyResults = rawCompanies.map(normalizeCompany);
     renderCompanies();
-    source.textContent = quota?.premium ? "Recherche Internet • Premium" : "Recherche Internet • " + quota.used + "/" + quota.limit;
+    source.textContent = quota.premium ? "Recherche Internet • Premium" : "Recherche Internet • " + (quota.used ?? "—") + "/" + (quota.limit ?? 5);
     message.textContent = companyResults.length
       ? companyResults.length + " entreprise" + (companyResults.length > 1 ? "s trouvées." : " trouvée.")
       : "Aucune entreprise trouvée pour ces critères.";
