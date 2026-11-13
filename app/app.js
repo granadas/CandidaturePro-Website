@@ -105,6 +105,7 @@
     if (isJobs) loadJobs();
     if (isTracking) loadTracking();
     if (isDocuments) loadDocuments();
+    if (name === "settings") loadGmail();
     sidebar.classList.remove("open");
   }
 
@@ -220,7 +221,7 @@
 
   async function invokeEdgeFunction(name, body, retry = true) {
     const session = await ensureSession();
-    if (!session) throw new Error("Connectez-vous pour lancer une recherche.");
+    if (!session) throw new Error("Connectez-vous pour continuer.");
     const response = await fetch(config.supabaseUrl + "/functions/v1/" + name, {
       method: "POST",
       headers: {
@@ -235,7 +236,7 @@
       return invokeEdgeFunction(name, body, false);
     }
     const result = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(result.message || "Le service de recherche est indisponible.");
+    if (!response.ok) throw new Error(result.message || "Le service est indisponible.");
     return result;
   }
 
@@ -874,6 +875,7 @@
   signOutButton.addEventListener("click", () => {
     profile = null;
     ++documentsRequest;
+    sessionStorage.removeItem(gmailFlowKey);
     documentForm.reset();
     documentForm.hidden = true;
     documentsList.replaceChildren();
@@ -905,9 +907,90 @@
     }
   });
 
+  const gmailStatus = document.querySelector("#gmail-status");
+  const gmailConnect = document.querySelector("#gmail-connect");
+  const gmailDisconnect = document.querySelector("#gmail-disconnect");
+  const gmailFlowKey = "candidature-pro-gmail-flow";
+
+  function gmailEncode(bytes) {
+    return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+
+  async function loadGmail() {
+    const userId = getSession()?.user?.id;
+    gmailConnect.hidden = true;
+    gmailDisconnect.hidden = true;
+    gmailStatus.textContent = userId ? "Vérification de la connexion Gmail…" : "Connectez-vous à Candidature Pro pour lier Gmail.";
+    if (!userId) return;
+    try {
+      const result = await invokeEdgeFunction("gmail-web", { action: "status" });
+      if (getSession()?.user?.id !== userId) return;
+      gmailConnect.hidden = !result.configured || result.connected;
+      gmailDisconnect.hidden = !result.connected;
+      gmailStatus.textContent = result.connected ? "Compte Gmail connecté." :
+        result.configured ? "Aucun compte Gmail connecté." : "La connexion Gmail web attend la configuration Google.";
+    } catch {
+      if (getSession()?.user?.id === userId) gmailStatus.textContent = "Le service Gmail est indisponible.";
+    }
+  }
+
+  gmailConnect.addEventListener("click", async () => {
+    gmailConnect.disabled = true;
+    const userId = getSession()?.user?.id;
+    try {
+      const verifier = gmailEncode(crypto.getRandomValues(new Uint8Array(32)));
+      const state = gmailEncode(crypto.getRandomValues(new Uint8Array(32)));
+      const challenge = gmailEncode(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))));
+      const result = await invokeEdgeFunction("gmail-web", { action: "start", challenge, state });
+      if (getSession()?.user?.id !== userId) return;
+      const url = new URL(result.url);
+      if (url.origin !== "https://accounts.google.com" || url.pathname !== "/o/oauth2/v2/auth") throw new Error("Adresse Google inattendue.");
+      sessionStorage.setItem(gmailFlowKey, JSON.stringify({ verifier, state, userId, startedAt: Date.now() }));
+      location.assign(url.href);
+    } catch (error) {
+      gmailStatus.textContent = error.message;
+    } finally {
+      gmailConnect.disabled = false;
+    }
+  });
+
+  gmailDisconnect.addEventListener("click", async () => {
+    gmailDisconnect.disabled = true;
+    try {
+      await invokeEdgeFunction("gmail-web", { action: "disconnect" });
+      await loadGmail();
+    } catch (error) {
+      gmailStatus.textContent = error.message;
+    } finally {
+      gmailDisconnect.disabled = false;
+    }
+  });
+
+  async function finishGmailConnection() {
+    const url = new URL(location.href);
+    if (!url.searchParams.has("state") || !(url.searchParams.has("code") || url.searchParams.has("error"))) return;
+    let flow;
+    try { flow = JSON.parse(sessionStorage.getItem(gmailFlowKey) || "null"); }
+    catch { flow = null; }
+    sessionStorage.removeItem(gmailFlowKey);
+    history.replaceState(null, "", url.pathname);
+    showView("settings");
+    try {
+      if (!flow || flow.state !== url.searchParams.get("state") || Date.now() - flow.startedAt > 10 * 60 * 1000 ||
+          !flow.userId || flow.userId !== getSession()?.user?.id) throw new Error("La demande de connexion Gmail a expiré. Réessayez.");
+      if (url.searchParams.has("error")) throw new Error("Connexion Gmail annulée.");
+      await invokeEdgeFunction("gmail-web", { action: "exchange", code: url.searchParams.get("code"), verifier: flow.verifier });
+      await loadGmail();
+    } catch (error) {
+      await loadGmail();
+      gmailStatus.textContent = error.message;
+    }
+  }
+
   async function bootstrap() {
     renderAccount();
     showView("dashboard");
+    await finishGmailConnection();
     try { await loadDashboard(); }
     catch (error) {
       document.querySelector("#account-label").textContent = error.message;

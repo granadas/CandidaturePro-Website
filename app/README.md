@@ -23,3 +23,9 @@ Ne jamais placer une clé `service_role`, un secret OAuth Gmail ou une clé priv
 3. connecter Entreprises et Candidatures en lecture ;
 4. ajouter les opérations d'écriture après contrôle RLS ;
 5. intégrer Gmail via une fonction serveur dédiée.
+
+## Connexion Gmail web
+
+Créer un client OAuth Google de type **Application Web**, activer Gmail API et autoriser exactement l’URL de retour de l’application web, par exemple `https://candidaturepro.ch/app/` si le site est servi à cette adresse. Renseigner `GMAIL_WEB_CLIENT_ID`, `GMAIL_WEB_CLIENT_SECRET` et `GMAIL_WEB_REDIRECT_URI` dans les secrets de la fonction Supabase, puis tester le consentement avec un compte de test autorisé dans Google Cloud.
+
+La fonction `gmail-web` gère la connexion et la révocation pour le périmètre `gmail.send`. L’envoi de candidatures depuis le navigateur reste à intégrer.
