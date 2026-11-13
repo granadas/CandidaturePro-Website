@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#5b21b6">
+  <meta name="description" content="Candidature Pro en ligne : recherchez, préparez, envoyez et suivez vos candidatures.">
+  <title>Candidature Pro — Espace en ligne</title>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Navigation principale">
+      <a class="brand" href="../"><span class="logo">CP</span><span>Candidature Pro</span></a>
+      <nav>
+        <button class="nav-item active" data-view="dashboard"><span>⌂</span>Accueil</button>
+        <button class="nav-item" data-view="companies"><span>⌕</span>Entreprises</button>
+        <button class="nav-item" data-view="jobs"><span>▤</span>Postes ouverts</button>
+        <button class="nav-item" data-view="applications"><span>✉</span>Candidatures</button>
+        <button class="nav-item" data-view="tracking"><span>◷</span>Suivi</button>
+        <button class="nav-item" data-view="profile"><span>◯</span>Mon profil</button>
+        <button class="nav-item" data-view="documents"><span>▱</span>Documents</button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="plan"><small>FORMULE ACTUELLE</small><strong>Free</strong><span>5 candidatures par mois</span></div>
+        <button class="nav-item" data-view="settings"><span>⚙</span>Paramètres</button>
+        <button id="sign-out" class="nav-item danger" hidden><span>↪</span>Déconnexion</button>
+      </div>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <button id="menu-toggle" class="menu-toggle" aria-label="Ouvrir le menu">☰</button>
+        <div><strong id="page-title">Tableau de bord</strong><small id="account-label">Version web en préparation</small></div>
+        <button id="open-login" class="primary">Se connecter</button>
+      </header>
+
+      <section id="dashboard" class="view active">
+        <div class="welcome">
+          <div><span class="eyebrow">VOTRE RECHERCHE D'EMPLOI</span><h1>Bonjour <span id="first-name">👋</span></h1><p>Préparez, envoyez et suivez vos candidatures depuis un seul espace.</p></div>
+          <button class="primary" data-view-link="companies">+ Rechercher des entreprises</button>
+        </div>
+        <div class="stats">
+          <article><span>Candidatures envoyées</span><strong id="stat-sent">0</strong><small>ce mois</small></article>
+          <article><span>Réponses reçues</span><strong id="stat-replies">0</strong><small>à consulter</small></article>
+          <article><span>Relances</span><strong id="stat-followups">0</strong><small>à préparer</small></article>
+          <article><span>Entretiens</span><strong id="stat-interviews">0</strong><small>planifiés</small></article>
+        </div>
+        <div class="dashboard-grid">
+          <article class="panel"><div class="panel-head"><div><small>PROCHAINE ÉTAPE</small><h2>Commencez votre recherche</h2></div><span class="badge">Nouveau</span></div><p>Choisissez un secteur et une ville. Candidature Pro vous aidera ensuite à préparer les dossiers adaptés.</p><button class="secondary" data-view-link="companies">Trouver des entreprises</button></article>
+          <article class="panel checklist"><div class="panel-head"><h2>Préparation du compte</h2><span id="setup-progress">1/4</span></div><div class="check done"><i>✓</i><span><b>Compte Candidature Pro</b><small>Connexion Supabase existante</small></span></div><div class="check"><i>2</i><span><b>Compléter le profil</b><small>Informations pour les candidatures</small></span></div><div class="check"><i>3</i><span><b>Ajouter un CV</b><small>PDF ou création guidée</small></span></div><div class="check"><i>4</i><span><b>Connecter Gmail</b><small>Envoi et suivi des réponses</small></span></div></article>
+        </div>
+      </section>
+
+      <section id="generic-view" class="view empty-view">
+        <span class="empty-icon">CP</span><h1 id="generic-title">Fonction en préparation</h1><p id="generic-description">Cette partie sera connectée progressivement aux données de l'application Windows.</p><button class="secondary" data-view-link="dashboard">Retour à l'accueil</button>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="login-dialog">
+    <form id="login-form">
+      <button type="button" id="close-login" class="close" aria-label="Fermer">×</button>
+      <span class="dialog-logo">CP</span>
+      <h2>Connexion</h2>
+      <p>Utilisez le même compte que dans l'application Windows.</p>
+      <label>Adresse e-mail<input id="email" type="email" autocomplete="email" required></label>
+      <label>Mot de passe<input id="password" type="password" autocomplete="current-password" required></label>
+      <div id="login-message" class="message" role="status"></div>
+      <button id="login-submit" class="primary full" type="submit">Se connecter</button>
+      <small>Vos identifiants sont transmis directement au service d'authentification sécurisé de Candidature Pro.</small>
+    </form>
+  </dialog>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
