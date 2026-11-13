@@ -52,6 +52,49 @@
         </div>
       </section>
 
+      <section id="companies-view" class="view">
+        <article class="panel company-search-panel">
+          <div class="panel-head">
+            <div><small>RECHERCHE INTERNET SÉCURISÉE</small><h2>Trouver des entreprises</h2></div>
+            <span class="badge">Cache + Internet</span>
+          </div>
+          <form id="company-search-form" class="company-search-form">
+            <label>Secteur d’activité
+              <select id="company-sector">
+                <option value="">Tous les secteurs</option>
+                <option value="Logistique / Transport">Logistique / Transport</option>
+                <option value="Crèche / Petite enfance">Crèche / Petite enfance</option>
+                <option value="Agence d’intérim / Recrutement">Agence d’intérim / Recrutement</option>
+                <option value="Hôtellerie">Hôtellerie</option>
+                <option value="Restauration">Restauration</option>
+                <option value="Santé">Santé</option>
+                <option value="Éducation / Formation">Éducation / Formation</option>
+                <option value="Automobile">Automobile</option>
+                <option value="Immobilier">Immobilier</option>
+                <option value="Informatique">Informatique</option>
+              </select>
+            </label>
+            <label>Ville<input id="company-city" type="text" value="Genève" maxlength="120" required></label>
+            <label>Rayon
+              <select id="company-radius">
+                <option value="10">10 km</option>
+                <option value="20">20 km</option>
+                <option value="30" selected>30 km</option>
+                <option value="50">50 km</option>
+                <option value="100">100 km</option>
+              </select>
+            </label>
+            <button id="company-search-submit" class="primary" type="submit">Rechercher</button>
+          </form>
+          <div class="search-foot"><span>Free : 5 recherches par mois • Premium : illimité</span><strong id="company-search-source"></strong></div>
+        </article>
+        <article class="panel company-results-panel">
+          <div class="panel-head"><div><small>RÉSULTATS</small><h2>Entreprises trouvées</h2></div><span id="company-results-count">0 résultat</span></div>
+          <div id="company-search-message" class="list-message" role="status">Lancez une recherche pour commencer.</div>
+          <div id="company-results" class="company-results"></div>
+        </article>
+      </section>
+
       <section id="applications-view" class="view">
         <div class="applications-layout">
           <article class="panel application-form-panel">
