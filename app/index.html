@@ -198,8 +198,29 @@
         </article>
       </section>
 
-      <section id="generic-view" class="view empty-view">
-        <span class="empty-icon">CP</span><h1 id="generic-title">Fonction en préparation</h1><p id="generic-description">Cette partie sera connectée progressivement aux données de l'application Windows.</p><button class="secondary" data-view-link="dashboard">Retour à l'accueil</button>
+      <section id="documents-view" class="view">
+        <article class="panel">
+          <div class="panel-head"><h2>Mes documents</h2></div>
+          <form id="document-form" class="profile-form" hidden>
+            <label>Type<select id="document-kind"><option value="cv">CV</option><option value="lettre">Lettre de motivation</option></select></label>
+            <label>Fichier PDF (10 Mo maximum)<input id="document-file" type="file" accept=".pdf,application/pdf" required></label>
+            <div class="wide"><button class="primary" type="submit">Ajouter le PDF</button></div>
+          </form>
+          <p id="documents-message" role="status"></p>
+          <div id="documents-list" class="applications-list"></div>
+        </article>
+      </section>
+
+      <section id="settings-view" class="view">
+        <article class="panel">
+          <div class="panel-head"><h2>Mon compte</h2></div>
+          <p id="settings-account"></p>
+          <button class="secondary" data-view-link="profile">Modifier mon profil</button>
+        </article>
+        <article class="panel">
+          <div class="panel-head"><h2>Gmail</h2></div>
+          <p>La connexion Gmail pour l’envoi depuis le web est en préparation.</p>
+        </article>
       </section>
     </main>
   </div>

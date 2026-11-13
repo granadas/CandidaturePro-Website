@@ -70,6 +70,9 @@
     const plan = String(profile?.plan || "free").toLowerCase();
     const isPremium = plan === "premium" || plan === "pro";
     document.querySelector("#current-plan").textContent = isPremium ? "Premium" : "Free";
+    document.querySelector("#settings-account").textContent = email
+      ? email + (profile ? " · " + (isPremium ? "Premium" : "Free") : "")
+      : "Connectez-vous pour accéder à votre compte.";
     document.querySelector("#plan-detail").textContent = isPremium ? "Candidatures illimitées" : "5 candidatures par mois";
   }
 
@@ -80,13 +83,15 @@
     const isCompanies = name === "companies";
     const isJobs = name === "jobs";
     const isTracking = name === "tracking";
+    const isDocuments = name === "documents";
     document.querySelector("#dashboard").classList.toggle("active", isDashboard);
     document.querySelector("#profile-view").classList.toggle("active", isProfile);
     document.querySelector("#applications-view").classList.toggle("active", isApplications);
     document.querySelector("#companies-view").classList.toggle("active", isCompanies);
     document.querySelector("#jobs-view").classList.toggle("active", isJobs);
     document.querySelector("#tracking-view").classList.toggle("active", isTracking);
-    document.querySelector("#generic-view").classList.toggle("active", !isDashboard && !isProfile && !isApplications && !isCompanies && !isJobs && !isTracking);
+    document.querySelector("#documents-view").classList.toggle("active", isDocuments);
+    document.querySelector("#settings-view").classList.toggle("active", name === "settings");
     document.querySelectorAll(".nav-item[data-view]").forEach(item => item.classList.toggle("active", item.dataset.view === name));
 
     const [title, subtitle] = titles[name] || ["Candidature Pro", "Espace en ligne"];
@@ -94,15 +99,12 @@
     document.querySelector("#account-label").dataset.pageSubtitle = subtitle;
     if (!getSession()) document.querySelector("#account-label").textContent = subtitle;
 
-    if (!isDashboard && !isProfile && !isApplications && !isCompanies && !isJobs && !isTracking) {
-      document.querySelector("#generic-title").textContent = title;
-      document.querySelector("#generic-description").textContent = subtitle + ". Cette fonction sera reliée aux données existantes lors de la prochaine étape.";
-    }
     if (isProfile) renderProfile();
     if (isApplications) loadApplications();
     if (isCompanies) renderCompanies();
     if (isJobs) loadJobs();
     if (isTracking) loadTracking();
+    if (isDocuments) loadDocuments();
     sidebar.classList.remove("open");
   }
 
@@ -536,6 +538,132 @@
     }
   });
 
+  const documentsBucket = "candidature-documents";
+  const documentKinds = { cv: "CV", lettre: "Lettre de motivation" };
+  const documentForm = document.querySelector("#document-form");
+  const documentsList = document.querySelector("#documents-list");
+  const documentsMessage = document.querySelector("#documents-message");
+  let documentsRequest = 0;
+
+  async function documentRequest(session, path, options = {}) {
+    const response = await fetch(config.supabaseUrl + "/storage/v1/object/" + path, {
+      ...options,
+      headers: {
+        apikey: config.supabasePublishableKey,
+        Authorization: "Bearer " + session.access_token,
+        ...options.headers
+      }
+    });
+    if (!response.ok) {
+      const result = await response.json().catch(() => ({}));
+      throw new Error(result.message || "Le service de documents est indisponible.");
+    }
+    return response;
+  }
+
+  async function loadDocuments() {
+    const request = ++documentsRequest;
+    documentForm.hidden = true;
+    documentsList.replaceChildren();
+    documentsMessage.textContent = "Chargement des documents…";
+    try {
+      const session = await ensureSession();
+      if (request !== documentsRequest) return;
+      if (!session?.user?.id) {
+        documentsMessage.textContent = "Connectez-vous pour accéder à vos documents.";
+        return;
+      }
+      const groups = await Promise.all(Object.entries(documentKinds).map(async ([kind, label]) => {
+        const prefix = session.user.id + "/" + kind;
+        const files = [];
+        const limit = 100;
+        for (let offset = 0; ; offset += limit) {
+          const response = await documentRequest(session, "list/" + documentsBucket, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ prefix, limit, offset, sortBy: { column: "name", order: "asc" } })
+          });
+          const page = await response.json();
+          files.push(...page.filter(file => file.id).map(file => ({ prefix, label, name: file.name })));
+          if (page.length < limit) return files;
+        }
+      }));
+      if (request !== documentsRequest || getSession()?.user?.id !== session.user.id) return;
+      const files = groups.flat();
+      for (const file of files) {
+        const row = document.createElement("div");
+        row.className = "application-row";
+        const title = document.createElement("p");
+        const name = file.name.replace(/^[a-f0-9-]{36}_/, "");
+        title.textContent = file.label + " · " + name;
+        const button = document.createElement("button");
+        button.className = "secondary";
+        button.textContent = "Télécharger";
+        button.addEventListener("click", async () => {
+          button.disabled = true;
+          try {
+            const active = await ensureSession();
+            if (active?.user?.id !== session.user.id) throw new Error("Reconnectez-vous pour télécharger ce document.");
+            const response = await documentRequest(active, "authenticated/" + documentsBucket + "/" + file.prefix + "/" + encodeURIComponent(file.name));
+            const blob = await response.blob();
+            if (getSession()?.user?.id !== session.user.id) return;
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = name;
+            link.click();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+          } catch (error) {
+            if (getSession()?.user?.id === session.user.id) documentsMessage.textContent = error.message;
+          } finally {
+            button.disabled = false;
+          }
+        });
+        row.append(title, button);
+        documentsList.append(row);
+      }
+      documentForm.hidden = false;
+      documentsMessage.textContent = files.length ? "" : "Aucun document ajouté.";
+    } catch (error) {
+      if (request === documentsRequest) documentsMessage.textContent = error.message;
+    }
+  }
+
+  documentForm.addEventListener("submit", async event => {
+    event.preventDefault();
+    const button = documentForm.querySelector("button");
+    const file = document.querySelector("#document-file").files[0];
+    const kind = document.querySelector("#document-kind").value;
+    if (!file || !Object.hasOwn(documentKinds, kind)) return;
+    if (file.size > 10 * 1024 * 1024 || !/\.pdf$/i.test(file.name)) {
+      documentsMessage.textContent = "Choisissez un PDF de 10 Mo maximum.";
+      return;
+    }
+    button.disabled = true;
+    documentsMessage.textContent = "Envoi du document…";
+    const userId = getSession()?.user?.id;
+    try {
+      const session = await ensureSession();
+      if (!userId || session?.user?.id !== userId) throw new Error("Reconnectez-vous pour ajouter un document.");
+      const header = await file.slice(0, 5).text();
+      if (header !== "%PDF-") throw new Error("Ce fichier ne semble pas être un PDF valide.");
+      const name = file.name.slice(0, -4).normalize("NFKD").replace(/[^a-zA-Z0-9._ -]/g, "").trim().slice(0, 120) || "document";
+      const path = userId + "/" + kind + "/" + crypto.randomUUID() + "_" + name + ".pdf";
+      await documentRequest(session, documentsBucket + "/" + path.split("/").map(encodeURIComponent).join("/"), {
+        method: "POST",
+        headers: { "Content-Type": "application/pdf" },
+        body: file
+      });
+      if (getSession()?.user?.id !== userId) return;
+      documentForm.reset();
+      await loadDocuments();
+    } catch (error) {
+      if (getSession()?.user?.id === userId) documentsMessage.textContent = error.message;
+    } finally {
+      button.disabled = false;
+    }
+  });
+
   function currentMonthStart() {
     const now = new Date();
     const year = now.getUTCFullYear();
@@ -745,6 +873,11 @@
   });
   signOutButton.addEventListener("click", () => {
     profile = null;
+    ++documentsRequest;
+    documentForm.reset();
+    documentForm.hidden = true;
+    documentsList.replaceChildren();
+    documentsMessage.textContent = "";
     document.querySelector("#tracking-list").replaceChildren();
     document.querySelector("#tracking-message").textContent = "";
     setSession(null);
