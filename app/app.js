@@ -6,6 +6,7 @@
   let profile = null;
   let applications = [];
   let companyResults = [];
+  let jobResults = [];
   let refreshPromise = null;
 
   const titles = {
@@ -77,11 +78,13 @@
     const isProfile = name === "profile";
     const isApplications = name === "applications";
     const isCompanies = name === "companies";
+    const isJobs = name === "jobs";
     document.querySelector("#dashboard").classList.toggle("active", isDashboard);
     document.querySelector("#profile-view").classList.toggle("active", isProfile);
     document.querySelector("#applications-view").classList.toggle("active", isApplications);
     document.querySelector("#companies-view").classList.toggle("active", isCompanies);
-    document.querySelector("#generic-view").classList.toggle("active", !isDashboard && !isProfile && !isApplications && !isCompanies);
+    document.querySelector("#jobs-view").classList.toggle("active", isJobs);
+    document.querySelector("#generic-view").classList.toggle("active", !isDashboard && !isProfile && !isApplications && !isCompanies && !isJobs);
     document.querySelectorAll(".nav-item[data-view]").forEach(item => item.classList.toggle("active", item.dataset.view === name));
 
     const [title, subtitle] = titles[name] || ["Candidature Pro", "Espace en ligne"];
@@ -89,13 +92,14 @@
     document.querySelector("#account-label").dataset.pageSubtitle = subtitle;
     if (!getSession()) document.querySelector("#account-label").textContent = subtitle;
 
-    if (!isDashboard && !isProfile && !isApplications && !isCompanies) {
+    if (!isDashboard && !isProfile && !isApplications && !isCompanies && !isJobs) {
       document.querySelector("#generic-title").textContent = title;
       document.querySelector("#generic-description").textContent = subtitle + ". Cette fonction sera reliée aux données existantes lors de la prochaine étape.";
     }
     if (isProfile) renderProfile();
     if (isApplications) loadApplications();
     if (isCompanies) renderCompanies();
+    if (isJobs) loadJobs();
     sidebar.classList.remove("open");
   }
 
@@ -248,6 +252,15 @@
     })[character]);
   }
 
+  function safeExternalUrl(value) {
+    try {
+      const url = new URL(String(value || ""));
+      return url.protocol === "http:" || url.protocol === "https:" ? url.href : "";
+    } catch {
+      return "";
+    }
+  }
+
   function normalizeCompany(company) {
     return {
       id: company.company_id ?? company.id ?? "",
@@ -273,8 +286,9 @@
     }
 
     container.innerHTML = companyResults.map((company, index) => {
-      const website = company.website
-        ? '<a href="' + escapeHtml(company.website) + '" target="_blank" rel="noopener noreferrer">Voir le site</a>'
+      const safeWebsite = safeExternalUrl(company.website);
+      const website = safeWebsite
+        ? '<a href="' + escapeHtml(safeWebsite) + '" target="_blank" rel="noopener noreferrer">Voir le site</a>'
         : "";
       return '<article class="company-card" data-company-index="' + index + '">' +
         '<div class="company-card-main"><strong>' + escapeHtml(company.name) + '</strong>' +
@@ -337,6 +351,72 @@
     await supabaseRpc("record_company_search_event", { p_sector: sector || "Tous les secteurs", p_city: city });
   }
 
+  function renderJobs() {
+    const container = document.querySelector("#jobs-results");
+    document.querySelector("#jobs-results-count").textContent =
+      jobResults.length + " offre" + (jobResults.length > 1 ? "s" : "");
+
+    if (!jobResults.length) {
+      container.innerHTML = '<div class="empty-list"><strong>Aucune offre trouvée</strong><span>Modifiez le métier, la ville ou le secteur.</span></div>';
+      return;
+    }
+
+    container.innerHTML = jobResults.map((job, index) => {
+      const safeUrl = safeExternalUrl(job.url);
+      const sourceLink = safeUrl
+        ? '<a class="secondary compact" href="' + escapeHtml(safeUrl) + '" target="_blank" rel="noopener noreferrer">Voir l’annonce</a>'
+        : "";
+      return '<article class="job-card" data-job-index="' + index + '">' +
+        '<div class="job-card-main"><strong>' + escapeHtml(job.title) + '</strong>' +
+        '<span>' + escapeHtml(job.company_name) + ' • ' + escapeHtml(job.location) + '</span>' +
+        '<small>' + escapeHtml(job.sector) + ' • ' + escapeHtml(job.source) + '</small>' +
+        '<p>' + escapeHtml(job.snippet) + '</p></div>' +
+        '<div class="job-card-actions">' + sourceLink +
+        '<button class="primary compact" data-action="add-job">Ajouter aux candidatures</button></div></article>';
+    }).join("");
+  }
+
+  function cleanSearchTerm(value) {
+    return String(value || "").trim().replace(/[%(),]/g, " ").replace(/\s+/g, " ");
+  }
+
+  async function loadJobs() {
+    const message = document.querySelector("#jobs-message");
+    if (!getSession()) {
+      jobResults = [];
+      renderJobs();
+      message.textContent = "Connectez-vous pour consulter les postes ouverts.";
+      return;
+    }
+
+    const query = cleanSearchTerm(document.querySelector("#jobs-query").value);
+    const city = cleanSearchTerm(document.querySelector("#jobs-city").value);
+    const sector = document.querySelector("#jobs-sector").value;
+    const filters = ["active=eq.true"];
+    if (query) {
+      const pattern = encodeURIComponent("*" + query + "*");
+      filters.push("or=(title.ilike." + pattern + ",company_name.ilike." + pattern + ",snippet.ilike." + pattern + ")");
+    }
+    if (city) filters.push("location=ilike." + encodeURIComponent("*" + city + "*"));
+    if (sector) filters.push("sector=eq." + encodeURIComponent(sector));
+
+    message.textContent = "Chargement…";
+    try {
+      jobResults = await supabaseFetch(
+        "job_market_offers?select=id,title,company_name,location,sector,source,url,snippet,discovered_at&" +
+        filters.join("&") + "&order=discovered_at.desc&limit=60"
+      );
+      renderJobs();
+      message.textContent = jobResults.length
+        ? "Offres actives correspondant à vos critères."
+        : "Aucune offre active ne correspond à ces critères.";
+    } catch (error) {
+      jobResults = [];
+      renderJobs();
+      message.textContent = error.message;
+    }
+  }
+
   function renderApplications() {
     const list = document.querySelector("#applications-list");
     if (!applications.length) {
@@ -354,10 +434,15 @@
         'value="' + escapeHtml(application.status) + '"',
         'value="' + escapeHtml(application.status) + '" selected'
       );
+      const safeSourceUrl = safeExternalUrl(application.source_url);
+      const sourceLink = safeSourceUrl
+        ? '<a href="' + escapeHtml(safeSourceUrl) + '" target="_blank" rel="noopener noreferrer">Annonce originale</a>'
+        : "";
       return '<article class="application-row' + (hidden ? ' is-hidden' : '') + '" data-id="' + escapeHtml(application.id) + '">' +
         '<div class="application-main"><strong>' + escapeHtml(application.company_name) + '</strong>' +
         '<span>' + escapeHtml(application.job_title || "Candidature spontanée") + '</span>' +
-        '<small>' + escapeHtml([application.company_city, application.company_email].filter(Boolean).join(" • ")) + '</small></div>' +
+        '<small>' + escapeHtml([application.company_city, application.company_email].filter(Boolean).join(" • ")) + '</small>' +
+        sourceLink + '</div>' +
         '<label class="status-field"><span>Statut</span><select data-action="status">' + options + '</select></label>' +
         '<button class="secondary compact" data-action="' + (hidden ? "restore" : "hide") + '">' +
         (hidden ? "Réafficher" : "Masquer") + '</button></article>';
@@ -377,7 +462,7 @@
       const includeHidden = document.querySelector("#show-hidden-applications").checked;
       const filter = includeHidden ? "" : "&hidden_at=is.null";
       applications = await supabaseFetch(
-        "user_applications?select=id,company_name,company_city,company_email,job_title,status,hidden_at,last_activity_at" +
+        "user_applications?select=id,company_name,company_city,company_email,job_title,status,source_url,hidden_at,last_activity_at" +
         filter + "&order=last_activity_at.desc"
       );
       renderApplications();
@@ -443,6 +528,44 @@
     } finally {
       button.disabled = false;
       button.textContent = "Enregistrer";
+    }
+  });
+
+  document.querySelector("#jobs-search-form").addEventListener("submit", async event => {
+    event.preventDefault();
+    const button = document.querySelector("#jobs-search-submit");
+    button.disabled = true;
+    button.textContent = "Recherche…";
+    try {
+      await loadJobs();
+    } finally {
+      button.disabled = false;
+      button.textContent = "Rechercher";
+    }
+  });
+
+  document.querySelector("#jobs-results").addEventListener("click", async event => {
+    if (event.target.dataset.action !== "add-job") return;
+    const card = event.target.closest("[data-job-index]");
+    const job = jobResults[Number(card.dataset.jobIndex)];
+    if (!job) return;
+    const button = event.target;
+    button.disabled = true;
+    button.textContent = "Ajout…";
+    try {
+      await supabaseWrite("user_applications", "POST", {
+        company_name: job.company_name,
+        company_city: job.location || null,
+        job_title: job.title,
+        source_url: safeExternalUrl(job.url) || null,
+        status: "draft",
+        source: "web"
+      });
+      button.textContent = "Ajoutée ✓";
+    } catch (error) {
+      button.disabled = false;
+      button.textContent = "Réessayer";
+      document.querySelector("#jobs-message").textContent = error.message;
     }
   });
 
