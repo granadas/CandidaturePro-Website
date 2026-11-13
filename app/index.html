@@ -52,6 +52,41 @@
         </div>
       </section>
 
+      <section id="applications-view" class="view">
+        <div class="applications-layout">
+          <article class="panel application-form-panel">
+            <div class="panel-head"><div><small>NOUVELLE CANDIDATURE</small><h2>Ajouter un dossier</h2></div><span class="badge">En ligne</span></div>
+            <form id="application-form" class="application-form">
+              <label>Entreprise<input id="application-company" type="text" maxlength="200" required></label>
+              <label>Poste recherché<input id="application-job" type="text" maxlength="200"></label>
+              <label>Ville<input id="application-city" type="text" maxlength="150"></label>
+              <label>E-mail de contact<input id="application-email" type="email" maxlength="254"></label>
+              <label class="wide">Statut
+                <select id="application-status">
+                  <option value="draft">Brouillon</option>
+                  <option value="ready">Prête à envoyer</option>
+                  <option value="sent">Envoyée</option>
+                  <option value="reply_received">Réponse reçue</option>
+                  <option value="interview">Entretien</option>
+                  <option value="accepted">Acceptée</option>
+                  <option value="rejected">Refusée</option>
+                </select>
+              </label>
+              <div id="application-message" class="profile-message wide" role="status"></div>
+              <div class="wide"><button id="application-submit" class="primary" type="submit">Ajouter la candidature</button></div>
+            </form>
+          </article>
+          <article class="panel applications-panel">
+            <div class="panel-head">
+              <div><small>VOS DOSSIERS</small><h2>Candidatures enregistrées</h2></div>
+              <label class="inline-toggle"><input id="show-hidden-applications" type="checkbox"> Voir les masquées</label>
+            </div>
+            <div id="applications-message" class="list-message" role="status"></div>
+            <div id="applications-list" class="applications-list"></div>
+          </article>
+        </div>
+      </section>
+
       <section id="profile-view" class="view">
         <article class="panel profile-panel">
           <div class="panel-head">
