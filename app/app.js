@@ -5,6 +5,7 @@
   const storageKey = "candidature-pro-web-session";
   let profile = null;
   let applications = [];
+  let companyResults = [];
   let refreshPromise = null;
 
   const titles = {
@@ -75,10 +76,12 @@
     const isDashboard = name === "dashboard";
     const isProfile = name === "profile";
     const isApplications = name === "applications";
+    const isCompanies = name === "companies";
     document.querySelector("#dashboard").classList.toggle("active", isDashboard);
     document.querySelector("#profile-view").classList.toggle("active", isProfile);
     document.querySelector("#applications-view").classList.toggle("active", isApplications);
-    document.querySelector("#generic-view").classList.toggle("active", !isDashboard && !isProfile && !isApplications);
+    document.querySelector("#companies-view").classList.toggle("active", isCompanies);
+    document.querySelector("#generic-view").classList.toggle("active", !isDashboard && !isProfile && !isApplications && !isCompanies);
     document.querySelectorAll(".nav-item[data-view]").forEach(item => item.classList.toggle("active", item.dataset.view === name));
 
     const [title, subtitle] = titles[name] || ["Candidature Pro", "Espace en ligne"];
@@ -86,12 +89,13 @@
     document.querySelector("#account-label").dataset.pageSubtitle = subtitle;
     if (!getSession()) document.querySelector("#account-label").textContent = subtitle;
 
-    if (!isDashboard && !isProfile && !isApplications) {
+    if (!isDashboard && !isProfile && !isApplications && !isCompanies) {
       document.querySelector("#generic-title").textContent = title;
       document.querySelector("#generic-description").textContent = subtitle + ". Cette fonction sera reliée aux données existantes lors de la prochaine étape.";
     }
     if (isProfile) renderProfile();
     if (isApplications) loadApplications();
+    if (isCompanies) renderCompanies();
     sidebar.classList.remove("open");
   }
 
@@ -201,7 +205,28 @@
       return supabaseRpc(name, body, false);
     }
     const result = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(result.message || "Impossible d’enregistrer le profil.");
+    if (!response.ok) throw new Error(result.message || "Impossible d’exécuter l’opération.");
+    return result;
+  }
+
+  async function invokeEdgeFunction(name, body, retry = true) {
+    const session = await ensureSession();
+    if (!session) throw new Error("Connectez-vous pour lancer une recherche.");
+    const response = await fetch(config.supabaseUrl + "/functions/v1/" + name, {
+      method: "POST",
+      headers: {
+        "apikey": config.supabasePublishableKey,
+        "Authorization": "Bearer " + session.access_token,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(body)
+    });
+    if (response.status === 401 && retry) {
+      await refreshSession();
+      return invokeEdgeFunction(name, body, false);
+    }
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.message || "Le service de recherche est indisponible.");
     return result;
   }
 
@@ -221,6 +246,97 @@
     return String(value ?? "").replace(/[&<>"']/g, character => ({
       "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
     })[character]);
+  }
+
+  function normalizeCompany(company) {
+    return {
+      id: company.company_id ?? company.id ?? "",
+      name: company.company_name ?? company.name ?? "",
+      city: company.city ?? "",
+      sector: company.sector ?? "",
+      email: company.email ?? "",
+      website: company.website ?? "",
+      address: company.address ?? "",
+      phone: company.phone ?? "",
+      isFresh: Boolean(company.is_fresh)
+    };
+  }
+
+  function renderCompanies() {
+    const container = document.querySelector("#company-results");
+    document.querySelector("#company-results-count").textContent =
+      companyResults.length + " résultat" + (companyResults.length > 1 ? "s" : "");
+
+    if (!companyResults.length) {
+      container.innerHTML = '<div class="empty-list"><strong>Aucune entreprise affichée</strong><span>Choisissez un secteur, une ville et un rayon.</span></div>';
+      return;
+    }
+
+    container.innerHTML = companyResults.map((company, index) => {
+      const website = company.website
+        ? '<a href="' + escapeHtml(company.website) + '" target="_blank" rel="noopener noreferrer">Voir le site</a>'
+        : "";
+      return '<article class="company-card" data-company-index="' + index + '">' +
+        '<div class="company-card-main"><strong>' + escapeHtml(company.name) + '</strong>' +
+        '<span>' + escapeHtml(company.address || company.city) + '</span>' +
+        '<small>' + escapeHtml([company.sector, company.email, company.phone].filter(Boolean).join(" • ")) + '</small></div>' +
+        '<div class="company-card-actions">' + website +
+        '<button class="primary compact" data-action="add-company">Ajouter aux candidatures</button></div></article>';
+    }).join("");
+  }
+
+  async function searchCompanies() {
+    const message = document.querySelector("#company-search-message");
+    const source = document.querySelector("#company-search-source");
+    const sector = document.querySelector("#company-sector").value.trim();
+    const city = document.querySelector("#company-city").value.trim();
+    const radius = document.querySelector("#company-radius").value;
+    message.textContent = "Recherche dans les résultats récents…";
+    source.textContent = "";
+
+    const cached = await supabaseRpc("get_cached_company_search", {
+      p_sector: sector,
+      p_city: city,
+      p_radius: radius
+    });
+    const cachedCompanies = Array.isArray(cached) ? cached.map(normalizeCompany) : [];
+    if (cachedCompanies.length && cachedCompanies.some(company => company.isFresh)) {
+      companyResults = cachedCompanies;
+      renderCompanies();
+      source.textContent = "Résultats récents";
+      message.textContent = companyResults.length + " entreprise" + (companyResults.length > 1 ? "s trouvées." : " trouvée.");
+      await supabaseRpc("record_company_search_event", { p_sector: sector || "Tous les secteurs", p_city: city });
+      return;
+    }
+
+    message.textContent = "Recherche Internet en cours…";
+    const quota = await supabaseRpc("consume_my_company_search", {});
+    if (!quota?.allowed) throw new Error(quota?.message || "Limite mensuelle de recherches atteinte.");
+
+    const result = await invokeEdgeFunction("app-services", {
+      action: "company_search",
+      payload: { sector, city, radius }
+    });
+    const rawCompanies = Array.isArray(result.companies) ? result.companies : [];
+    companyResults = rawCompanies.map(normalizeCompany);
+    renderCompanies();
+    source.textContent = quota?.premium ? "Recherche Internet • Premium" : "Recherche Internet • " + quota.used + "/" + quota.limit;
+    message.textContent = companyResults.length
+      ? companyResults.length + " entreprise" + (companyResults.length > 1 ? "s trouvées." : " trouvée.")
+      : "Aucune entreprise trouvée pour ces critères.";
+
+    if (rawCompanies.length) {
+      await supabaseRpc("remember_company_search", {
+        p_sector: sector,
+        p_city: city,
+        p_radius: radius,
+        p_companies: rawCompanies
+      });
+      if (rawCompanies.some(company => company.email)) {
+        await supabaseRpc("review_discovered_company_emails", { p_companies: rawCompanies });
+      }
+    }
+    await supabaseRpc("record_company_search_event", { p_sector: sector || "Tous les secteurs", p_city: city });
   }
 
   function renderApplications() {
@@ -329,6 +445,48 @@
     } finally {
       button.disabled = false;
       button.textContent = "Enregistrer";
+    }
+  });
+
+  document.querySelector("#company-search-form").addEventListener("submit", async event => {
+    event.preventDefault();
+    const button = document.querySelector("#company-search-submit");
+    const message = document.querySelector("#company-search-message");
+    button.disabled = true;
+    button.textContent = "Recherche…";
+    try {
+      await searchCompanies();
+    } catch (error) {
+      companyResults = [];
+      renderCompanies();
+      message.textContent = error.message;
+    } finally {
+      button.disabled = false;
+      button.textContent = "Rechercher";
+    }
+  });
+
+  document.querySelector("#company-results").addEventListener("click", async event => {
+    if (event.target.dataset.action !== "add-company") return;
+    const card = event.target.closest("[data-company-index]");
+    const company = companyResults[Number(card.dataset.companyIndex)];
+    if (!company) return;
+    const button = event.target;
+    button.disabled = true;
+    button.textContent = "Ajout…";
+    try {
+      await supabaseWrite("user_applications", "POST", {
+        company_name: company.name,
+        company_city: company.city || null,
+        company_email: company.email || null,
+        status: "draft",
+        source: "web"
+      });
+      button.textContent = "Ajoutée ✓";
+    } catch (error) {
+      button.disabled = false;
+      button.textContent = "Réessayer";
+      document.querySelector("#company-search-message").textContent = error.message;
     }
   });
 
