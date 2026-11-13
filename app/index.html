@@ -52,6 +52,23 @@
         </div>
       </section>
 
+      <section id="profile-view" class="view">
+        <article class="panel profile-panel">
+          <div class="panel-head">
+            <div><small>IDENTITÉ DU CANDIDAT</small><h2>Mon profil</h2></div>
+            <span class="badge">Données sécurisées</span>
+          </div>
+          <p>Ces informations seront utilisées pour préparer vos candidatures. Votre formule et vos droits de compte ne sont pas modifiables depuis ce formulaire.</p>
+          <form id="profile-form" class="profile-form">
+            <label>Prénom<input id="profile-first-name" type="text" maxlength="100" autocomplete="given-name"></label>
+            <label>Nom<input id="profile-last-name" type="text" maxlength="100" autocomplete="family-name"></label>
+            <label class="wide">E-mail de candidature<input id="profile-email" type="email" maxlength="254" autocomplete="email"></label>
+            <div id="profile-message" class="profile-message wide" role="status"></div>
+            <div class="wide"><button id="profile-submit" class="primary" type="submit">Enregistrer</button></div>
+          </form>
+        </article>
+      </section>
+
       <section id="generic-view" class="view empty-view">
         <span class="empty-icon">CP</span><h1 id="generic-title">Fonction en préparation</h1><p id="generic-description">Cette partie sera connectée progressivement aux données de l'application Windows.</p><button class="secondary" data-view-link="dashboard">Retour à l'accueil</button>
       </section>
