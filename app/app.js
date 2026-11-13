@@ -3,6 +3,9 @@
 
   const config = window.CANDIDATURE_PRO_CONFIG || {};
   const storageKey = "candidature-pro-web-session";
+  let profile = null;
+  let refreshPromise = null;
+
   const titles = {
     dashboard: ["Tableau de bord", "Votre recherche en un coup d’œil"],
     companies: ["Entreprises", "Recherchez et sélectionnez des entreprises"],
@@ -32,13 +35,28 @@
     renderAccount();
   }
 
+  function normalizeSession(result) {
+    return {
+      access_token: result.access_token,
+      refresh_token: result.refresh_token,
+      expires_at: Math.floor(Date.now() / 1000) + Number(result.expires_in || 3600),
+      user: result.user
+    };
+  }
+
   function renderAccount() {
     const session = getSession();
     const email = session?.user?.email;
+    const firstName = profile?.candidate_first_name?.trim();
     document.querySelector("#account-label").textContent = email || "Version web en préparation";
-    document.querySelector("#first-name").textContent = email ? email.split("@")[0] : "👋";
+    document.querySelector("#first-name").textContent = firstName || (email ? email.split("@")[0] : "👋");
     loginButton.textContent = email ? "Mon compte" : "Se connecter";
     signOutButton.hidden = !email;
+
+    const plan = String(profile?.plan || "free").toLowerCase();
+    const isPremium = plan === "premium" || plan === "pro";
+    document.querySelector("#current-plan").textContent = isPremium ? "Premium" : "Free";
+    document.querySelector("#plan-detail").textContent = isPremium ? "Candidatures illimitées" : "5 candidatures par mois";
   }
 
   function showView(name) {
@@ -59,26 +77,99 @@
     sidebar.classList.remove("open");
   }
 
-  async function signIn(email, password) {
-    if (!config.supabaseUrl || !config.supabasePublishableKey) {
-      throw new Error("La connexion réelle n’est pas encore activée sur cette version de test.");
-    }
-    const response = await fetch(config.supabaseUrl + "/auth/v1/token?grant_type=password", {
+  async function authRequest(grantType, body) {
+    const response = await fetch(config.supabaseUrl + "/auth/v1/token?grant_type=" + grantType, {
       method: "POST",
       headers: {
         "apikey": config.supabasePublishableKey,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify(body)
     });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.error_description || result.msg || "Connexion impossible.");
-    return {
-      access_token: result.access_token,
-      refresh_token: result.refresh_token,
-      expires_at: Math.floor(Date.now() / 1000) + Number(result.expires_in || 3600),
-      user: result.user
-    };
+    return normalizeSession(result);
+  }
+
+  async function signIn(email, password) {
+    if (!config.supabaseUrl || !config.supabasePublishableKey) {
+      throw new Error("La connexion réelle n’est pas encore activée sur cette version de test.");
+    }
+    return authRequest("password", { email, password });
+  }
+
+  async function refreshSession() {
+    if (refreshPromise) return refreshPromise;
+    refreshPromise = (async () => {
+      const session = getSession();
+      if (!session?.refresh_token) throw new Error("Session expirée.");
+      const refreshed = await authRequest("refresh_token", { refresh_token: session.refresh_token });
+      setSession(refreshed);
+      return refreshed;
+    })();
+    try { return await refreshPromise; }
+    finally { refreshPromise = null; }
+  }
+
+  async function ensureSession() {
+    const session = getSession();
+    if (!session) return null;
+    if (Number(session.expires_at || 0) > Math.floor(Date.now() / 1000) + 60) return session;
+    try { return await refreshSession(); }
+    catch {
+      profile = null;
+      setSession(null);
+      return null;
+    }
+  }
+
+  async function supabaseFetch(path, retry = true) {
+    const session = await ensureSession();
+    if (!session) throw new Error("Connectez-vous pour afficher vos données.");
+    const response = await fetch(config.supabaseUrl + "/rest/v1/" + path, {
+      headers: {
+        "apikey": config.supabasePublishableKey,
+        "Authorization": "Bearer " + session.access_token,
+        "Accept": "application/json"
+      }
+    });
+    if (response.status === 401 && retry) {
+      await refreshSession();
+      return supabaseFetch(path, false);
+    }
+    const result = await response.json().catch(() => []);
+    if (!response.ok) throw new Error(result.message || "Impossible de charger les données.");
+    return result;
+  }
+
+  function currentMonthStart() {
+    const now = new Date();
+    const year = now.getUTCFullYear();
+    const month = String(now.getUTCMonth() + 1).padStart(2, "0");
+    return year + "-" + month + "-01";
+  }
+
+  async function loadDashboard() {
+    const session = await ensureSession();
+    if (!session?.user?.id) {
+      profile = null;
+      renderAccount();
+      document.querySelector("#stat-sent").textContent = "0";
+      return;
+    }
+
+    const userId = encodeURIComponent(session.user.id);
+    const month = currentMonthStart();
+    const [profiles, usage] = await Promise.all([
+      supabaseFetch("profiles?id=eq." + userId + "&select=candidate_first_name,candidate_last_name,plan,premium_until,is_admin"),
+      supabaseFetch("candidature_usage?user_id=eq." + userId + "&month_start=eq." + month + "&select=application_key")
+    ]);
+
+    profile = Array.isArray(profiles) ? profiles[0] || null : null;
+    document.querySelector("#stat-sent").textContent = String(Array.isArray(usage) ? usage.length : 0);
+    const hasProfile = Boolean(profile?.candidate_first_name && profile?.candidate_last_name);
+    document.querySelector("#setup-progress").textContent = hasProfile ? "2/4" : "1/4";
+    renderAccount();
   }
 
   document.querySelectorAll("[data-view], [data-view-link]").forEach(el => {
@@ -90,7 +181,12 @@
     if (getSession()) showView("settings");
     else dialog.showModal();
   });
-  signOutButton.addEventListener("click", () => { setSession(null); showView("dashboard"); });
+  signOutButton.addEventListener("click", () => {
+    profile = null;
+    setSession(null);
+    showView("dashboard");
+    loadDashboard();
+  });
 
   loginForm.addEventListener("submit", async event => {
     event.preventDefault();
@@ -101,6 +197,7 @@
     try {
       const session = await signIn(document.querySelector("#email").value.trim(), document.querySelector("#password").value);
       setSession(session);
+      await loadDashboard();
       dialog.close();
       loginForm.reset();
     } catch (error) {
@@ -111,6 +208,14 @@
     }
   });
 
-  renderAccount();
-  showView("dashboard");
+  async function bootstrap() {
+    renderAccount();
+    showView("dashboard");
+    try { await loadDashboard(); }
+    catch (error) {
+      document.querySelector("#account-label").textContent = error.message;
+    }
+  }
+
+  bootstrap();
 })();
