@@ -79,12 +79,14 @@
     const isApplications = name === "applications";
     const isCompanies = name === "companies";
     const isJobs = name === "jobs";
+    const isTracking = name === "tracking";
     document.querySelector("#dashboard").classList.toggle("active", isDashboard);
     document.querySelector("#profile-view").classList.toggle("active", isProfile);
     document.querySelector("#applications-view").classList.toggle("active", isApplications);
     document.querySelector("#companies-view").classList.toggle("active", isCompanies);
     document.querySelector("#jobs-view").classList.toggle("active", isJobs);
-    document.querySelector("#generic-view").classList.toggle("active", !isDashboard && !isProfile && !isApplications && !isCompanies && !isJobs);
+    document.querySelector("#tracking-view").classList.toggle("active", isTracking);
+    document.querySelector("#generic-view").classList.toggle("active", !isDashboard && !isProfile && !isApplications && !isCompanies && !isJobs && !isTracking);
     document.querySelectorAll(".nav-item[data-view]").forEach(item => item.classList.toggle("active", item.dataset.view === name));
 
     const [title, subtitle] = titles[name] || ["Candidature Pro", "Espace en ligne"];
@@ -92,7 +94,7 @@
     document.querySelector("#account-label").dataset.pageSubtitle = subtitle;
     if (!getSession()) document.querySelector("#account-label").textContent = subtitle;
 
-    if (!isDashboard && !isProfile && !isApplications && !isCompanies && !isJobs) {
+    if (!isDashboard && !isProfile && !isApplications && !isCompanies && !isJobs && !isTracking) {
       document.querySelector("#generic-title").textContent = title;
       document.querySelector("#generic-description").textContent = subtitle + ". Cette fonction sera reliée aux données existantes lors de la prochaine étape.";
     }
@@ -100,6 +102,7 @@
     if (isApplications) loadApplications();
     if (isCompanies) renderCompanies();
     if (isJobs) loadJobs();
+    if (isTracking) loadTracking();
     sidebar.classList.remove("open");
   }
 
@@ -474,6 +477,65 @@
     }
   }
 
+  const trackingDateFormat = new Intl.DateTimeFormat("fr-CH", { dateStyle: "medium" });
+
+  async function loadTracking() {
+    const message = document.querySelector("#tracking-message");
+    const list = document.querySelector("#tracking-list");
+    const userId = getSession()?.user?.id;
+    list.replaceChildren();
+    if (!userId) {
+      message.textContent = "Connectez-vous pour consulter le suivi.";
+      return;
+    }
+    message.textContent = "Chargement…";
+    try {
+      const rows = await supabaseFetch(
+        "user_applications?select=id,company_name,job_title,status,sent_at,next_follow_up_at" +
+        "&hidden_at=is.null&status=in.(sent,reply_received,interview,accepted,rejected)" +
+        "&order=next_follow_up_at.asc.nullslast,last_activity_at.desc"
+      );
+      if (getSession()?.user?.id !== userId) return;
+      message.textContent = rows.length ? "" : "Les candidatures envoyées apparaîtront ici.";
+      list.innerHTML = rows.map(row => {
+        const followUp = row.next_follow_up_at ? new Date(row.next_follow_up_at) : null;
+        const localDate = followUp
+          ? new Date(followUp.getTime() - followUp.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
+          : "";
+        const overdue = followUp && followUp.getTime() < new Date().setHours(0, 0, 0, 0);
+        return '<article class="application-row"><div class="application-main"><strong>' +
+          escapeHtml(row.company_name) + '</strong><span>' +
+          escapeHtml(row.job_title || "Candidature spontanée") + '</span><small>' +
+          escapeHtml(statusLabels[row.status]) +
+          (row.sent_at ? " · " + trackingDateFormat.format(new Date(row.sent_at)) : "") +
+          (overdue ? " · Relance en retard" : "") + '</small></div>' +
+          '<form class="application-form tracking-form" data-id="' + escapeHtml(row.id) + '">' +
+          '<label>Date de relance<input name="follow-up" type="date" value="' + localDate + '"></label>' +
+          '<button type="submit" class="secondary compact">Enregistrer</button></form></article>';
+      }).join("");
+    } catch (error) {
+      if (getSession()?.user?.id === userId) message.textContent = error.message;
+    }
+  }
+
+  document.querySelector("#tracking-list").addEventListener("submit", async event => {
+    event.preventDefault();
+    const form = event.target;
+    const date = form.elements.namedItem("follow-up").value;
+    const button = form.querySelector("button");
+    button.disabled = true;
+    try {
+      await supabaseWrite("user_applications?id=eq." + encodeURIComponent(form.dataset.id), "PATCH", {
+        next_follow_up_at: date ? new Date(date + "T12:00:00").toISOString() : null
+      });
+      await loadTracking();
+    } catch (error) {
+      document.querySelector("#tracking-message").textContent = error.message;
+    } finally {
+      button.disabled = false;
+    }
+  });
+
   function currentMonthStart() {
     const now = new Date();
     const year = now.getUTCFullYear();
@@ -683,6 +745,8 @@
   });
   signOutButton.addEventListener("click", () => {
     profile = null;
+    document.querySelector("#tracking-list").replaceChildren();
+    document.querySelector("#tracking-message").textContent = "";
     setSession(null);
     showView("dashboard");
     loadDashboard();
