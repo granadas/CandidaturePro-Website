@@ -52,6 +52,46 @@
         </div>
       </section>
 
+      <section id="jobs-view" class="view">
+        <article class="panel jobs-search-panel">
+          <div class="panel-head">
+            <div><small>MARCHÉ DE L’EMPLOI SUISSE</small><h2>Trouver un poste ouvert</h2></div>
+            <span class="badge">431 offres actives</span>
+          </div>
+          <form id="jobs-search-form" class="jobs-search-form">
+            <label>Métier ou mot-clé<input id="jobs-query" type="search" maxlength="120" placeholder="Ex. assistant, chauffeur, éducateur"></label>
+            <label>Ville ou région<input id="jobs-city" type="search" maxlength="120" placeholder="Ex. Genève"></label>
+            <label>Secteur
+              <select id="jobs-sector">
+                <option value="">Tous les secteurs</option>
+                <option>Administration / Bureau</option>
+                <option>Automobile</option>
+                <option>Banque / Assurance</option>
+                <option>Commerce / Vente</option>
+                <option>Construction / Bâtiment</option>
+                <option>Crèches / Petite enfance</option>
+                <option>Éducation / Formation</option>
+                <option>Hôtellerie</option>
+                <option>Immobilier</option>
+                <option>Industrie / Production</option>
+                <option>Informatique / Technologie</option>
+                <option>Logistique / Transport</option>
+                <option>Nettoyage / Entretien</option>
+                <option>Restauration</option>
+                <option>Santé</option>
+                <option>Sécurité</option>
+              </select>
+            </label>
+            <button id="jobs-search-submit" class="primary" type="submit">Rechercher</button>
+          </form>
+        </article>
+        <article class="panel jobs-results-panel">
+          <div class="panel-head"><div><small>OFFRES DISPONIBLES</small><h2>Résultats</h2></div><span id="jobs-results-count">0 offre</span></div>
+          <div id="jobs-message" class="list-message" role="status">Chargement des offres récentes…</div>
+          <div id="jobs-results" class="jobs-results"></div>
+        </article>
+      </section>
+
       <section id="companies-view" class="view">
         <article class="panel company-search-panel">
           <div class="panel-head">
