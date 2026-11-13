@@ -61,8 +61,10 @@
 
   function showView(name) {
     const isDashboard = name === "dashboard";
+    const isProfile = name === "profile";
     document.querySelector("#dashboard").classList.toggle("active", isDashboard);
-    document.querySelector("#generic-view").classList.toggle("active", !isDashboard);
+    document.querySelector("#profile-view").classList.toggle("active", isProfile);
+    document.querySelector("#generic-view").classList.toggle("active", !isDashboard && !isProfile);
     document.querySelectorAll(".nav-item[data-view]").forEach(item => item.classList.toggle("active", item.dataset.view === name));
 
     const [title, subtitle] = titles[name] || ["Candidature Pro", "Espace en ligne"];
@@ -70,10 +72,11 @@
     document.querySelector("#account-label").dataset.pageSubtitle = subtitle;
     if (!getSession()) document.querySelector("#account-label").textContent = subtitle;
 
-    if (!isDashboard) {
+    if (!isDashboard && !isProfile) {
       document.querySelector("#generic-title").textContent = title;
       document.querySelector("#generic-description").textContent = subtitle + ". Cette fonction sera reliée aux données existantes lors de la prochaine étape.";
     }
+    if (isProfile) renderProfile();
     sidebar.classList.remove("open");
   }
 
@@ -142,6 +145,40 @@
     return result;
   }
 
+  async function supabaseRpc(name, body, retry = true) {
+    const session = await ensureSession();
+    if (!session) throw new Error("Connectez-vous pour enregistrer votre profil.");
+    const response = await fetch(config.supabaseUrl + "/rest/v1/rpc/" + name, {
+      method: "POST",
+      headers: {
+        "apikey": config.supabasePublishableKey,
+        "Authorization": "Bearer " + session.access_token,
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+      },
+      body: JSON.stringify(body)
+    });
+    if (response.status === 401 && retry) {
+      await refreshSession();
+      return supabaseRpc(name, body, false);
+    }
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.message || "Impossible d’enregistrer le profil.");
+    return result;
+  }
+
+  function renderProfile() {
+    const session = getSession();
+    const form = document.querySelector("#profile-form");
+    const message = document.querySelector("#profile-message");
+    const enabled = Boolean(session?.user?.id);
+    form.querySelectorAll("input, button").forEach(element => { element.disabled = !enabled; });
+    document.querySelector("#profile-first-name").value = profile?.candidate_first_name || "";
+    document.querySelector("#profile-last-name").value = profile?.candidate_last_name || "";
+    document.querySelector("#profile-email").value = profile?.candidate_email || session?.user?.email || "";
+    message.textContent = enabled ? "" : "Connectez-vous pour compléter votre profil.";
+  }
+
   function currentMonthStart() {
     const now = new Date();
     const year = now.getUTCFullYear();
@@ -161,7 +198,7 @@
     const userId = encodeURIComponent(session.user.id);
     const month = currentMonthStart();
     const [profiles, usage] = await Promise.all([
-      supabaseFetch("profiles?id=eq." + userId + "&select=candidate_first_name,candidate_last_name,plan,premium_until,is_admin"),
+      supabaseFetch("profiles?id=eq." + userId + "&select=candidate_first_name,candidate_last_name,candidate_email,plan,premium_until,is_admin"),
       supabaseFetch("candidature_usage?user_id=eq." + userId + "&month_start=eq." + month + "&select=application_key")
     ]);
 
@@ -170,7 +207,34 @@
     const hasProfile = Boolean(profile?.candidate_first_name && profile?.candidate_last_name);
     document.querySelector("#setup-progress").textContent = hasProfile ? "2/4" : "1/4";
     renderAccount();
+    renderProfile();
   }
+
+  document.querySelector("#profile-form").addEventListener("submit", async event => {
+    event.preventDefault();
+    const button = document.querySelector("#profile-submit");
+    const message = document.querySelector("#profile-message");
+    button.disabled = true;
+    button.textContent = "Enregistrement…";
+    message.textContent = "";
+    try {
+      profile = await supabaseRpc("update_own_candidate_profile", {
+        p_first_name: document.querySelector("#profile-first-name").value,
+        p_last_name: document.querySelector("#profile-last-name").value,
+        p_email: document.querySelector("#profile-email").value
+      });
+      renderAccount();
+      renderProfile();
+      document.querySelector("#setup-progress").textContent =
+        profile?.candidate_first_name && profile?.candidate_last_name ? "2/4" : "1/4";
+      message.textContent = "Profil enregistré.";
+    } catch (error) {
+      message.textContent = error.message;
+    } finally {
+      button.disabled = false;
+      button.textContent = "Enregistrer";
+    }
+  });
 
   document.querySelectorAll("[data-view], [data-view-link]").forEach(el => {
     el.addEventListener("click", () => showView(el.dataset.view || el.dataset.viewLink));
