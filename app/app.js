@@ -4,6 +4,7 @@
   const config = window.CANDIDATURE_PRO_CONFIG || {};
   const storageKey = "candidature-pro-web-session";
   let profile = null;
+  let applications = [];
   let refreshPromise = null;
 
   const titles = {
@@ -15,6 +16,17 @@
     profile: ["Mon profil", "Vos informations de candidature"],
     documents: ["Documents", "CV et lettres de motivation"],
     settings: ["Paramètres", "Compte, e-mail et préférences"]
+  };
+
+  const statusLabels = {
+    draft: "Brouillon",
+    ready: "Prête à envoyer",
+    sent: "Envoyée",
+    reply_received: "Réponse reçue",
+    interview: "Entretien",
+    accepted: "Acceptée",
+    rejected: "Refusée",
+    archived: "Archivée"
   };
 
   const dialog = document.querySelector("#login-dialog");
@@ -62,9 +74,11 @@
   function showView(name) {
     const isDashboard = name === "dashboard";
     const isProfile = name === "profile";
+    const isApplications = name === "applications";
     document.querySelector("#dashboard").classList.toggle("active", isDashboard);
     document.querySelector("#profile-view").classList.toggle("active", isProfile);
-    document.querySelector("#generic-view").classList.toggle("active", !isDashboard && !isProfile);
+    document.querySelector("#applications-view").classList.toggle("active", isApplications);
+    document.querySelector("#generic-view").classList.toggle("active", !isDashboard && !isProfile && !isApplications);
     document.querySelectorAll(".nav-item[data-view]").forEach(item => item.classList.toggle("active", item.dataset.view === name));
 
     const [title, subtitle] = titles[name] || ["Candidature Pro", "Espace en ligne"];
@@ -72,11 +86,12 @@
     document.querySelector("#account-label").dataset.pageSubtitle = subtitle;
     if (!getSession()) document.querySelector("#account-label").textContent = subtitle;
 
-    if (!isDashboard && !isProfile) {
+    if (!isDashboard && !isProfile && !isApplications) {
       document.querySelector("#generic-title").textContent = title;
       document.querySelector("#generic-description").textContent = subtitle + ". Cette fonction sera reliée aux données existantes lors de la prochaine étape.";
     }
     if (isProfile) renderProfile();
+    if (isApplications) loadApplications();
     sidebar.classList.remove("open");
   }
 
@@ -145,6 +160,29 @@
     return result;
   }
 
+  async function supabaseWrite(path, method, body, retry = true) {
+    const session = await ensureSession();
+    if (!session) throw new Error("Connectez-vous pour modifier vos données.");
+    const response = await fetch(config.supabaseUrl + "/rest/v1/" + path, {
+      method,
+      headers: {
+        "apikey": config.supabasePublishableKey,
+        "Authorization": "Bearer " + session.access_token,
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Prefer": "return=representation"
+      },
+      body: JSON.stringify(body)
+    });
+    if (response.status === 401 && retry) {
+      await refreshSession();
+      return supabaseWrite(path, method, body, false);
+    }
+    const result = await response.json().catch(() => []);
+    if (!response.ok) throw new Error(result.message || "Impossible d’enregistrer les données.");
+    return result;
+  }
+
   async function supabaseRpc(name, body, retry = true) {
     const session = await ensureSession();
     if (!session) throw new Error("Connectez-vous pour enregistrer votre profil.");
@@ -177,6 +215,64 @@
     document.querySelector("#profile-last-name").value = profile?.candidate_last_name || "";
     document.querySelector("#profile-email").value = profile?.candidate_email || session?.user?.email || "";
     message.textContent = enabled ? "" : "Connectez-vous pour compléter votre profil.";
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "").replace(/[&<>"']/g, character => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    })[character]);
+  }
+
+  function renderApplications() {
+    const list = document.querySelector("#applications-list");
+    if (!applications.length) {
+      list.innerHTML = '<div class="empty-list"><strong>Aucune candidature enregistrée</strong><span>Ajoutez votre premier dossier avec le formulaire.</span></div>';
+      return;
+    }
+
+    const statusOptions = Object.entries(statusLabels)
+      .map(([value, label]) => '<option value="' + value + '">' + label + '</option>')
+      .join("");
+
+    list.innerHTML = applications.map(application => {
+      const hidden = Boolean(application.hidden_at);
+      const options = statusOptions.replace(
+        'value="' + escapeHtml(application.status) + '"',
+        'value="' + escapeHtml(application.status) + '" selected'
+      );
+      return '<article class="application-row' + (hidden ? ' is-hidden' : '') + '" data-id="' + escapeHtml(application.id) + '">' +
+        '<div class="application-main"><strong>' + escapeHtml(application.company_name) + '</strong>' +
+        '<span>' + escapeHtml(application.job_title || "Candidature spontanée") + '</span>' +
+        '<small>' + escapeHtml([application.company_city, application.company_email].filter(Boolean).join(" • ")) + '</small></div>' +
+        '<label class="status-field"><span>Statut</span><select data-action="status">' + options + '</select></label>' +
+        '<button class="secondary compact" data-action="' + (hidden ? "restore" : "hide") + '">' +
+        (hidden ? "Réafficher" : "Masquer") + '</button></article>';
+    }).join("");
+  }
+
+  async function loadApplications() {
+    const message = document.querySelector("#applications-message");
+    if (!getSession()) {
+      applications = [];
+      renderApplications();
+      message.textContent = "Connectez-vous pour afficher vos candidatures.";
+      return;
+    }
+    message.textContent = "Chargement…";
+    try {
+      const includeHidden = document.querySelector("#show-hidden-applications").checked;
+      const filter = includeHidden ? "" : "&hidden_at=is.null";
+      applications = await supabaseFetch(
+        "user_applications?select=id,company_name,company_city,company_email,job_title,status,hidden_at,last_activity_at" +
+        filter + "&order=last_activity_at.desc"
+      );
+      renderApplications();
+      message.textContent = applications.length + " candidature" + (applications.length > 1 ? "s" : "") + ".";
+    } catch (error) {
+      applications = [];
+      renderApplications();
+      message.textContent = error.message;
+    }
   }
 
   function currentMonthStart() {
@@ -233,6 +329,67 @@
     } finally {
       button.disabled = false;
       button.textContent = "Enregistrer";
+    }
+  });
+
+  document.querySelector("#application-form").addEventListener("submit", async event => {
+    event.preventDefault();
+    const button = document.querySelector("#application-submit");
+    const message = document.querySelector("#application-message");
+    const status = document.querySelector("#application-status").value;
+    button.disabled = true;
+    button.textContent = "Ajout…";
+    message.textContent = "";
+    try {
+      await supabaseWrite("user_applications", "POST", {
+        company_name: document.querySelector("#application-company").value.trim(),
+        job_title: document.querySelector("#application-job").value.trim() || null,
+        company_city: document.querySelector("#application-city").value.trim() || null,
+        company_email: document.querySelector("#application-email").value.trim() || null,
+        status,
+        sent_at: status === "sent" ? new Date().toISOString() : null
+      });
+      event.currentTarget.reset();
+      message.textContent = "Candidature ajoutée.";
+      await loadApplications();
+    } catch (error) {
+      message.textContent = error.message;
+    } finally {
+      button.disabled = false;
+      button.textContent = "Ajouter la candidature";
+    }
+  });
+
+  document.querySelector("#show-hidden-applications").addEventListener("change", loadApplications);
+
+  document.querySelector("#applications-list").addEventListener("change", async event => {
+    if (event.target.dataset.action !== "status") return;
+    const row = event.target.closest("[data-id]");
+    const status = event.target.value;
+    try {
+      await supabaseWrite("user_applications?id=eq." + encodeURIComponent(row.dataset.id), "PATCH", {
+        status,
+        sent_at: status === "sent" ? new Date().toISOString() : undefined,
+        last_activity_at: new Date().toISOString()
+      });
+      await loadApplications();
+    } catch (error) {
+      document.querySelector("#applications-message").textContent = error.message;
+    }
+  });
+
+  document.querySelector("#applications-list").addEventListener("click", async event => {
+    const action = event.target.dataset.action;
+    if (action !== "hide" && action !== "restore") return;
+    const row = event.target.closest("[data-id]");
+    try {
+      await supabaseWrite("user_applications?id=eq." + encodeURIComponent(row.dataset.id), "PATCH", {
+        hidden_at: action === "hide" ? new Date().toISOString() : null,
+        last_activity_at: new Date().toISOString()
+      });
+      await loadApplications();
+    } catch (error) {
+      document.querySelector("#applications-message").textContent = error.message;
     }
   });
 
