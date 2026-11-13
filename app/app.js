@@ -449,6 +449,8 @@
         '<span>' + escapeHtml(application.job_title || "Candidature spontanée") + '</span>' +
         '<small>' + escapeHtml([application.company_city, application.company_email].filter(Boolean).join(" • ")) + '</small>' +
         sourceLink + '</div>' +
+        (!hidden && application.status === "ready" && application.company_email && !application.sent_at
+          ? '<button class="secondary compact" data-action="send">Préparer l’envoi</button>' : '') +
         '<label class="status-field"><span>Statut</span><select data-action="status">' + options + '</select></label>' +
         '<button class="secondary compact" data-action="' + (hidden ? "restore" : "hide") + '">' +
         (hidden ? "Réafficher" : "Masquer") + '</button></article>';
@@ -468,7 +470,7 @@
       const includeHidden = document.querySelector("#show-hidden-applications").checked;
       const filter = includeHidden ? "" : "&hidden_at=is.null";
       applications = await supabaseFetch(
-        "user_applications?select=id,company_name,company_city,company_email,job_title,status,source_url,hidden_at,last_activity_at" +
+        "user_applications?select=id,company_name,company_city,company_email,job_title,status,source_url,hidden_at,last_activity_at,sent_at" +
         filter + "&order=last_activity_at.desc"
       );
       renderApplications();
@@ -850,6 +852,10 @@
 
   document.querySelector("#applications-list").addEventListener("click", async event => {
     const action = event.target.dataset.action;
+    if (action === "send") {
+      openSendDialog(event.target.closest("[data-id]")?.dataset.id);
+      return;
+    }
     if (action !== "hide" && action !== "restore") return;
     const row = event.target.closest("[data-id]");
     try {
@@ -904,6 +910,70 @@
     } finally {
       submit.disabled = false;
       submit.textContent = "Se connecter";
+    }
+  });
+
+  const sendDialog = document.querySelector("#send-dialog");
+  const sendForm = document.querySelector("#send-form");
+  const sendSubmit = document.querySelector("#send-submit");
+  const sendStatus = document.querySelector("#send-status");
+  let sendApplication = null;
+
+  function openSendDialog(id) {
+    const dossier = applications.find(application => application.id === id);
+    if (!dossier?.company_email || !getSession()?.user?.id) return;
+    sendApplication = dossier;
+    sendForm.reset();
+    sendSubmit.disabled = false;
+    sendStatus.textContent = "";
+    document.querySelector("#send-recipient").textContent = "Destinataire · " + dossier.company_email;
+    document.querySelector("#send-subject").value =
+      (dossier.job_title ? "Candidature – " + dossier.job_title : "Candidature spontanée").slice(0, 120);
+    sendDialog.showModal();
+  }
+
+  document.querySelector("#send-cancel").addEventListener("click", () => sendDialog.close());
+  sendDialog.addEventListener("cancel", event => {
+    if (sendSubmit.disabled) event.preventDefault();
+  });
+  sendForm.addEventListener("submit", async event => {
+    event.preventDefault();
+    if (sendSubmit.disabled || !sendApplication) return;
+    const userId = getSession()?.user?.id;
+    sendSubmit.disabled = true;
+    document.querySelector("#send-cancel").disabled = true;
+    sendStatus.textContent = "Envoi en cours…";
+    try {
+      const files = Array.from(document.querySelector("#send-files").files);
+      if (files.length > 2 || files.reduce((total, file) => total + file.size, 0) > 5 * 1024 * 1024) {
+        throw new Error("Choisissez au maximum deux PDF de 5 Mo au total.");
+      }
+      const attachments = await Promise.all(files.map(async file => {
+        if (!/\.pdf$/i.test(file.name) || await file.slice(0, 5).text() !== "%PDF-") {
+          throw new Error("Les pièces jointes doivent être des PDF.");
+        }
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        let binary = "";
+        for (let offset = 0; offset < bytes.length; offset += 8192) {
+          binary += String.fromCharCode(...bytes.subarray(offset, offset + 8192));
+        }
+        return { name: file.name, data: btoa(binary) };
+      }));
+      if (!userId || getSession()?.user?.id !== userId) return;
+      await invokeEdgeFunction("gmail-web", {
+        action: "send", attachments, applicationId: sendApplication.id, recipient: sendApplication.company_email,
+        subject: document.querySelector("#send-subject").value.trim(),
+        message: document.querySelector("#send-message").value
+      });
+      if (getSession()?.user?.id !== userId) return;
+      sendDialog.close();
+      await Promise.all([loadApplications(), loadDashboard().catch(() => {})]);
+      document.querySelector("#applications-message").textContent = "Candidature envoyée via Gmail.";
+    } catch (error) {
+      if (getSession()?.user?.id === userId) sendStatus.textContent = error.message;
+    } finally {
+      sendSubmit.disabled = false;
+      document.querySelector("#send-cancel").disabled = false;
     }
   });
 

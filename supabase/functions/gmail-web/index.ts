@@ -66,6 +66,63 @@ Deno.serve(async (request: Request) => {
 
     if (!configured) return json({ message: "La connexion Gmail web attend la configuration Google." }, 503);
 
+    if (body?.action === "send") {
+      const { applicationId, recipient, subject, message } = body;
+      const email = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)+$/;
+      if (typeof applicationId !== "string" || !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(applicationId) ||
+          typeof recipient !== "string" || recipient.length > 254 || !email.test(recipient) ||
+          typeof subject !== "string" || !subject.trim() || subject.length > 120 || /[\r\n]/.test(subject) ||
+          typeof message !== "string" || !message.trim() || message.length > 12000) {
+        return json({ message: "Vérifiez le destinataire, l’objet et le texte du message." }, 400);
+      }
+      const read = await fetch(endpoint + filter + "&select=refresh_token", { headers: serviceHeaders });
+      if (!read.ok) return json({ message: "Connexion Gmail indisponible." }, 503);
+      const [connection] = await read.json();
+      if (!connection) return json({ message: "Connectez Gmail dans les paramètres." }, 409);
+      const refresh = await fetch(tokenEndpoint, {
+        method: "POST",
+        body: new URLSearchParams({ refresh_token: connection.refresh_token, client_id: clientId,
+          client_secret: clientSecret, grant_type: "refresh_token" })
+      });
+      const access = await refresh.json().catch(() => null);
+      if (!refresh.ok || !access?.access_token) {
+        return json({ message: "Impossible d’autoriser l’envoi. Vérifiez la connexion Gmail dans les paramètres." }, 502);
+      }
+      const attachments = parseAttachments(body.attachments ?? []);
+      if (!attachments) return json({ message: "Ajoutez au maximum deux PDF de 5 Mo au total." }, 400);
+      const raw = encodeMessage(recipient, subject, message, attachments);
+      const rpc = (name: string, args: object) => fetch(root + "/rest/v1/rpc/" + name, {
+        method: "POST",
+        headers: { ...serviceHeaders, "Content-Type": "application/json" },
+        body: JSON.stringify({ p_user: id, p_application: applicationId, ...args })
+      });
+      const reservation = await rpc("reserve_web_gmail_delivery", { p_email: recipient });
+      const reserved = await reservation.json().catch(() => null);
+      if (!reservation.ok) return json({ message: "Impossible de vérifier le quota d’envoi." }, 503);
+      if (!reserved?.reserved) return json({ message: reserved?.error || "Envoi indisponible." }, 409);
+      const uncertain = () => json({ message: "Résultat incertain. Vérifiez le dossier Envoyés dans Gmail. Un second envoi est bloqué." }, 502);
+      try {
+        const sent = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+          method: "POST", signal: AbortSignal.timeout(20000),
+          headers: { Authorization: "Bearer " + access.access_token, "Content-Type": "application/json" },
+          body: JSON.stringify({ raw })
+        });
+        if ([400, 401, 403, 429].includes(sent.status)) {
+          const released = await rpc("finish_web_gmail_delivery", { p_message: null });
+          if (!released.ok) return uncertain();
+          return json({ message: "Gmail a refusé le message. Vérifiez le compte Gmail avant de réessayer." }, 422);
+        }
+        if (!sent.ok) return uncertain();
+        const result = await sent.json();
+        if (typeof result.id !== "string" || !result.id) return uncertain();
+        const recorded = await rpc("finish_web_gmail_delivery", { p_message: result.id });
+        if (!recorded.ok) return uncertain();
+        return json({ sent: true });
+      } catch {
+        return uncertain();
+      }
+    }
+
     if (body?.action === "start" && /^[a-zA-Z0-9_-]{43}$/.test(body.challenge || "") && /^[a-zA-Z0-9_-]{43}$/.test(body.state || "")) {
       const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
       url.search = new URLSearchParams({
@@ -102,3 +159,57 @@ Deno.serve(async (request: Request) => {
     return json({ message: "Le service Gmail est temporairement indisponible." }, 503);
   }
 });
+
+function mimeBase64(text: string) {
+  const bytes = new TextEncoder().encode(text);
+  let binary = "";
+  for (let offset = 0; offset < bytes.length; offset += 8192) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + 8192));
+  }
+  return btoa(binary);
+}
+
+type Attachment = { name: string; data: string };
+
+function parseAttachments(input: unknown): Attachment[] | null {
+  if (!Array.isArray(input) || input.length > 2) return null;
+  let size = 0;
+  for (const item of input) {
+    if (typeof item?.name !== "string" || !/\.pdf$/i.test(item.name) || item.name.length > 255 ||
+        typeof item.data !== "string" || item.data.length > Math.ceil(5 * 1024 * 1024 / 3) * 4 ||
+        item.data.length % 4 || !/^[A-Za-z0-9+/]+={0,2}$/.test(item.data) ||
+        !atob(item.data.slice(0, 8)).startsWith("%PDF-")) return null;
+    size += item.data.length / 4 * 3 - (item.data.match(/=+$/)?.[0].length ?? 0);
+  }
+  return size <= 5 * 1024 * 1024 ? input : null;
+}
+
+function encodeMessage(recipient: string, subject: string, message: string, attachments: Attachment[]) {
+  const words: string[] = [];
+  let part = "";
+  for (const char of subject) {
+    if (mimeBase64(part + char).length > 60) {
+      words.push("=?UTF-8?B?" + mimeBase64(part) + "?=");
+      part = "";
+    }
+    part += char;
+  }
+  words.push("=?UTF-8?B?" + mimeBase64(part) + "?=");
+  const wrap = (value: string) => value.match(/.{1,76}/g)?.join("\r\n") || "";
+  const body = ["Content-Type: text/plain; charset=UTF-8", "Content-Transfer-Encoding: base64", "",
+    wrap(mimeBase64(message.replace(/\r\n|\r|\n/g, "\r\n")))];
+  const headers = ["To: " + recipient, "Subject: " + words.join("\r\n "), "MIME-Version: 1.0"];
+  if (attachments.length) {
+    const boundary = "candidature-" + crypto.randomUUID();
+    headers.push('Content-Type: multipart/mixed; boundary="' + boundary + '"', "", "--" + boundary, ...body);
+    for (const file of attachments) {
+      const name = file.name.slice(0, -4).normalize("NFKD").replace(/[^a-zA-Z0-9._ -]/g, "").trim().slice(0, 90) || "document";
+      headers.push("--" + boundary, "Content-Type: application/pdf", "Content-Transfer-Encoding: base64",
+        'Content-Disposition: attachment; filename="' + name + '.pdf"', "", wrap(file.data));
+    }
+    headers.push("--" + boundary + "--");
+  } else {
+    headers.push(...body);
+  }
+  return mimeBase64(headers.join("\r\n") + "\r\n").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}

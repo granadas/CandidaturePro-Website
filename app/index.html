@@ -228,6 +228,19 @@
     </main>
   </div>
 
+  <dialog id="send-dialog">
+    <form id="send-form">
+      <h2>Envoyer via Gmail</h2>
+      <p id="send-recipient"></p>
+      <label>Objet<input id="send-subject" maxlength="120" required></label>
+      <label>Message<textarea id="send-message" rows="8" maxlength="12000" required></textarea></label>
+      <label>CV et lettre en PDF (5 Mo au total)<input id="send-files" type="file" accept=".pdf,application/pdf" multiple></label>
+      <p id="send-status" role="status"></p>
+      <button id="send-submit" class="primary" type="submit">Envoyer</button>
+      <button id="send-cancel" class="secondary" type="button">Fermer</button>
+    </form>
+  </dialog>
+
   <dialog id="login-dialog">
     <form id="login-form">
       <button type="button" id="close-login" class="close" aria-label="Fermer">×</button>

@@ -28,4 +28,4 @@ Ne jamais placer une clé `service_role`, un secret OAuth Gmail ou une clé priv
 
 Créer un client OAuth Google de type **Application Web**, activer Gmail API et autoriser exactement l’URL de retour de l’application web, par exemple `https://candidaturepro.ch/app/` si le site est servi à cette adresse. Renseigner `GMAIL_WEB_CLIENT_ID`, `GMAIL_WEB_CLIENT_SECRET` et `GMAIL_WEB_REDIRECT_URI` dans les secrets de la fonction Supabase, puis tester le consentement avec un compte de test autorisé dans Google Cloud.
 
-La fonction `gmail-web` gère la connexion et la révocation pour le périmètre `gmail.send`. L’envoi de candidatures depuis le navigateur reste à intégrer.
+La fonction `gmail-web` gère la connexion et la révocation pour le périmètre `gmail.send`. Un dossier au statut **Prête à envoyer** peut être envoyé depuis le navigateur avec jusqu’à deux PDF, pour 5 Mo au total. L’envoi confirmé passe le dossier au statut **Envoyée**. Si Gmail ne confirme pas le résultat, le dossier reste protégé contre un second envoi et l’utilisateur peut vérifier le dossier Envoyés dans Gmail. La synchronisation des réponses reste à intégrer.
