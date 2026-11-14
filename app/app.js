@@ -37,6 +37,9 @@
   const loginButton = document.querySelector("#open-login");
   const signOutButton = document.querySelector("#sign-out");
   const sidebar = document.querySelector(".sidebar");
+  const appShell = document.querySelector(".app-shell");
+  const guestHome = document.querySelector("#guest-home");
+  const guestLogin = document.querySelector("#guest-login");
 
   function getSession() {
     try { return JSON.parse(localStorage.getItem(storageKey) || "null"); }
@@ -60,6 +63,9 @@
 
   function renderAccount() {
     const session = getSession();
+    const signedIn = Boolean(session?.user?.id && session?.access_token);
+    guestHome.hidden = signedIn;
+    appShell.hidden = !signedIn;
     const email = session?.user?.email;
     const firstName = profile?.candidate_first_name?.trim();
     document.querySelector("#account-label").textContent = email || "Version web en préparation";
@@ -77,6 +83,7 @@
   }
 
   function showView(name) {
+    if (appShell.hidden) return;
     const isDashboard = name === "dashboard";
     const isProfile = name === "profile";
     const isApplications = name === "applications";
@@ -873,6 +880,7 @@
     el.addEventListener("click", () => showView(el.dataset.view || el.dataset.viewLink));
   });
   document.querySelector("#menu-toggle").addEventListener("click", () => sidebar.classList.toggle("open"));
+  guestLogin.addEventListener("click", () => dialog.showModal());
   document.querySelector("#close-login").addEventListener("click", () => dialog.close());
   loginButton.addEventListener("click", () => {
     if (getSession()) showView("settings");
@@ -889,8 +897,7 @@
     document.querySelector("#tracking-list").replaceChildren();
     document.querySelector("#tracking-message").textContent = "";
     setSession(null);
-    showView("dashboard");
-    loadDashboard();
+    location.replace("../");
   });
 
   loginForm.addEventListener("submit", async event => {
@@ -902,9 +909,12 @@
     try {
       const session = await signIn(document.querySelector("#email").value.trim(), document.querySelector("#password").value);
       setSession(session);
-      await loadDashboard();
+      showView("dashboard");
       dialog.close();
       loginForm.reset();
+      await loadDashboard().catch(error => {
+        document.querySelector("#account-label").textContent = error.message;
+      });
     } catch (error) {
       loginMessage.textContent = error.message;
     } finally {
@@ -1058,6 +1068,7 @@
   }
 
   async function bootstrap() {
+    await ensureSession();
     renderAccount();
     showView("dashboard");
     await finishGmailConnection();

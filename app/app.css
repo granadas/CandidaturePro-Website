@@ -21,3 +21,10 @@
 
 #document-form[hidden]{display:none}
 #settings-view .panel + .panel{margin-top:16px}
+
+.app-shell[hidden], .guest-home[hidden], #sign-out[hidden]{display:none}
+.guest-home{max-width:880px;margin:0 auto;padding:clamp(24px,6vw,72px)}
+.guest-content{margin-top:clamp(36px,9vw,96px);padding:clamp(24px,6vw,56px);border-radius:24px;background:#fff}
+.guest-content h1{font-size:clamp(32px,6vw,56px);line-height:1.1;margin:0}
+.guest-content p{max-width:55ch;margin:20px 0 28px;line-height:1.6}
+.guest-content a{display:inline-block;margin:12px;color:#5b21b6}
