@@ -437,7 +437,15 @@
 
   function renderApplications() {
     const list = document.querySelector("#applications-list");
-    if (!applications.length) {
+    const filter = document.querySelector("#applications-filter").value;
+    const visible = applications.filter(row => !filter || (filter === "sent"
+      ? Boolean(row.sent_at) || ["sent", "reply_received", "interview", "accepted", "rejected"].includes(row.status)
+      : row.status === filter));
+    if (!visible.length) {
+      if (filter) {
+        list.textContent = "Aucun dossier pour ce filtre.";
+        return;
+      }
       list.innerHTML = '<div class="empty-list"><strong>Aucune candidature enregistrée</strong><span>Ajoutez votre premier dossier avec le formulaire.</span></div>';
       return;
     }
@@ -446,7 +454,9 @@
       .map(([value, label]) => '<option value="' + value + '">' + label + '</option>')
       .join("");
 
-    list.innerHTML = applications.map(application => {
+    const priority = row => row.status === "ready" && !row.hidden_at ? 0 : 1;
+    visible.sort((first, second) => priority(first) - priority(second));
+    list.innerHTML = visible.map(application => {
       const hidden = Boolean(application.hidden_at);
       const options = statusOptions.replace(
         'value="' + escapeHtml(application.status) + '"',
@@ -631,6 +641,25 @@
     return response;
   }
 
+  async function listDocuments(session) {
+    const groups = await Promise.all(Object.entries(documentKinds).map(async ([kind, label]) => {
+      const prefix = session.user.id + "/" + kind;
+      const files = [];
+      const limit = 100;
+      for (let offset = 0; ; offset += limit) {
+        const response = await documentRequest(session, "list/" + documentsBucket, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prefix, limit, offset, sortBy: { column: "name", order: "asc" } })
+        });
+        const page = await response.json();
+        files.push(...page.filter(file => file.id).map(file => ({ prefix, label, name: file.name })));
+        if (page.length < limit) return files;
+      }
+    }));
+    return groups.flat();
+  }
+
   async function loadDocuments() {
     const request = ++documentsRequest;
     documentForm.hidden = true;
@@ -643,23 +672,8 @@
         documentsMessage.textContent = "Connectez-vous pour accéder à vos documents.";
         return;
       }
-      const groups = await Promise.all(Object.entries(documentKinds).map(async ([kind, label]) => {
-        const prefix = session.user.id + "/" + kind;
-        const files = [];
-        const limit = 100;
-        for (let offset = 0; ; offset += limit) {
-          const response = await documentRequest(session, "list/" + documentsBucket, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ prefix, limit, offset, sortBy: { column: "name", order: "asc" } })
-          });
-          const page = await response.json();
-          files.push(...page.filter(file => file.id).map(file => ({ prefix, label, name: file.name })));
-          if (page.length < limit) return files;
-        }
-      }));
+      const files = await listDocuments(session);
       if (request !== documentsRequest || getSession()?.user?.id !== session.user.id) return;
-      const files = groups.flat();
       for (const file of files) {
         const row = document.createElement("div");
         row.className = "application-row";
@@ -900,6 +914,7 @@
     }
   });
 
+  document.querySelector("#applications-filter").addEventListener("change", renderApplications);
   document.querySelector("#show-hidden-applications").addEventListener("change", loadApplications);
 
   document.querySelector("#applications-list").addEventListener("change", async event => {
@@ -1032,10 +1047,64 @@
   const sendTitle = document.querySelector("#send-title");
   const sendInputs = ["subject", "message", "files"].map(name => document.querySelector("#send-" + name));
 
+  const librarySelect = document.querySelector("#send-library");
+  const libraryAdd = document.querySelector("#send-add-document");
+  const librarySummary = document.querySelector("#send-selected-documents");
+  let libraryFiles = [];
+  let selectedDocuments = [];
+
+  async function loadSendDocuments(dossier) {
+    const session = await ensureSession();
+    if (!session) return;
+    const files = await listDocuments(session);
+    if (!sendDialog.open || sendApplication !== dossier || getSession()?.user?.id !== session.user.id) return;
+    libraryFiles = files;
+    for (const [index, file] of files.entries()) {
+      librarySelect.add(new Option(file.label + " · " + file.name.replace(/^[a-f0-9-]{36}_/, ""), index));
+    }
+  }
+
+  librarySelect.addEventListener("change", () => { libraryAdd.disabled = !librarySelect.value; });
+  libraryAdd.addEventListener("click", async () => {
+    const documentFile = libraryFiles[librarySelect.value];
+    const dossier = sendApplication;
+    if (!documentFile || selectedDocuments.length >= 2) return;
+    libraryAdd.disabled = true;
+    try {
+      const session = await ensureSession();
+      if (!session) return;
+      const response = await documentRequest(session, "authenticated/" + documentsBucket + "/" +
+        documentFile.prefix + "/" + encodeURIComponent(documentFile.name));
+      const blob = await response.blob();
+      if (!sendDialog.open || sendApplication !== dossier || reviewed || getSession()?.user?.id !== session.user.id) return;
+      const name = documentFile.name.replace(/^[a-f0-9-]{36}_/, "");
+      selectedDocuments.push(new File([blob], name, { type: "application/pdf" }));
+      librarySummary.textContent = "Retirer les PDF ajoutés (" + selectedDocuments.map(file => file.name).join(", ") + ")";
+      librarySummary.hidden = false;
+      librarySelect.options[librarySelect.selectedIndex].disabled = true;
+      librarySelect.value = "";
+    } catch (error) {
+      if (sendDialog.open && sendApplication === dossier) sendStatus.textContent = error.message;
+    } finally {
+      libraryAdd.disabled = !librarySelect.value || selectedDocuments.length >= 2;
+    }
+  });
+
+  librarySummary.addEventListener("click", () => {
+    selectedDocuments = [];
+    librarySummary.textContent = "";
+    librarySummary.hidden = true;
+    for (const option of librarySelect.options) option.disabled = false;
+    libraryAdd.disabled = !librarySelect.value;
+  });
+
   function editSendDraft() {
     reviewed = null;
     sendReview.hidden = true;
     sendAi.hidden = false;
+    librarySelect.closest("label").hidden = false;
+    libraryAdd.hidden = false;
+    librarySummary.hidden = selectedDocuments.length === 0;
     for (const input of sendInputs) {
       input.disabled = false;
       input.closest("label").hidden = false;
@@ -1055,6 +1124,12 @@
     if (!dossier?.company_email || !getSession()?.user?.id) return;
     sendApplication = dossier;
     sendForm.reset();
+    libraryFiles = [];
+    selectedDocuments = [];
+    librarySelect.length = 1;
+    libraryAdd.disabled = true;
+    librarySummary.textContent = "";
+    librarySummary.hidden = true;
     sendAi.open = false;
     editSendDraft();
     sendSubmit.disabled = false;
@@ -1063,6 +1138,11 @@
     document.querySelector("#send-subject").value =
       (dossier.job_title ? "Candidature – " + dossier.job_title : "Candidature spontanée").slice(0, 120);
     sendDialog.showModal();
+    loadSendDocuments(dossier).catch(() => {
+      if (sendDialog.open && sendApplication === dossier && !reviewed) {
+        sendStatus.textContent = "Documents indisponibles. Vous pouvez joindre un PDF depuis votre appareil.";
+      }
+    });
   }
 
   document.querySelector("#send-cancel").addEventListener("click", () => sendDialog.close());
@@ -1075,7 +1155,7 @@
     const userId = getSession()?.user?.id;
     if (!reviewed) {
       const [subject, message, fileInput] = sendInputs;
-      const draft = { subject: subject.value.trim(), message: message.value.trim(), files: Array.from(fileInput.files) };
+      const draft = { subject: subject.value.trim(), message: message.value.trim(), files: [...fileInput.files, ...selectedDocuments] };
       if (!draft.subject || !draft.message) {
         sendStatus.textContent = "Renseignez l’objet et le message.";
         return;
@@ -1099,6 +1179,9 @@
       sendTitle.textContent = "Contrôle final";
       sendSubmit.textContent = "Confirmer l’envoi via Gmail";
       sendAi.hidden = true;
+      librarySelect.closest("label").hidden = true;
+      libraryAdd.hidden = true;
+      librarySummary.hidden = true;
       sendReview.hidden = false;
       sendReview.focus();
       return;

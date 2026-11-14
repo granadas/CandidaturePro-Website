@@ -179,6 +179,12 @@
               <div><small>VOS DOSSIERS</small><h2>Candidatures enregistrées</h2></div>
               <label class="inline-toggle"><input id="show-hidden-applications" type="checkbox"> Voir les masquées</label>
             </div>
+            <label>Filtrer les dossiers
+              <select id="applications-filter">
+                <option value="">Tous</option><option value="draft">Brouillons</option>
+                <option value="ready">Prêtes à envoyer</option><option value="sent">Envoyées et suivies</option>
+              </select>
+            </label>
             <div id="applications-message" class="list-message" role="status"></div>
             <div id="applications-list" class="applications-list"></div>
           </article>
@@ -281,6 +287,9 @@
       <label>Objet<input id="send-subject" maxlength="120" required></label>
       <label>Message<textarea id="send-message" rows="8" maxlength="12000" required></textarea></label>
       <label>CV et lettre en PDF (5 Mo au total)<input id="send-files" type="file" accept=".pdf,application/pdf" multiple></label>
+      <label>Ajouter un PDF de mes documents<select id="send-library"><option value="">Sélectionner un document</option></select></label>
+      <button id="send-add-document" class="secondary" type="button" disabled>Ajouter le PDF</button>
+      <button id="send-selected-documents" class="secondary" type="button" hidden></button>
       <details id="send-ai">
         <summary>Préparer une lettre avec l’IA</summary>
         <label>Description de l’offre<textarea id="send-ai-offer" maxlength="6000" rows="3"></textarea></label>
