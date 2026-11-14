@@ -311,6 +311,16 @@
     <form method="dialog">
       <h2 id="reply-title">Réponses Gmail</h2>
       <div id="reply-content" role="status" tabindex="0"></div>
+      <details id="reply-editor" hidden>
+        <summary>Préparer une réponse</summary>
+        <label for="reply-draft">Votre message</label>
+        <textarea id="reply-draft" rows="6" maxlength="12000"></textarea>
+        <div class="reply-actions">
+          <button id="reply-generate" type="button" class="secondary">Proposer un texte avec l’IA</button>
+          <button id="reply-copy" type="button" class="secondary">Copier le texte</button>
+        </div>
+        <p id="reply-editor-status" role="status"></p>
+      </details>
       <div class="reply-actions">
         <button id="reply-consent" type="button" class="secondary" hidden>Autoriser la lecture dans Candidature Pro</button>
         <a id="reply-gmail" class="secondary" target="_blank" rel="noopener noreferrer" hidden>Ouvrir le fil dans Gmail</a>

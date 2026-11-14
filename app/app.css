@@ -73,3 +73,10 @@
  #cv-dialog[open]{position:static;width:auto;max-height:none;overflow:visible;margin:0;padding:0;border:0;box-shadow:none}
  #cv-dialog::backdrop,.cv-actions{display:none!important}
 }
+
+#reply-editor{padding:14px clamp(16px,4vw,30px);border-top:1px solid #dce3ee}
+#reply-editor[hidden]{display:none}
+#reply-editor summary{cursor:pointer;font-weight:700}
+#reply-editor label{display:block;margin-top:12px}
+#reply-draft{display:block;width:100%;margin-top:4px}
+#reply-editor .reply-actions{padding:10px 0 0;background:transparent;border:0;justify-content:flex-start}

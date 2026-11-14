@@ -512,6 +512,66 @@
   const replyContent = document.querySelector("#reply-content");
   const replyGmail = document.querySelector("#reply-gmail");
   const replyConsent = document.querySelector("#reply-consent");
+  const replyEditor = document.querySelector("#reply-editor");
+  const replyDraft = document.querySelector("#reply-draft");
+  const replyEditorStatus = document.querySelector("#reply-editor-status");
+  const replyGenerate = document.querySelector("#reply-generate");
+  let replyContext = null;
+  let replyRequest = 0;
+
+  replyDialog.addEventListener("close", () => {
+    ++replyRequest;
+    replyContext = null;
+    replyDraft.value = "";
+    replyEditorStatus.textContent = "";
+    replyContent.replaceChildren();
+    replyGmail.removeAttribute("href");
+  });
+
+  replyGenerate.addEventListener("click", async () => {
+    const context = replyContext;
+    const before = replyDraft.value;
+    if (!context || replyGenerate.disabled) return;
+    replyGenerate.disabled = true;
+    replyEditorStatus.textContent = "Génération en cours…";
+    try {
+      const result = await invokeEdgeFunction("smart-reply", {
+        mode: "reply", companyName: context.companyName, jobTitle: context.jobTitle,
+        originalSubject: "", replySubject: "", replyBody: context.body,
+        classification: "Réponse reçue",
+        candidateName: [profile?.candidate_first_name, profile?.candidate_last_name].filter(Boolean).join(" ") || "le candidat"
+      });
+      if (replyContext !== context || !replyDialog.open || getSession()?.user?.id !== context.userId) return;
+      if (replyDraft.value !== before) {
+        replyEditorStatus.textContent = "Vos modifications ont été conservées.";
+        return;
+      }
+      if (typeof result.reply !== "string" || !result.reply.trim() || result.reply.length > 12000) {
+        throw new Error("La proposition est vide ou dépasse la taille autorisée.");
+      }
+      replyDraft.value = result.reply.trim();
+      replyEditorStatus.textContent = "Proposition prête à modifier.";
+    } catch (error) {
+      if (replyContext === context) replyEditorStatus.textContent = error.message;
+    } finally {
+      replyGenerate.disabled = false;
+    }
+  });
+
+  document.querySelector("#reply-copy").addEventListener("click", async () => {
+    if (!replyDraft.value.trim()) {
+      replyEditorStatus.textContent = "Écrivez une réponse avant de la copier.";
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(replyDraft.value);
+      replyEditorStatus.textContent = "Texte copié. Ouvrez le fil Gmail pour répondre.";
+    } catch {
+      replyDraft.select();
+      replyEditorStatus.textContent = "Copiez le texte sélectionné, puis ouvrez le fil Gmail.";
+    }
+  });
+
   replyConsent.addEventListener("click", () => startGmailConnection(replyConsent, true));
 
   document.querySelector("#tracking-list").addEventListener("click", async event => {
@@ -519,6 +579,12 @@
     if (!button || button.disabled) return;
     const userId = getSession()?.user?.id;
     button.disabled = true;
+    const request = ++replyRequest;
+    replyContext = null;
+    replyEditor.hidden = true;
+    replyEditor.open = false;
+    replyDraft.value = "";
+    replyEditorStatus.textContent = "";
     replyGmail.hidden = true;
     replyConsent.hidden = true;
     replyContent.textContent = "Chargement…";
@@ -527,11 +593,18 @@
       const result = await invokeEdgeFunction("gmail-web", {
         action: "open_reply", applicationId: button.dataset.openReply, preview: true
       });
-      if (!userId || getSession()?.user?.id !== userId) return;
+      if (request !== replyRequest || !replyDialog.open || !userId || getSession()?.user?.id !== userId) return;
       replyGmail.href = "https://mail.google.com/mail/u/0/#all/" + encodeURIComponent(result.threadId);
       replyGmail.hidden = false;
       replyConsent.hidden = !result.needsConsent;
       const replies = result.replies?.filter(text => text.trim()) || [];
+      if (replies.length) {
+        const application = button.closest(".application-row");
+        replyContext = { userId, body: replies.at(-1).slice(0, 8000),
+          companyName: application.querySelector(".application-main strong").textContent,
+          jobTitle: application.querySelector(".application-main span").textContent };
+        replyEditor.hidden = false;
+      }
       replyContent.textContent = result.needsConsent ? "Autorisez la lecture pour afficher le message ici." :
         replies.length ? "" : "Le contenu de ce message est disponible dans Gmail.";
       for (const reply of replies) {
@@ -555,7 +628,7 @@
         replyContent.append(message);
       }
     } catch (error) {
-      if (getSession()?.user?.id === userId) replyContent.textContent = error.message;
+      if (request === replyRequest && getSession()?.user?.id === userId) replyContent.textContent = error.message;
     } finally {
       button.disabled = false;
     }
@@ -1203,6 +1276,7 @@
   });
   signOutButton.addEventListener("click", () => {
     profile = null;
+    if (replyDialog.open) replyDialog.close();
     ++documentsRequest;
     ++adminRequest;
     adminResults.replaceChildren();
