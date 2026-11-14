@@ -4,20 +4,24 @@ const readScope = "https://www.googleapis.com/auth/gmail.readonly";
 const tokenEndpoint = "https://oauth2.googleapis.com/token";
 
 Deno.serve(async (request: Request) => {
-  const redirect = Deno.env.get("GMAIL_WEB_REDIRECT_URI") || "";
+  const previewRedirect = Deno.env.get("GMAIL_WEB_REDIRECT_URI") || "";
+  const productionRedirect = "https://candidaturepro.ch/app/";
+  const origin = request.headers.get("origin");
+  const productionEnabled = Deno.env.get("GMAIL_WEB_PRODUCTION_REDIRECT_URI") === productionRedirect;
+  const redirect = productionEnabled && origin === new URL(productionRedirect).origin
+    ? productionRedirect : previewRedirect;
   const clientId = Deno.env.get("GMAIL_WEB_CLIENT_ID") || "";
   const clientSecret = Deno.env.get("GMAIL_WEB_CLIENT_SECRET") || "";
-  const siteOrigin = redirect ? new URL(redirect).origin : "https://candidaturepro.ch";
-  const origin = request.headers.get("origin");
+  const siteOrigin = redirect ? new URL(redirect).origin : null;
   const headers = {
-    "Access-Control-Allow-Origin": siteOrigin,
+    "Access-Control-Allow-Origin": siteOrigin || "null",
     "Access-Control-Allow-Headers": "authorization, apikey, content-type",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Cache-Control": "no-store",
     "Vary": "Origin"
   };
   const json = (data: object, status = 200) => Response.json(data, { status, headers });
-  if (origin !== siteOrigin) return json({ message: "Origine non autorisée." }, 403);
+  if (!siteOrigin || origin !== siteOrigin) return json({ message: "Origine non autorisée." }, 403);
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers });
   if (request.method !== "POST") return json({ message: "Méthode non autorisée." }, 405);
 
