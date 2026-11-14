@@ -2209,7 +2209,15 @@
     try {
       if (!flow || flow.state !== url.searchParams.get("state") || Date.now() - flow.startedAt > 10 * 60 * 1000 ||
           !flow.userId || flow.userId !== getSession()?.user?.id) throw new Error("La demande de connexion Gmail a expiré. Réessayez.");
-      if (url.searchParams.has("error")) throw new Error("Connexion Gmail annulée.");
+      const oauthError = url.searchParams.get("error");
+      if (oauthError) {
+        const messages = new Map([
+          ["access_denied", "L’autorisation Gmail a été refusée. Relancez la connexion pour réessayer."],
+          ["temporarily_unavailable", "Google est temporairement indisponible. Réessayez dans quelques minutes."],
+          ["server_error", "Google n’a pas pu terminer la connexion. Réessayez dans quelques minutes."]
+        ]);
+        throw new Error(messages.get(oauthError) || "Google n’a pas pu autoriser Gmail. Relancez la connexion.");
+      }
       await invokeEdgeFunction("gmail-web", { action: "exchange", code: url.searchParams.get("code"), verifier: flow.verifier, readReplies: flow.readReplies === true });
       if (flow.readReplies && flow.fromTracking) await syncGmailReplies(true);
       else await loadGmail();
