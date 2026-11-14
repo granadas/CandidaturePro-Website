@@ -637,6 +637,74 @@
   };
   let adminRequest = 0;
 
+  function administrativeActions(mode, row, current) {
+    const form = document.createElement("form");
+    form.className = "profile-form";
+    if (mode === "verification") {
+      form.innerHTML = '<label>Adresse vérifiée<input name="email" type="email" maxlength="254"></label>' +
+        '<label>Type de contact<select name="type"><option value="general">Général</option><option value="hr">RH</option></select></label>' +
+        '<label class="wide">Note<input name="note" maxlength="2000"></label>' +
+        '<div class="wide"><button type="submit" class="primary" value="email">Valider le contact</button> ' +
+        '<button type="submit" class="secondary" value="inactive">Marquer fermée ou inexistante</button></div>';
+    } else if (mode === "reports") {
+      form.innerHTML = '<label>Statut<select name="status"><option value="new">Nouveau</option><option value="in_progress">En cours</option>' +
+        '<option value="resolved">Résolu</option><option value="closed">Clôturé</option></select></label>' +
+        '<div><button type="submit" class="primary">Enregistrer le statut</button></div>';
+      form.elements.status.value = row.status;
+    } else {
+      form.innerHTML = '<label>Formule<select name="plan"><option value="free">Gratuite</option><option value="premium">Premium</option></select></label>' +
+        '<label>Expiration Premium<input name="until" type="date"></label>' +
+        '<div class="wide"><button type="submit" class="primary">Enregistrer la formule</button></div>';
+      form.elements.plan.value = row.plan === "premium" ? "premium" : "free";
+      form.elements.until.value = row.premium_until?.slice(0, 10) || "";
+    }
+    form.addEventListener("submit", async event => {
+      event.preventDefault();
+      if (!current() || profile?.is_admin !== true) return;
+      const buttons = form.querySelectorAll("button");
+      if ([...buttons].some(button => button.disabled)) return;
+      const data = new FormData(form);
+      const action = event.submitter?.value;
+      const email = String(data.get("email") || "").trim();
+      if (mode === "verification" && (!["email", "inactive"].includes(action) || (action === "email" && !email))) {
+        adminStatus.textContent = "Indiquez une adresse vérifiée pour valider le contact.";
+        return;
+      }
+      buttons.forEach(button => button.disabled = true);
+      try {
+        let done;
+        if (mode === "verification") {
+          done = await supabaseRpc("admin_resolve_company_manual_verification", {
+            p_request_id: row.id, p_action: action, p_email: action === "email" ? email : "",
+            p_contact_type: data.get("type"), p_admin_note: data.get("note")
+          });
+        } else if (mode === "reports") {
+          done = await supabaseRpc("admin_update_support_report_status", { p_report_id: row.id, p_status: data.get("status") });
+        } else {
+          const premium = data.get("plan") === "premium";
+          const until = data.get("until");
+          await supabaseRpc("admin_set_user_premium", {
+            p_user_id: row.user_id, p_premium: premium,
+            p_premium_until: premium && until ? until + "T23:59:59Z" : null
+          });
+          done = true;
+        }
+        if (done !== true) throw new Error("La modification n’a pas été enregistrée.");
+        if (current()) {
+          await loadAdmin();
+          if (getSession()?.user?.id && adminMode.value === mode && !adminStatus.textContent) {
+            adminStatus.textContent = "Modification enregistrée.";
+          }
+        }
+      } catch (error) {
+        if (current()) adminStatus.textContent = error.message;
+      } finally {
+        buttons.forEach(button => button.disabled = false);
+      }
+    });
+    return form;
+  }
+
   async function loadAdmin() {
     if (profile?.is_admin !== true) return;
     const userId = getSession()?.user?.id;
@@ -717,6 +785,9 @@
             }
           });
           card.append(review);
+        }
+        if (["verification", "reports", "users"].includes(mode)) {
+          card.append(administrativeActions(mode, row, current));
         }
         adminResults.append(card);
       }
