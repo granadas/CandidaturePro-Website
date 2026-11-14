@@ -512,8 +512,29 @@
       replyGmail.href = "https://mail.google.com/mail/u/0/#all/" + encodeURIComponent(result.threadId);
       replyGmail.hidden = false;
       replyConsent.hidden = !result.needsConsent;
+      const replies = result.replies?.filter(text => text.trim()) || [];
       replyContent.textContent = result.needsConsent ? "Autorisez la lecture pour afficher le message ici." :
-        result.replies?.filter(Boolean).join("\n\n────────\n\n") || "Le contenu de ce message est disponible dans Gmail.";
+        replies.length ? "" : "Le contenu de ce message est disponible dans Gmail.";
+      for (const reply of replies) {
+        const content = reply.replace(/\r\n?/g, "\n").trim();
+        const quoted = /\n(?:_{8,}|-{3,}\s*(?:Original Message|Message d’origine)\s*-{3,}|On .+ wrote:|Le .+ a écrit\s*:|From:.*\nSent:|De :.*\nEnvoyé :)/i.exec(content);
+        const split = quoted && quoted.index > 0 ? quoted.index : content.length;
+        const message = document.createElement("article");
+        message.className = "reply-message";
+        const body = document.createElement("p");
+        body.textContent = content.slice(0, split).trim();
+        message.append(body);
+        if (split < content.length) {
+          const history = document.createElement("details");
+          const caption = document.createElement("summary");
+          caption.textContent = "Afficher l’historique cité";
+          const quote = document.createElement("p");
+          quote.textContent = content.slice(split).trim();
+          history.append(caption, quote);
+          message.append(history);
+        }
+        replyContent.append(message);
+      }
     } catch (error) {
       if (getSession()?.user?.id === userId) replyContent.textContent = error.message;
     } finally {
