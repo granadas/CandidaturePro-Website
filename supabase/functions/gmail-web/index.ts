@@ -68,7 +68,8 @@ Deno.serve(async (request: Request) => {
 
     if (!configured) return json({ message: "La connexion Gmail web attend la configuration Google." }, 503);
 
-    if (body?.action === "open_reply") {
+    if (["open_reply", "send_reply"].includes(body?.action)) {
+      const sending = body.action === "send_reply";
       const applicationId = body.applicationId;
       if (typeof applicationId !== "string" || !/^[0-9a-f-]{36}$/i.test(applicationId)) {
         return json({ message: "Dossier invalide." }, 400);
@@ -99,7 +100,7 @@ Deno.serve(async (request: Request) => {
       if (!message.ok) return json({ message: "Impossible de retrouver ce fil dans Gmail." }, 502);
       const { threadId } = await message.json();
       if (typeof threadId !== "string" || !threadId) return json({ message: "Fil Gmail introuvable." }, 404);
-      if (body.preview !== true) return json({ threadId });
+      if (!sending && body.preview !== true) return json({ threadId });
       if (typeof token.scope === "string" && !token.scope.split(" ").includes(readScope)) {
         return json({ threadId, needsConsent: true });
       }
@@ -109,7 +110,7 @@ Deno.serve(async (request: Request) => {
       if (!thread.ok) return json({ message: "Impossible de lire la réponse Gmail." }, 502);
       const decoded = (data: string) => new TextDecoder().decode(
         Uint8Array.from(atob(data.replace(/-/g, "+").replace(/_/g, "/")), char => char.charCodeAt(0)));
-      type Part = { mimeType?: string; filename?: string; body?: { data?: string }; parts?: Part[] };
+      type Part = { headers?: { name: string; value: string }[]; mimeType?: string; filename?: string; body?: { data?: string }; parts?: Part[] };
       const plainText = (part?: Part): string => {
         if (!part || part.filename) return "";
         if (part.mimeType === "text/plain" && part.body?.data) return decoded(part.body.data);
@@ -117,11 +118,41 @@ Deno.serve(async (request: Request) => {
       };
       const messages = (await thread.json()).messages || [];
       const original = Number(messages.find((item: { id: string }) => item.id === delivery.message_id)?.internalDate);
-      const replies = messages.filter((item: { id: string; internalDate: string; labelIds?: string[] }) =>
+      type Mail = { id: string; internalDate: string; labelIds?: string[]; payload?: Part };
+      const incoming = (messages as Mail[]).filter(item =>
         item.id !== delivery.message_id && Number(item.internalDate) > original &&
         !(item.labelIds || []).some(label => ["SENT", "DRAFT", "SPAM", "TRASH"].includes(label))
-      ).slice(-20).map((item: { payload?: Part }) => plainText(item.payload).slice(0, 30000));
-      return json({ threadId, replies });
+      ).sort((a, b) => Number(a.internalDate) - Number(b.internalDate));
+      const header = (item: Mail | undefined, name: string) =>
+        item?.payload?.headers?.find(value => value.name.toLowerCase() === name)?.value || "";
+      const latest = incoming.at(-1);
+      const from = header(latest, "from");
+      const recipient = (/<([^<>]+)>$/.exec(from.trim())?.[1] || from.trim()).toLowerCase();
+      const email = /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+$/i;
+      const reference = header(latest, "message-id").trim();
+      const subject = header(latest, "subject").replace(/[\r\n]+/g, " ").trim();
+      const canReply = email.test(recipient) && /^<[^<>\s]+>$/.test(reference) && Boolean(subject);
+      if (sending) {
+        if (!canReply || body.replyId !== latest?.id || body.recipient !== recipient) {
+          return json({ message: "Le fil a changé. Rouvrez la réponse avant d’envoyer." }, 409);
+        }
+        if (typeof body.message !== "string" || !body.message.trim() || body.message.length > 12000) {
+          return json({ message: "Renseignez une réponse de 12 000 caractères maximum." }, 400);
+        }
+        const subjectLine = /^re:/i.test(subject) ? subject : "Re: " + subject;
+        try {
+          const sent = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+            method: "POST", signal: AbortSignal.timeout(20000),
+            headers: { Authorization: "Bearer " + token.access_token, "Content-Type": "application/json" },
+            body: JSON.stringify({ threadId, raw: encodeMessage(recipient, subjectLine, body.message, [], reference) })
+          });
+          if (sent.ok && (await sent.json()).id) return json({ sent: true });
+          if ([400, 401, 403, 429].includes(sent.status)) return json({ message: "Gmail a refusé la réponse." }, 422);
+        } catch { /* Gmail may have accepted the request before the connection closed. */ }
+        return json({ message: "Envoi incertain. Vérifiez le dossier Envoyés dans Gmail avant de réessayer.", uncertain: true }, 502);
+      }
+      const replies = incoming.slice(-20).map(item => plainText(item.payload).slice(0, 30000));
+      return json({ threadId, replies, replyTo: canReply ? { id: latest?.id, recipient } : null });
     }
 
     if (body?.action === "refresh_replies") {
@@ -313,7 +344,7 @@ function parseAttachments(input: unknown): Attachment[] | null {
   return size <= 5 * 1024 * 1024 ? input : null;
 }
 
-function encodeMessage(recipient: string, subject: string, message: string, attachments: Attachment[]) {
+function encodeMessage(recipient: string, subject: string, message: string, attachments: Attachment[], reference = "") {
   const words: string[] = [];
   let part = "";
   for (const char of subject) {
@@ -328,6 +359,7 @@ function encodeMessage(recipient: string, subject: string, message: string, atta
   const body = ["Content-Type: text/plain; charset=UTF-8", "Content-Transfer-Encoding: base64", "",
     wrap(mimeBase64(message.replace(/\r\n|\r|\n/g, "\r\n")))];
   const headers = ["To: " + recipient, "Subject: " + words.join("\r\n "), "MIME-Version: 1.0"];
+  if (reference) headers.push("In-Reply-To: " + reference, "References: " + reference);
   if (attachments.length) {
     const boundary = "candidature-" + crypto.randomUUID();
     headers.push('Content-Type: multipart/mixed; boundary="' + boundary + '"', "", "--" + boundary, ...body);

@@ -89,3 +89,6 @@
 #cv-preview[data-template="compact"]{font-size:13px;line-height:1.4}
 #cv-preview[data-template="compact"] h2{margin:12px 0 4px}
 #cv-preview[data-template="compact"] p{margin:4px 0}
+#batch-dialog{width:min(640px,calc(100% - 24px));max-height:90dvh;overflow:auto}
+#batch-form{padding:20px}
+#batch-status{overflow-wrap:anywhere}

@@ -523,6 +523,7 @@
   const replyDraft = document.querySelector("#reply-draft");
   const replyEditorStatus = document.querySelector("#reply-editor-status");
   const replyGenerate = document.querySelector("#reply-generate");
+  const replySend = document.querySelector("#reply-send");
   let replyContext = null;
   let replyRequest = 0;
 
@@ -565,6 +566,27 @@
     }
   });
 
+  replySend.addEventListener("click", async () => {
+    const context = replyContext;
+    const message = replyDraft.value.trim();
+    if (!context?.replyTo || replySend.disabled) return;
+    if (!message) { replyEditorStatus.textContent = "Rédigez votre réponse."; return; }
+    if (!window.confirm("Envoyer cette réponse à " + context.replyTo.recipient + " ?")) return;
+    replySend.disabled = true;
+    try {
+      const result = await invokeEdgeFunction("gmail-web", { action: "send_reply",
+        applicationId: context.applicationId, replyId: context.replyTo.id, recipient: context.replyTo.recipient, message });
+      if (replyContext !== context) return;
+      if (result.sent !== true) throw new Error("Gmail n’a pas confirmé l’envoi.");
+      replyDraft.value = "";
+      replyEditorStatus.textContent = "Réponse envoyée dans le fil Gmail.";
+    } catch (error) {
+      if (replyContext === context) replyEditorStatus.textContent = error.message;
+    } finally {
+      replySend.disabled = false;
+    }
+  });
+
   document.querySelector("#reply-copy").addEventListener("click", async () => {
     if (!replyDraft.value.trim()) {
       replyEditorStatus.textContent = "Écrivez une réponse avant de la copier.";
@@ -589,6 +611,7 @@
     const request = ++replyRequest;
     replyContext = null;
     replyEditor.hidden = true;
+    replySend.hidden = true;
     replyEditor.open = false;
     replyDraft.value = "";
     replyEditorStatus.textContent = "";
@@ -607,10 +630,11 @@
       const replies = result.replies?.filter(text => text.trim()) || [];
       if (replies.length) {
         const application = button.closest(".application-row");
-        replyContext = { userId, body: replies.at(-1).slice(0, 8000),
+        replyContext = { userId, applicationId: button.dataset.openReply, replyTo: result.replyTo, body: replies.at(-1).slice(0, 8000),
           companyName: application.querySelector(".application-main strong").textContent,
           jobTitle: application.querySelector(".application-main span").textContent };
         replyEditor.hidden = false;
+        replySend.hidden = !result.replyTo;
       }
       replyContent.textContent = result.needsConsent ? "Autorisez la lecture pour afficher le message ici." :
         replies.length ? "" : "Le contenu de ce message est disponible dans Gmail.";
@@ -1471,6 +1495,10 @@
   const batchSelection = new Set();
   let batchQueue = [];
   let batchSize = 0;
+  let batchDrafts = [];
+  const batchDialog = document.querySelector("#batch-dialog");
+  const batchConfirm = document.querySelector("#batch-confirm");
+  const batchStatus = document.querySelector("#batch-status");
   const batchStart = document.querySelector("#batch-start");
   const batchProgress = document.querySelector("#batch-progress");
 
@@ -1510,10 +1538,63 @@
       }
     }
     batchSize = 0;
+    if (!batchDrafts.length) return;
+    const recipients = document.querySelector("#batch-recipients");
+    recipients.replaceChildren();
+    for (const draft of batchDrafts) {
+      const item = document.createElement("li");
+      item.textContent = draft.recipient + " · " + draft.subject;
+      recipients.append(item);
+    }
+    batchStatus.textContent = "";
+    batchConfirm.hidden = false;
+    batchDialog.showModal();
   }
+
+  document.querySelector("#batch-cancel").addEventListener("click", () => batchDialog.close());
+  batchDialog.addEventListener("cancel", event => {
+    if (batchConfirm.disabled) event.preventDefault();
+  });
+  batchDialog.addEventListener("close", cancelBatch);
+  document.querySelector("#batch-form").addEventListener("submit", async event => {
+    event.preventDefault();
+    if (batchConfirm.disabled || batchConfirm.hidden) return;
+    const userId = getSession()?.user?.id;
+    if (!userId) return;
+    const close = document.querySelector("#batch-cancel");
+    batchConfirm.disabled = close.disabled = true;
+    const outcomes = [];
+    const uniqueDrafts = [...batchDrafts];
+    try {
+      for (const draft of uniqueDrafts) {
+        if (getSession()?.user?.id !== userId) break;
+        batchStatus.textContent = "Envoi " + (outcomes.length + 1) + " sur " + uniqueDrafts.length + "…";
+        try {
+          const attachments = await encodeSendFiles(draft.files);
+          if (getSession()?.user?.id !== userId) break;
+          await invokeEdgeFunction("gmail-web", { action: "send", applicationId: draft.applicationId,
+            recipient: draft.recipient, subject: draft.subject, message: draft.message, attachments });
+          batchSelection.delete(draft.applicationId);
+          outcomes.push(draft.recipient + " · Envoyée");
+        } catch (error) {
+          outcomes.push(draft.recipient + " · " + error.message);
+        }
+      }
+      batchStatus.replaceChildren(...outcomes.map(line => {
+        const result = document.createElement("div");
+        result.textContent = line;
+        return result;
+      }));
+      await Promise.allSettled([loadApplications(), loadDashboard()]);
+    } finally {
+      batchConfirm.hidden = true;
+      batchConfirm.disabled = close.disabled = false;
+    }
+  });
 
   batchStart.addEventListener("click", () => {
     updateBatchSelection();
+    batchDrafts = [];
     batchQueue = [...batchSelection];
     batchSize = batchQueue.length;
     nextBatchApplication();
@@ -1675,6 +1756,7 @@
 
   function cancelBatch() {
     batchQueue = [];
+    batchDrafts = [];
     batchSize = 0;
   }
 
@@ -1714,7 +1796,7 @@
         : "Aucune pièce jointe";
       sendStatus.textContent = "";
       sendTitle.textContent = "Contrôle final";
-      sendSubmit.textContent = "Confirmer l’envoi via Gmail";
+      sendSubmit.textContent = batchSize ? "Valider ce dossier pour le lot" : "Confirmer l’envoi via Gmail";
       sendAi.hidden = true;
       librarySelect.closest("label").hidden = true;
       libraryAdd.hidden = true;
@@ -1725,24 +1807,19 @@
     }
     const draft = reviewed;
     const application = sendApplication;
+    if (batchSize) {
+      batchDrafts.push({ ...draft, applicationId: application.id, recipient: application.company_email });
+      sendDialog.close();
+      nextBatchApplication();
+      return;
+    }
     const editButton = document.querySelector("#send-edit");
     editButton.disabled = true;
     sendSubmit.disabled = true;
     document.querySelector("#send-cancel").disabled = true;
     sendStatus.textContent = "Envoi en cours…";
     try {
-      const files = draft.files;
-      const attachments = await Promise.all(files.map(async file => {
-        if (!/\.pdf$/i.test(file.name) || await file.slice(0, 5).text() !== "%PDF-") {
-          throw new Error("Les pièces jointes doivent être des PDF.");
-        }
-        const bytes = new Uint8Array(await file.arrayBuffer());
-        let binary = "";
-        for (let offset = 0; offset < bytes.length; offset += 8192) {
-          binary += String.fromCharCode(...bytes.subarray(offset, offset + 8192));
-        }
-        return { name: file.name, data: btoa(binary) };
-      }));
+      const attachments = await encodeSendFiles(draft.files);
       if (!userId || getSession()?.user?.id !== userId) return;
       await invokeEdgeFunction("gmail-web", {
         action: "send", attachments, applicationId: application.id, recipient: application.company_email,
@@ -1763,6 +1840,20 @@
       document.querySelector("#send-cancel").disabled = false;
     }
   });
+
+  async function encodeSendFiles(files) {
+    return Promise.all(files.map(async file => {
+        if (!/\.pdf$/i.test(file.name) || await file.slice(0, 5).text() !== "%PDF-") {
+          throw new Error("Les pièces jointes doivent être des PDF.");
+        }
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        let binary = "";
+        for (let offset = 0; offset < bytes.length; offset += 8192) {
+          binary += String.fromCharCode(...bytes.subarray(offset, offset + 8192));
+        }
+        return { name: file.name, data: btoa(binary) };
+      }));
+  }
 
   const gmailStatus = document.querySelector("#gmail-status");
   const gmailConnect = document.querySelector("#gmail-connect");

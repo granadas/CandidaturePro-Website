@@ -338,6 +338,7 @@
         <textarea id="reply-draft" rows="6" maxlength="12000"></textarea>
         <div class="reply-actions">
           <button id="reply-generate" type="button" class="secondary">Proposer un texte avec l’IA</button>
+          <button id="reply-send" type="button" class="primary" hidden>Confirmer l’envoi de la réponse</button>
           <button id="reply-copy" type="button" class="secondary">Copier le texte</button>
         </div>
         <p id="reply-editor-status" role="status"></p>
@@ -347,6 +348,16 @@
         <a id="reply-gmail" class="secondary" target="_blank" rel="noopener noreferrer" hidden>Ouvrir le fil dans Gmail</a>
         <button class="primary" autofocus>Fermer</button>
       </div>
+    </form>
+  </dialog>
+
+  <dialog id="batch-dialog" aria-labelledby="batch-title">
+    <form id="batch-form">
+      <h2 id="batch-title">Confirmer l’envoi groupé</h2>
+      <ul id="batch-recipients"></ul>
+      <p id="batch-status" role="status"></p>
+      <button class="primary" id="batch-confirm" type="submit">Envoyer les dossiers</button>
+      <button class="secondary" id="batch-cancel" type="button">Fermer</button>
     </form>
   </dialog>
 
