@@ -36,6 +36,8 @@
       <div class="sidebar-bottom">
         <a class="nav-item" href="https://github.com/granadas/CandidaturePro-Releases/releases/latest/download/CandidaturePro_Setup_x64.exe"><span aria-hidden="true">↓</span>Télécharger pour Windows</a>
         <div class="plan"><small>FORMULE ACTUELLE</small><strong id="current-plan">Free</strong><span id="plan-detail">5 candidatures par mois</span></div>
+        <button class="nav-item" data-view="premium"><span aria-hidden="true">☆</span>Premium</button>
+        <button class="nav-item" data-view="support"><span aria-hidden="true">?</span>Support</button>
         <button class="nav-item" data-view="settings"><span>⚙</span>Paramètres</button>
         <button id="sign-out" class="nav-item danger" hidden><span>↪</span>Déconnexion</button>
       </div>
@@ -227,6 +229,23 @@
         </article>
       </section>
 
+      <section id="premium-view" class="view">
+        <article class="panel">
+          <h2>Votre formule</h2>
+          <p id="premium-plan"></p>
+          <h3>Candidature Pro Premium · 14,99 CHF par mois</h3>
+          <p>Candidatures illimitées. L’offre gratuite comprend 5 candidatures par mois.</p>
+          <a class="secondary" href="mailto:jobrufali@gmail.com?subject=Demande%20Premium%20Candidature%20Pro">Demander Premium</a>
+        </article>
+      </section>
+      <section id="support-view" class="view">
+        <article class="panel">
+          <h2>Contacter le support</h2>
+          <p>Décrivez le problème et indiquez l’écran concerné.</p>
+          <a class="secondary" href="mailto:jobrufali@gmail.com?subject=Support%20Candidature%20Pro%20Web">Écrire au support</a>
+        </article>
+      </section>
+
       <section id="settings-view" class="view">
         <article class="panel">
           <div class="panel-head"><h2>Mon compte</h2></div>
@@ -262,6 +281,12 @@
       <label>Objet<input id="send-subject" maxlength="120" required></label>
       <label>Message<textarea id="send-message" rows="8" maxlength="12000" required></textarea></label>
       <label>CV et lettre en PDF (5 Mo au total)<input id="send-files" type="file" accept=".pdf,application/pdf" multiple></label>
+      <details id="send-ai">
+        <summary>Préparer une lettre avec l’IA</summary>
+        <label>Description de l’offre<textarea id="send-ai-offer" maxlength="6000" rows="3"></textarea></label>
+        <label>Expérience et compétences pertinentes<textarea id="send-ai-cv" maxlength="4000" rows="3"></textarea></label>
+        <button id="send-ai-generate" class="secondary" type="button">Générer la lettre</button>
+      </details>
       <section id="send-review" hidden tabindex="-1" aria-label="Aperçu du message">
         <h3 id="send-preview-subject"></h3>
         <p id="send-preview-message"></p>

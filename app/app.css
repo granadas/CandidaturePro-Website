@@ -55,3 +55,7 @@
 #send-dialog [hidden]{display:none}
 #send-review{padding:16px;background:#f5f7fc;border-radius:12px;overflow-wrap:anywhere}
 #send-preview-message{white-space:pre-wrap;max-height:42dvh;overflow:auto}
+
+#send-ai{margin:10px 0;padding:12px;border:1px solid #dce3ee;border-radius:12px}
+#send-ai summary{cursor:pointer;font-weight:700}
+#send-ai label{margin:12px 0}

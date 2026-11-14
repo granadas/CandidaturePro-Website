@@ -17,6 +17,8 @@
     tracking: ["Suivi", "Réponses, relances et entretiens"],
     profile: ["Mon profil", "Vos informations de candidature"],
     documents: ["Documents", "CV et lettres de motivation"],
+    premium: ["Premium", "Votre formule et les conditions Premium"],
+    support: ["Support", "Assistance Candidature Pro"],
     settings: ["Paramètres", "Compte, e-mail et préférences"]
   };
 
@@ -79,6 +81,7 @@
     document.querySelector("#settings-account").textContent = email
       ? email + (profile ? " · " + (isPremium ? "Premium" : "Free") : "")
       : "Connectez-vous pour accéder à votre compte.";
+    document.querySelector("#premium-plan").textContent = "Formule actuelle · " + (isPremium ? "Premium" : "Free");
     document.querySelector("#plan-detail").textContent = isPremium ? "Candidatures illimitées" : "5 candidatures par mois";
   }
 
@@ -98,6 +101,8 @@
     document.querySelector("#jobs-view").classList.toggle("active", isJobs);
     document.querySelector("#tracking-view").classList.toggle("active", isTracking);
     document.querySelector("#documents-view").classList.toggle("active", isDocuments);
+    document.querySelector("#premium-view").classList.toggle("active", name === "premium");
+    document.querySelector("#support-view").classList.toggle("active", name === "support");
     document.querySelector("#settings-view").classList.toggle("active", name === "settings");
     document.querySelectorAll(".nav-item[data-view]").forEach(item => item.classList.toggle("active", item.dataset.view === name));
 
@@ -243,7 +248,7 @@
       return invokeEdgeFunction(name, body, false);
     }
     const result = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(result.message || "Le service est indisponible.");
+    if (!response.ok) throw new Error(result.message || result.error || "Le service est indisponible.");
     return result;
   }
 
@@ -985,6 +990,44 @@
   const sendStatus = document.querySelector("#send-status");
   let sendApplication = null;
   let reviewed = null;
+  const sendAi = document.querySelector("#send-ai");
+  const sendAiButton = document.querySelector("#send-ai-generate");
+
+  sendAiButton.addEventListener("click", async () => {
+    const dossier = sendApplication;
+    const userId = getSession()?.user?.id;
+    const message = document.querySelector("#send-message");
+    const initialMessage = message.value;
+    const summary = document.querySelector("#send-ai-cv").value.trim();
+    const jobOffer = document.querySelector("#send-ai-offer").value.trim();
+    if (!dossier || !userId || !summary) {
+      sendStatus.textContent = "Indiquez votre expérience et vos compétences pour préparer la lettre.";
+      return;
+    }
+    sendAiButton.disabled = true;
+    sendStatus.textContent = "Génération en cours…";
+    try {
+      const result = await invokeEdgeFunction("generate-motivation-letter", {
+        company: dossier.company_name, jobTitle: dossier.job_title || "", city: dossier.company_city || "",
+        jobOffer, cv: { summary }
+      });
+      if (!sendDialog.open || sendApplication !== dossier || getSession()?.user?.id !== userId || reviewed) return;
+      if (message.value !== initialMessage) {
+        sendStatus.textContent = "Le message a été modifié pendant la génération. Vos modifications sont conservées.";
+        return;
+      }
+      if (typeof result.letter !== "string" || !result.letter.trim() || result.letter.length > 12000) {
+        throw new Error("La lettre générée est vide ou dépasse la taille autorisée.");
+      }
+      message.value = result.letter.trim();
+      sendStatus.textContent = "Lettre ajoutée. Tu peux la modifier avant le contrôle final.";
+    } catch (error) {
+      if (sendDialog.open && sendApplication === dossier && getSession()?.user?.id === userId) sendStatus.textContent = error.message;
+    } finally {
+      sendAiButton.disabled = false;
+    }
+  });
+
   const sendReview = document.querySelector("#send-review");
   const sendTitle = document.querySelector("#send-title");
   const sendInputs = ["subject", "message", "files"].map(name => document.querySelector("#send-" + name));
@@ -992,6 +1035,7 @@
   function editSendDraft() {
     reviewed = null;
     sendReview.hidden = true;
+    sendAi.hidden = false;
     for (const input of sendInputs) {
       input.disabled = false;
       input.closest("label").hidden = false;
@@ -1011,6 +1055,7 @@
     if (!dossier?.company_email || !getSession()?.user?.id) return;
     sendApplication = dossier;
     sendForm.reset();
+    sendAi.open = false;
     editSendDraft();
     sendSubmit.disabled = false;
     sendStatus.textContent = "";
@@ -1053,6 +1098,7 @@
       sendStatus.textContent = "";
       sendTitle.textContent = "Contrôle final";
       sendSubmit.textContent = "Confirmer l’envoi via Gmail";
+      sendAi.hidden = true;
       sendReview.hidden = false;
       sendReview.focus();
       return;
