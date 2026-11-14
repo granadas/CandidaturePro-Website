@@ -89,7 +89,7 @@
     document.querySelector("#plan-detail").textContent = isPremium ? "Candidatures illimitées" : "5 candidatures par mois";
   }
 
-  function showView(name) {
+  function showView(name, syncReplies = true) {
     if (appShell.hidden || (name === "admin" && profile?.is_admin !== true)) return;
     const isDashboard = name === "dashboard";
     const isProfile = name === "profile";
@@ -122,7 +122,10 @@
     if (isApplications) loadApplications();
     if (isCompanies) renderCompanies();
     if (isJobs) loadJobs();
-    if (isTracking) loadTracking();
+    if (isTracking) {
+      loadTracking();
+      if (syncReplies) syncGmailRepliesAutomatically();
+    }
     if (isDocuments) { loadDocuments(); loadCvVariants(); }
     if (name === "settings") loadGmail();
     sidebar.classList.remove("open");
@@ -1970,22 +1973,65 @@
   const authorizeReplies = document.querySelector("#authorize-replies");
   const repliesStatus = document.querySelector("#replies-status");
 
-  refreshReplies.addEventListener("click", async () => {
+  const gmailSyncInterval = 5 * 60 * 1000;
+  let lastGmailSync = 0;
+  let lastGmailSyncUser = null;
+  let gmailSyncRunning = false;
+
+  const trackingVisible = () => !appShell.hidden && !document.hidden &&
+    document.querySelector("#tracking-view").classList.contains("active");
+
+  function syncGmailRepliesAutomatically() {
+    const userId = getSession()?.user?.id;
+    if (userId && trackingVisible() &&
+        (lastGmailSyncUser !== userId || Date.now() - lastGmailSync >= gmailSyncInterval)) {
+      syncGmailReplies(false);
+    }
+  }
+
+  async function syncGmailReplies(manual) {
+    const userId = getSession()?.user?.id;
+    if (!userId || gmailSyncRunning) return;
+    gmailSyncRunning = true;
+    lastGmailSync = Date.now();
+    lastGmailSyncUser = userId;
     refreshReplies.disabled = true;
-    authorizeReplies.hidden = true;
-    repliesStatus.textContent = "Recherche des réponses Gmail…";
+    if (manual) repliesStatus.textContent = "Recherche des réponses Gmail…";
+    let updated = 0;
+    let checked = 0;
+    let after = null;
     try {
-      const result = await invokeEdgeFunction("gmail-web", { action: "refresh_replies" });
-      authorizeReplies.hidden = !result.needsConsent;
-      repliesStatus.textContent = result.needsConsent ? "Autorisez Gmail pour vérifier les réponses à vos candidatures." :
-        result.updated ? result.updated + " candidature(s) mise(s) à jour." : "Aucune nouvelle réponse dans les 20 derniers envois web.";
-      await loadTracking();
+      do {
+        const result = await invokeEdgeFunction("gmail-web", { action: "refresh_replies", after });
+        if (getSession()?.user?.id !== userId) return;
+        updated += result.updated || 0;
+        checked += result.checked || 0;
+        authorizeReplies.hidden = !result.needsConsent;
+        if (result.needsConsent) {
+          repliesStatus.textContent = "Autorisez Gmail pour vérifier les réponses à vos candidatures.";
+          return;
+        }
+        after = result.next || null;
+        if (after && manual) repliesStatus.textContent = checked + " dossiers vérifiés…";
+        if (after && !manual && !trackingVisible()) {
+          lastGmailSync = 0;
+          return;
+        }
+      } while (after);
+      repliesStatus.textContent = updated ? updated + " candidature(s) mise(s) à jour." :
+        checked ? "Aucune nouvelle réponse." : "Aucun envoi Gmail à vérifier.";
     } catch (error) {
-      repliesStatus.textContent = error.message;
+      if (getSession()?.user?.id === userId) repliesStatus.textContent = error.message;
     } finally {
       refreshReplies.disabled = false;
+      gmailSyncRunning = false;
+      if (updated && getSession()?.user?.id === userId && trackingVisible()) await loadTracking();
     }
-  });
+  }
+
+  refreshReplies.addEventListener("click", () => syncGmailReplies(true));
+  document.addEventListener("visibilitychange", syncGmailRepliesAutomatically);
+  setInterval(syncGmailRepliesAutomatically, gmailSyncInterval);
 
   gmailConnect.addEventListener("click", () => startGmailConnection(gmailConnect, true));
   authorizeReplies.addEventListener("click", () => startGmailConnection(authorizeReplies, true));
@@ -2030,13 +2076,13 @@
     catch { flow = null; }
     sessionStorage.removeItem(gmailFlowKey);
     history.replaceState(null, "", url.pathname);
-    showView(flow?.readReplies && flow?.fromTracking ? "tracking" : "settings");
+    showView(flow?.readReplies && flow?.fromTracking ? "tracking" : "settings", false);
     try {
       if (!flow || flow.state !== url.searchParams.get("state") || Date.now() - flow.startedAt > 10 * 60 * 1000 ||
           !flow.userId || flow.userId !== getSession()?.user?.id) throw new Error("La demande de connexion Gmail a expiré. Réessayez.");
       if (url.searchParams.has("error")) throw new Error("Connexion Gmail annulée.");
       await invokeEdgeFunction("gmail-web", { action: "exchange", code: url.searchParams.get("code"), verifier: flow.verifier, readReplies: flow.readReplies === true });
-      if (flow.readReplies && flow.fromTracking) refreshReplies.click();
+      if (flow.readReplies && flow.fromTracking) await syncGmailReplies(true);
       else await loadGmail();
     } catch (error) {
       await loadGmail();

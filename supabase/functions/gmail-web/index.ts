@@ -216,28 +216,35 @@ Deno.serve(async (request: Request) => {
       if (typeof token.scope === "string" && !token.scope.split(" ").some((item: string) => item === metadataScope || item === readScope)) return json({ needsConsent: true });
       const gmailHeaders = { Authorization: "Bearer " + token.access_token };
       const rest = root + "/rest/v1/";
+      const after = body.after;
+      if (after != null && (typeof after !== "string" || !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(after))) {
+        return json({ message: "Position de synchronisation invalide." }, 400);
+      }
+      const pageSize = 10;
       const deliveries = await fetch(rest + "web_gmail_deliveries" + filter +
-        "&select=application_id,message_id&message_id=not.is.null&order=reserved_at.desc&limit=20", { headers: serviceHeaders });
+        "&select=application_id,message_id&message_id=not.is.null&order=application_id.asc&limit=" + (pageSize + 1) +
+        (after ? "&application_id=gt." + after : ""), { headers: serviceHeaders });
       if (!deliveries.ok) return json({ message: "Dossiers envoyés indisponibles." }, 503);
-      let updated = 0;
-      for (const delivery of await deliveries.json()) {
+      const rows = await deliveries.json();
+      const page = rows.slice(0, pageSize);
+      const checkDelivery = async (delivery: { application_id: string; message_id: string }) => {
         const message = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/" +
-          encodeURIComponent(delivery.message_id) + "?format=minimal", { headers: gmailHeaders });
+          encodeURIComponent(delivery.message_id) + "?format=minimal", { headers: gmailHeaders, signal: AbortSignal.timeout(7000) });
         if (message.status === 403) {
           const error = await message.json().catch(() => null);
           if ((JSON.stringify(error) || "").includes("ACCESS_TOKEN_SCOPE_INSUFFICIENT") ||
               error?.error?.errors?.some((item: { reason?: string }) => item.reason === "insufficientPermissions")) {
-            return json({ needsConsent: true });
+            return { updated: 0, needsConsent: true };
           }
         }
-        if (message.status === 404) continue;
-        if (!message.ok) return json({ message: "Impossible de consulter les fils Gmail. Réessayez." }, 502);
+        if (message.status === 404) return { updated: 0 };
+        if (!message.ok) throw new Error("Impossible de consulter les fils Gmail. Réessayez.");
         const sent = await message.json();
-        if (!sent.threadId) continue;
+        if (!sent.threadId) return { updated: 0 };
         const thread = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/threads/" +
-          encodeURIComponent(sent.threadId) + "?format=metadata&metadataHeaders=Date&fields=messages(id,internalDate,labelIds,payload(headers))", { headers: gmailHeaders });
-        if (thread.status === 404) continue;
-        if (!thread.ok) return json({ message: "Impossible de consulter les fils Gmail. Réessayez." }, 502);
+          encodeURIComponent(sent.threadId) + "?format=metadata&metadataHeaders=Date&fields=messages(id,internalDate,labelIds,payload(headers))", { headers: gmailHeaders, signal: AbortSignal.timeout(7000) });
+        if (thread.status === 404) return { updated: 0 };
+        if (!thread.ok) throw new Error("Impossible de consulter les fils Gmail. Réessayez.");
         const messages = (await thread.json()).messages || [];
         type GmailMessage = { id: string; internalDate?: string; labelIds?: string[];
           payload?: { headers?: { name: string; value: string }[] } };
@@ -245,7 +252,7 @@ Deno.serve(async (request: Request) => {
           ? Number(item.internalDate)
           : Date.parse(item?.payload?.headers?.find(header => header.name.toLowerCase() === "date")?.value || "");
         const originalDate = timestamp(messages.find((item: GmailMessage) => item.id === delivery.message_id));
-        if (!Number.isFinite(originalDate)) continue;
+        if (!Number.isFinite(originalDate)) return { updated: 0 };
         const latest = messages.reduce((date: number, item: GmailMessage) => {
           if (item.id === delivery.message_id) return date;
           const received = timestamp(item);
@@ -253,7 +260,7 @@ Deno.serve(async (request: Request) => {
           return Number.isFinite(received) && !labels.some(label => ["SENT", "DRAFT", "SPAM", "TRASH"].includes(label))
             ? Math.max(date, received) : date;
         }, originalDate);
-        if (latest <= originalDate) continue;
+        if (latest <= originalDate) return { updated: 0 };
         const date = new Date(latest).toISOString();
         const changed = await fetch(rest + "user_applications" + filter + "&id=eq." +
           encodeURIComponent(delivery.application_id) +
@@ -262,10 +269,23 @@ Deno.serve(async (request: Request) => {
           headers: { ...serviceHeaders, "Content-Type": "application/json", Prefer: "return=representation" },
           body: JSON.stringify({ status: "reply_received", last_inbound_at: date })
         });
-        if (!changed.ok) return json({ message: "Impossible d’enregistrer une réponse. Réessayez." }, 503);
-        updated += (await changed.json()).length;
+        if (!changed.ok) throw new Error("Impossible d’enregistrer une réponse. Réessayez.");
+        return { updated: (await changed.json()).length };
+      };
+
+      let updated = 0;
+      try {
+        for (let index = 0; index < page.length; index += 5) {
+          const results = await Promise.all(page.slice(index, index + 5).map(checkDelivery));
+          updated += results.reduce((sum, result) => sum + result.updated, 0);
+          if (results.some(result => result.needsConsent)) return json({ updated, needsConsent: true });
+        }
+      } catch (error) {
+        return json({ message: error instanceof Error && error.name === "Error"
+          ? error.message : "La vérification Gmail a été interrompue. Réessayez." }, 502);
       }
-      return json({ updated });
+      return json({ updated, checked: page.length,
+        next: rows.length > pageSize ? page.at(-1).application_id : null });
     }
 
     if (body?.action === "send") {
