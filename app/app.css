@@ -28,3 +28,9 @@
 .guest-content h1{font-size:clamp(32px,6vw,56px);line-height:1.1;margin:0}
 .guest-content p{max-width:55ch;margin:20px 0 28px;line-height:1.6}
 .guest-content a{display:inline-block;margin:12px;color:#5b21b6}
+
+.guest-home{margin:clamp(20px,5vw,60px) auto;background:linear-gradient(135deg,#101828,#192841);border-radius:24px;color:#f7f9ff;width:calc(100% - 32px)}
+.guest-home .brand,.guest-content a{color:#d9e5ff}
+.guest-content{background:transparent;padding:0;margin-top:clamp(36px,7vw,70px)}
+.guest-content p{color:#c4cfe2}
+.guest-content .guest-kicker{margin:0 0 10px;color:#b4c9ff;font-weight:700}

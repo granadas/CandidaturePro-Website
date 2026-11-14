@@ -1072,6 +1072,12 @@
     renderAccount();
     showView("dashboard");
     await finishGmailConnection();
+    const url = new URL(location.href);
+    if (url.searchParams.has("connexion")) {
+      url.searchParams.delete("connexion");
+      history.replaceState(null, "", url);
+      if (appShell.hidden) dialog.showModal();
+    }
     try { await loadDashboard(); }
     catch (error) {
       document.querySelector("#account-label").textContent = error.message;
