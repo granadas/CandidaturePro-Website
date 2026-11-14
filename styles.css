@@ -21,3 +21,13 @@
 .product-preview figcaption{padding:0 24px 16px}
 @media(max-width:850px){.hero{grid-template-columns:1fr;min-height:0;padding:58px 0}.product-preview{width:min(100%,560px)}}
 @media(max-width:480px){.hero h1{font-size:clamp(37px,10vw,48px)}.hero h1 br{display:none}.preview-header,.preview-body{padding-inline:16px}.product-preview figcaption{padding-inline:16px}}
+
+.hero-electric{position:relative;isolation:isolate}
+.hero-electric::before{content:"";position:absolute;z-index:-1;inset:0 calc((100% - 100vw)/2);pointer-events:none;overflow:hidden;background:radial-gradient(ellipse at 82% 50%,#0c2d73 0,transparent 45%),linear-gradient(155deg,#041022 55%,#041633 74%,#073b9d 95%)}
+.hero-electric h1 em{color:#41cef7;background:none}
+.hero-electric .btn-primary,.nav-actions .btn-primary{background:#0759e5}
+.hero-electric .product-preview{position:relative;overflow:visible;background:linear-gradient(145deg,#182f50,#0b2141);border-color:#63baff;box-shadow:0 0 24px #1684ff7a,inset 0 0 15px #1e82ee55;transform:perspective(1000px) rotateY(-10deg) rotateZ(-4deg)}
+.hero-electric .product-preview::after{content:"";position:absolute;inset:18px -13px -15px 22px;z-index:-1;border:1px solid #338fff;border-radius:24px;box-shadow:0 8px 22px #0067f56b;pointer-events:none}
+.hero-electric .preview-header{border-radius:23px 23px 0 0;background:#182d4b}
+.hero-electric .preview-row{margin:8px 0;padding:12px;border:1px solid #345175;border-radius:12px;background:#1b3456}
+@media(max-width:850px){.hero-electric .product-preview{transform:none;margin-bottom:14px}.hero-electric .product-preview::after{right:-5px}}
