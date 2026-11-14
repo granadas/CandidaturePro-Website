@@ -7,8 +7,7 @@ Deno.serve(async (request: Request) => {
   const previewRedirect = Deno.env.get("GMAIL_WEB_REDIRECT_URI") || "";
   const productionRedirect = "https://candidaturepro.ch/app/";
   const origin = request.headers.get("origin");
-  const productionEnabled = Deno.env.get("GMAIL_WEB_PRODUCTION_REDIRECT_URI") === productionRedirect;
-  const redirect = productionEnabled && origin === new URL(productionRedirect).origin
+  const redirect = origin === new URL(productionRedirect).origin
     ? productionRedirect : previewRedirect;
   const clientId = Deno.env.get("GMAIL_WEB_CLIENT_ID") || "";
   const clientSecret = Deno.env.get("GMAIL_WEB_CLIENT_SECRET") || "";
