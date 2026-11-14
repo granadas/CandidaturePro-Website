@@ -1,6 +1,13 @@
 (() => {
   "use strict";
 
+  if (location.hostname === "www.candidaturepro.ch") {
+    const canonical = new URL(location.href);
+    canonical.hostname = "candidaturepro.ch";
+    location.replace(canonical.href);
+    return;
+  }
+
   const config = window.CANDIDATURE_PRO_CONFIG || {};
   const storageKey = "candidature-pro-web-session";
   let profile = null;
