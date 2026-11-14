@@ -198,7 +198,8 @@ Deno.serve(async (request: Request) => {
         return json({ message: "Envoi incertain. Vérifiez le dossier Envoyés dans Gmail avant de réessayer.", uncertain: true }, 502);
       }
       const replies = incoming.slice(-20).map(item => plainText(item.payload).slice(0, 30000));
-      return json({ threadId, replies, replyTo: canReply ? { id: latest?.id, recipient } : null });
+      const latestInboundAt = latest ? new Date(Number(latest.internalDate)).toISOString() : null;
+      return json({ threadId, replies, latestInboundAt, replyTo: canReply ? { id: latest?.id, recipient } : null });
     }
 
     if (body?.action === "refresh_replies") {
@@ -242,7 +243,7 @@ Deno.serve(async (request: Request) => {
         const sent = await message.json();
         if (!sent.threadId) return { updated: 0 };
         const thread = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/threads/" +
-          encodeURIComponent(sent.threadId) + "?format=metadata&metadataHeaders=Date&fields=messages(id,internalDate,labelIds,payload(headers))", { headers: gmailHeaders, signal: AbortSignal.timeout(7000) });
+          encodeURIComponent(sent.threadId) + "?format=metadata&metadataHeaders=Date&metadataHeaders=Auto-Submitted&metadataHeaders=X-Autoreply&metadataHeaders=X-Autorespond&fields=messages(id,internalDate,labelIds,payload(headers))", { headers: gmailHeaders, signal: AbortSignal.timeout(7000) });
         if (thread.status === 404) return { updated: 0 };
         if (!thread.ok) throw new Error("Impossible de consulter les fils Gmail. Réessayez.");
         const messages = (await thread.json()).messages || [];
@@ -253,24 +254,32 @@ Deno.serve(async (request: Request) => {
           : Date.parse(item?.payload?.headers?.find(header => header.name.toLowerCase() === "date")?.value || "");
         const originalDate = timestamp(messages.find((item: GmailMessage) => item.id === delivery.message_id));
         if (!Number.isFinite(originalDate)) return { updated: 0 };
-        const latest = messages.reduce((date: number, item: GmailMessage) => {
-          if (item.id === delivery.message_id) return date;
+        let automatic = originalDate;
+        let human = originalDate;
+        for (const item of messages as GmailMessage[]) {
+          if (item.id === delivery.message_id || (item.labelIds || []).some(label =>
+            ["SENT", "DRAFT", "SPAM", "TRASH"].includes(label))) continue;
           const received = timestamp(item);
-          const labels = item.labelIds || [];
-          return Number.isFinite(received) && !labels.some(label => ["SENT", "DRAFT", "SPAM", "TRASH"].includes(label))
-            ? Math.max(date, received) : date;
-        }, originalDate);
-        if (latest <= originalDate) return { updated: 0 };
-        const date = new Date(latest).toISOString();
-        const changed = await fetch(rest + "user_applications" + filter + "&id=eq." +
-          encodeURIComponent(delivery.application_id) +
-          "&hidden_at=is.null&status=in.(sent,reply_received)&or=(last_inbound_at.is.null,last_inbound_at.lt." + encodeURIComponent(date) + ")&select=id", {
-          method: "PATCH",
-          headers: { ...serviceHeaders, "Content-Type": "application/json", Prefer: "return=representation" },
-          body: JSON.stringify({ status: "reply_received", last_inbound_at: date })
+          if (!Number.isFinite(received) || received <= originalDate) continue;
+          const automated = (item.payload?.headers || []).some(({ name, value }) => {
+            const header = name.toLowerCase();
+            const marker = value.trim().toLowerCase().split(";")[0].trim();
+            return header === "auto-submitted" ? Boolean(marker && marker !== "no") :
+              ["x-autoreply", "x-autorespond"].includes(header) && Boolean(marker && marker !== "no");
+          });
+          if (automated) automatic = Math.max(automatic, received);
+          else human = Math.max(human, received);
+        }
+        if (automatic === originalDate && human === originalDate) return { updated: 0 };
+        const changed = await fetch(rest + "rpc/record_web_gmail_replies", {
+          method: "POST",
+          headers: { ...serviceHeaders, "Content-Type": "application/json" },
+          body: JSON.stringify({ p_user: id, p_application: delivery.application_id,
+            p_automatic: automatic > originalDate ? new Date(automatic).toISOString() : null,
+            p_human: human > originalDate ? new Date(human).toISOString() : null })
         });
         if (!changed.ok) throw new Error("Impossible d’enregistrer une réponse. Réessayez.");
-        return { updated: (await changed.json()).length };
+        return { updated: (await changed.json()) === true ? 1 : 0 };
       };
 
       let updated = 0;

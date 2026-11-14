@@ -663,6 +663,20 @@
         }
         replyContent.append(message);
       }
+      if (replies.length && result.latestInboundAt) {
+        const id = button.dataset.openReply;
+        try {
+          const date = encodeURIComponent(result.latestInboundAt);
+          await supabaseWrite("user_applications?id=eq." + encodeURIComponent(id) +
+            "&or=(last_reply_read_at.is.null,last_reply_read_at.lt." + date + ")", "PATCH",
+            { last_reply_read_at: result.latestInboundAt });
+          if (getSession()?.user?.id === userId) await loadTracking();
+        } catch {
+          if (request === replyRequest && replyDialog.open) {
+            replyEditorStatus.textContent = "La lecture n’a pas pu être enregistrée.";
+          }
+        }
+      }
     } catch (error) {
       if (request === replyRequest && getSession()?.user?.id === userId) replyContent.textContent = error.message;
     } finally {
@@ -767,9 +781,26 @@
     return due <= today;
   }
 
+  function hasUnreadReply(row) {
+    return Boolean(row.last_inbound_at &&
+      (!row.last_reply_read_at || Date.parse(row.last_inbound_at) > Date.parse(row.last_reply_read_at)));
+  }
+
+  function recommendedTrackingAction(row) {
+    if (row.hidden_at) return "";
+    if (hasUnreadReply(row)) return "Lire la nouvelle réponse";
+    if (row.status === "interview") return "Préparer l’entretien";
+    if (followUpDue(row)) return "Préparer une relance";
+    if (row.status === "reply_received" && row.last_human_reply_at) return "Vérifier si une réponse est nécessaire";
+    return "";
+  }
+
   function applyTrackingFilters() {
     const query = trackingText(trackingSearch.value.trim());
     const filters = {
+      unread: hasUnreadReply,
+      action: recommendedTrackingAction,
+      automatic: row => Boolean(row.last_automatic_reply_at),
       waiting: row => row.status === "sent" && !row.last_inbound_at,
       reply: row => Boolean(row.last_inbound_at) || row.status === "reply_received",
       interview: row => row.status === "interview",
@@ -825,14 +856,15 @@
     message.textContent = "Chargement…";
     try {
       const rows = await supabaseFetch(
-        "user_applications?select=id,company_name,company_email,job_title,status,sent_at,next_follow_up_at,last_inbound_at,last_follow_up_sent_at,follow_up_delay_days,hidden_at" +
+        "user_applications?select=id,company_name,company_email,job_title,status,sent_at,next_follow_up_at,last_inbound_at,last_follow_up_sent_at,follow_up_delay_days,hidden_at,last_automatic_reply_at,last_human_reply_at,last_reply_read_at" +
         "&status=in.(sent,reply_received,interview,accepted,rejected)" +
         "&order=next_follow_up_at.asc.nullslast,last_activity_at.desc"
       );
       if (getSession()?.user?.id !== userId || trackingHidden.checked !== showHidden) return;
       const activeRows = rows.filter(row => !row.hidden_at);
       document.querySelector("#tracking-sent-count").textContent = activeRows.filter(row => row.sent_at).length;
-      document.querySelector("#tracking-reply-count").textContent = activeRows.filter(row => row.last_inbound_at || row.status === "reply_received").length;
+      document.querySelector("#tracking-reply-count").textContent = activeRows.filter(row => row.last_human_reply_at).length;
+      document.querySelector("#tracking-automatic-count").textContent = activeRows.filter(row => row.last_automatic_reply_at).length;
       document.querySelector("#tracking-interview-count").textContent = activeRows.filter(row => row.status === "interview").length;
       document.querySelector("#tracking-due-count").textContent = activeRows.filter(followUpDue).length;
       trackingRows = showHidden ? rows.filter(row => row.hidden_at) : activeRows;
@@ -841,6 +873,7 @@
         const localDate = followUp
           ? new Date(followUp.getTime() - followUp.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
           : "";
+        const action = recommendedTrackingAction(row);
         const overdue = followUp && followUp.getTime() < new Date().setHours(0, 0, 0, 0);
         return '<article class="application-row"><div class="application-main"><strong>' +
           escapeHtml(row.company_name) + '</strong><span>' +
@@ -849,6 +882,8 @@
           (row.sent_at ? " · " + trackingDateFormat.format(new Date(row.sent_at)) : "") +
           (row.last_follow_up_sent_at ? " · Dernière relance le " + trackingDateFormat.format(new Date(row.last_follow_up_sent_at)) : "") +
           (overdue ? " · Relance en retard" : "") + '</small>' +
+          (hasUnreadReply(row) ? '<strong class="badge">Non lue</strong>' : '') +
+          (action ? '<p class="tracking-action">' + escapeHtml(action) + '</p>' : '') +
           (canFollowUp(row)
             ? '<label><input type="checkbox" data-followup-choice value="' + escapeHtml(row.id) + '"> Sélectionner pour relance</label>' : '') +
           (row.last_inbound_at ? '<button type="button" class="secondary compact" data-open-reply="' +

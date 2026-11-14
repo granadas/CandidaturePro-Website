@@ -207,7 +207,8 @@
           <p id="replies-status" role="status"></p>
           <div class="tracking-stats" aria-label="Résumé du suivi">
             <div><span>Envoyées</span><strong id="tracking-sent-count">—</strong></div>
-            <div><span>Avec réponse</span><strong id="tracking-reply-count">—</strong></div>
+            <div><span>Réponses humaines</span><strong id="tracking-reply-count">—</strong></div>
+            <div><span>Réponses automatiques</span><strong id="tracking-automatic-count">—</strong></div>
             <div><span>Entretiens</span><strong id="tracking-interview-count">—</strong></div>
             <div><span>Relances à faire</span><strong id="tracking-due-count">—</strong></div>
           </div>
@@ -215,7 +216,10 @@
             <label>Rechercher un dossier<input id="tracking-search" type="search" placeholder="Entreprise ou poste"></label>
             <label>Filtrer le suivi<select id="tracking-filter">
               <option value="">Toutes</option>
+              <option value="unread">Réponses non lues</option>
+              <option value="action">Actions recommandées</option>
               <option value="waiting">Sans réponse</option>
+              <option value="automatic">Réponses automatiques</option>
               <option value="reply">Avec réponse</option>
               <option value="interview">Entretiens</option>
               <option value="due">Relances à faire</option>
