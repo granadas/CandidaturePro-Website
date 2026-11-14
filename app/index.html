@@ -205,6 +205,7 @@
           <button id="refresh-replies" class="secondary compact">Actualiser les e-mails reçus</button>
           <button id="authorize-replies" class="secondary compact" hidden>Autoriser le suivi Gmail</button>
           <p id="replies-status" role="status"></p>
+          <button id="followup-batch" type="button" class="secondary compact">Préparer les relances sélectionnées</button>
           <div id="tracking-message" class="list-message" role="status"></div>
           <div id="tracking-list" class="applications-list"></div>
         </article>
@@ -348,6 +349,17 @@
         <a id="reply-gmail" class="secondary" target="_blank" rel="noopener noreferrer" hidden>Ouvrir le fil dans Gmail</a>
         <button class="primary" autofocus>Fermer</button>
       </div>
+    </form>
+  </dialog>
+
+  <dialog id="followup-dialog" aria-labelledby="followup-title">
+    <form id="followup-form">
+      <h2 id="followup-title">Relances en lot</h2>
+      <p>Vérifiez le destinataire et le texte de chaque relance.</p>
+      <div id="followup-drafts"></div>
+      <p id="followup-status" role="status"></p>
+      <button id="followup-confirm" class="primary" type="submit">Envoyer les relances</button>
+      <button id="followup-close" class="secondary" type="button">Fermer</button>
     </form>
   </dialog>
 

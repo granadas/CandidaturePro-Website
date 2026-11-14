@@ -667,10 +667,85 @@
 
   const trackingDateFormat = new Intl.DateTimeFormat("fr-CH", { dateStyle: "medium" });
 
+  let trackingRows = [];
+  const followupDialog = document.querySelector("#followup-dialog");
+  const followupForm = document.querySelector("#followup-form");
+  const followupStatus = document.querySelector("#followup-status");
+  const followupClose = document.querySelector("#followup-close");
+  const followupConfirm = document.querySelector("#followup-confirm");
+  const followupDrafts = document.querySelector("#followup-drafts");
+  let followupRows = [];
+
+  document.querySelector("#followup-batch").addEventListener("click", () => {
+    const selection = new Set([...document.querySelectorAll("[data-followup-choice]:checked")].map(input => input.value));
+    followupRows = trackingRows.filter(row => selection.has(row.id));
+    if (!followupRows.length) {
+      document.querySelector("#tracking-message").textContent = "Sélectionnez les dossiers à relancer.";
+      return;
+    }
+    followupDrafts.replaceChildren();
+    for (const row of followupRows) {
+      const label = document.createElement("label");
+      label.textContent = row.company_name + " · " + row.company_email;
+      const message = document.createElement("textarea");
+      message.value = "Bonjour,\n\nJe me permets de revenir vers vous au sujet de ma candidature" +
+        (row.job_title ? " pour le poste de " + row.job_title : "") +
+        ". Je reste à votre disposition pour tout complément.\n\nCordialement,";
+      message.required = true;
+      message.maxLength = 12000;
+      message.rows = 5;
+      label.append(message);
+      followupDrafts.append(label);
+    }
+    followupStatus.textContent = "";
+    followupConfirm.hidden = false;
+    followupDialog.showModal();
+  });
+
+  followupClose.addEventListener("click", () => followupDialog.close());
+  followupDialog.addEventListener("cancel", event => {
+    if (followupConfirm.disabled) event.preventDefault();
+  });
+  followupForm.addEventListener("submit", async event => {
+    event.preventDefault();
+    if (followupConfirm.disabled || followupConfirm.hidden) return;
+    const userId = getSession()?.user?.id;
+    if (!userId) return;
+    const messages = [...followupDrafts.querySelectorAll("textarea")].map(input => input.value.trim());
+    if (messages.some(message => !message)) {
+      followupStatus.textContent = "Renseignez le texte de chaque relance.";
+      return;
+    }
+    const rows = [...followupRows];
+    followupConfirm.disabled = followupClose.disabled = true;
+    followupDrafts.querySelectorAll("textarea").forEach(input => { input.readOnly = true; });
+    const results = [];
+    try {
+      for (const [index, row] of rows.entries()) {
+        if (getSession()?.user?.id !== userId) break;
+        followupStatus.textContent = "Relance " + (index + 1) + " sur " + rows.length + "…";
+        try {
+          const response = await invokeEdgeFunction("gmail-web", { action: "send_followup",
+            applicationId: row.id, recipient: row.company_email, message: messages[index] });
+          if (response.sent !== true) throw new Error("Gmail n’a pas confirmé l’envoi.");
+          results.push(row.company_name + " · Relance envoyée");
+        } catch (error) {
+          results.push(row.company_name + " · " + error.message);
+        }
+      }
+      followupStatus.textContent = results.join("\n");
+      await loadTracking();
+    } finally {
+      followupConfirm.hidden = true;
+      followupConfirm.disabled = followupClose.disabled = false;
+    }
+  });
+
   async function loadTracking() {
     const message = document.querySelector("#tracking-message");
     const list = document.querySelector("#tracking-list");
     const userId = getSession()?.user?.id;
+    trackingRows = [];
     list.replaceChildren();
     if (!userId) {
       message.textContent = "Connectez-vous pour consulter le suivi.";
@@ -679,11 +754,12 @@
     message.textContent = "Chargement…";
     try {
       const rows = await supabaseFetch(
-        "user_applications?select=id,company_name,job_title,status,sent_at,next_follow_up_at,last_inbound_at" +
+        "user_applications?select=id,company_name,company_email,job_title,status,sent_at,next_follow_up_at,last_inbound_at" +
         "&hidden_at=is.null&status=in.(sent,reply_received,interview,accepted,rejected)" +
         "&order=next_follow_up_at.asc.nullslast,last_activity_at.desc"
       );
       if (getSession()?.user?.id !== userId) return;
+      trackingRows = rows;
       message.textContent = rows.length ? "" : "Les candidatures envoyées apparaîtront ici.";
       list.innerHTML = rows.map(row => {
         const followUp = row.next_follow_up_at ? new Date(row.next_follow_up_at) : null;
@@ -697,6 +773,8 @@
           escapeHtml(statusLabels[row.status]) +
           (row.sent_at ? " · " + trackingDateFormat.format(new Date(row.sent_at)) : "") +
           (overdue ? " · Relance en retard" : "") + '</small>' +
+          (row.status === "sent" && row.company_email && !row.last_inbound_at && row.sent_at
+            ? '<label><input type="checkbox" data-followup-choice value="' + escapeHtml(row.id) + '"> Sélectionner pour relance</label>' : '') +
           (row.last_inbound_at ? '<button type="button" class="secondary compact" data-open-reply="' +
             escapeHtml(row.id) + '">Lire la réponse</button>' : '') + '</div>' +
           '<form class="application-form tracking-form" data-id="' + escapeHtml(row.id) + '">' +

@@ -92,3 +92,8 @@
 #batch-dialog{width:min(640px,calc(100% - 24px));max-height:90dvh;overflow:auto}
 #batch-form{padding:20px}
 #batch-status{overflow-wrap:anywhere}
+#followup-dialog{width:min(640px,calc(100% - 24px));max-height:90dvh;overflow:auto}
+#followup-form{padding:20px}
+#followup-drafts label,#followup-drafts textarea{display:block;width:100%;margin-bottom:12px}
+#followup-status{white-space:pre-wrap;overflow-wrap:anywhere}
+#tracking-list [data-followup-choice]{width:auto}

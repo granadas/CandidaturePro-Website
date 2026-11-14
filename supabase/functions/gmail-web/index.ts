@@ -68,8 +68,9 @@ Deno.serve(async (request: Request) => {
 
     if (!configured) return json({ message: "La connexion Gmail web attend la configuration Google." }, 503);
 
-    if (["open_reply", "send_reply"].includes(body?.action)) {
-      const sending = body.action === "send_reply";
+    if (["open_reply", "send_reply", "send_followup"].includes(body?.action)) {
+      const followup = body.action === "send_followup";
+      const sending = followup || body.action === "send_reply";
       const applicationId = body.applicationId;
       if (typeof applicationId !== "string" || !/^[0-9a-f-]{36}$/i.test(applicationId)) {
         return json({ message: "Dossier invalide." }, 400);
@@ -126,14 +127,27 @@ Deno.serve(async (request: Request) => {
       const header = (item: Mail | undefined, name: string) =>
         item?.payload?.headers?.find(value => value.name.toLowerCase() === name)?.value || "";
       const latest = incoming.at(-1);
-      const from = header(latest, "from");
+      const originalMessage = (messages as Mail[]).find(item => item.id === delivery.message_id);
+      const parent = followup ? originalMessage : latest;
+      const from = header(parent, followup ? "to" : "from");
       const recipient = (/<([^<>]+)>$/.exec(from.trim())?.[1] || from.trim()).toLowerCase();
       const email = /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+$/i;
-      const reference = header(latest, "message-id").trim();
-      const subject = header(latest, "subject").replace(/[\r\n]+/g, " ").trim();
+      const reference = header(parent, "message-id").trim();
+      const subject = header(parent, "subject").replace(/[\r\n]+/g, " ").trim();
       const canReply = email.test(recipient) && /^<[^<>\s]+>$/.test(reference) && Boolean(subject);
       if (sending) {
-        if (!canReply || body.replyId !== latest?.id || body.recipient !== recipient) {
+        if (followup) {
+          const response = await fetch(root + "/rest/v1/user_applications" + filter + "&id=eq." +
+            encodeURIComponent(applicationId) + "&status=eq.sent&hidden_at=is.null&select=company_email,last_inbound_at",
+            { headers: serviceHeaders });
+          if (!response.ok) return json({ message: "Impossible de vérifier le dossier." }, 503);
+          const [application] = await response.json();
+          if (!application || application.last_inbound_at || incoming.length ||
+              application.company_email?.trim().toLowerCase() !== recipient) {
+            return json({ message: "Ce dossier a changé ou a reçu une réponse. Actualisez le suivi." }, 409);
+          }
+        }
+        if (!canReply || (!followup && body.replyId !== latest?.id) || (typeof body.recipient === "string" ? body.recipient.trim().toLowerCase() : "") !== recipient) {
           return json({ message: "Le fil a changé. Rouvrez la réponse avant d’envoyer." }, 409);
         }
         if (typeof body.message !== "string" || !body.message.trim() || body.message.length > 12000) {
