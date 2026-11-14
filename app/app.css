@@ -34,3 +34,12 @@
 .guest-content{background:transparent;padding:0;margin-top:clamp(36px,7vw,70px)}
 .guest-content p{color:#c4cfe2}
 .guest-content .guest-kicker{margin:0 0 10px;color:#b4c9ff;font-weight:700}
+
+#reply-dialog{width:min(680px,calc(100% - 24px));max-width:none;max-height:calc(100dvh - 24px)}
+#reply-dialog form{padding:clamp(18px,4vw,30px)}
+#reply-dialog h2{margin:0 0 16px}
+#reply-content{white-space:pre-wrap;overflow-wrap:anywhere;max-height:50dvh;overflow:auto;padding:clamp(12px,3vw,20px);background:#f5f7fc;border:1px solid #dce3ee;border-radius:12px;line-height:1.6}
+.reply-actions{display:flex;justify-content:flex-end;align-items:center;flex-wrap:wrap;gap:10px;margin-top:18px}
+.reply-actions a{text-decoration:none}
+.reply-actions [hidden]{display:none}
+@media(max-width:480px){.reply-actions>*{width:100%;text-align:center}}
