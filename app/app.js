@@ -80,6 +80,7 @@
     const plan = String(profile?.plan || "free").toLowerCase();
     const isPremium = plan === "premium" || plan === "pro";
     document.querySelector("#cv-targeting").hidden = !hasPremiumCv();
+    document.querySelectorAll("#cv-form [name=template] option:not([value=classic])").forEach(option => { option.disabled = !hasPremiumCv(); });
     document.querySelector("#current-plan").textContent = isPremium ? "Premium" : "Free";
     document.querySelector("#settings-account").textContent = email
       ? email + (profile ? " · " + (isPremium ? "Premium" : "Free") : "")
@@ -915,7 +916,7 @@
   const cvVariants = document.querySelector("#cv-variants");
   const cvLabel = document.querySelector("#cv-label");
   const cvSaveStatus = document.querySelector("#cv-save-status");
-  const cvFieldNames = ["name", "title", "contact", "summary", "experience", "education", "skills", "target", "offer"];
+  const cvFieldNames = ["name", "title", "contact", "summary", "experience", "education", "skills", "target", "offer", "template"];
   let savedCvVariants = [];
   let editingCvId = null;
 
@@ -938,6 +939,7 @@
     const variant = savedCvVariants.find(row => row.id === cvVariants.value);
     if (!variant) return;
     for (const name of cvFieldNames) cvForm.elements.namedItem(name).value = typeof variant.fields[name] === "string" ? variant.fields[name] : "";
+    if (!cvForm.elements.template.value) cvForm.elements.template.value = "classic";
     cvLabel.value = variant.label;
     editingCvId = variant.id;
     document.querySelector("#cv-target-context").textContent = "";
@@ -970,8 +972,8 @@
         if (getSession()?.user?.id !== userId) return;
         if (!rows?.[0]?.id) throw new Error("La variante a été supprimée ou n’est plus accessible.");
         editingCvId = rows[0].id;
+        cvSaveStatus.textContent = "Variante enregistrée.";
         await loadCvVariants();
-        if (getSession()?.user?.id === userId) cvSaveStatus.textContent = "Variante enregistrée.";
       } catch (error) {
         if (getSession()?.user?.id === userId) cvSaveStatus.textContent = error.message;
       } finally {
@@ -1011,6 +1013,7 @@
     const data = new FormData(cvForm);
     const preview = document.querySelector("#cv-preview");
     preview.replaceChildren();
+    preview.dataset.template = hasPremiumCv() ? String(data.get("template")) : "classic";
     const name = document.createElement("h1");
     name.textContent = String(data.get("name")).trim();
     const title = document.createElement("p");
