@@ -608,6 +608,18 @@
 
   replyConsent.addEventListener("click", () => startGmailConnection(replyConsent, true));
 
+  function gmailHtmlToText(html) {
+    if (typeof html !== "string" || !html) return "";
+    const template = document.createElement("template");
+    template.innerHTML = html;
+    template.content.querySelectorAll("script, style, noscript, svg, math, iframe, object, template, head, [hidden], [aria-hidden='true']")
+      .forEach(element => element.remove());
+    template.content.querySelectorAll("br").forEach(element => element.replaceWith("\n"));
+    template.content.querySelectorAll("p, div, li, tr, blockquote, h1, h2, h3, h4, h5, h6")
+      .forEach(element => element.append("\n"));
+    return (template.content.textContent || "").replace(/\n[ \t]*\n(?:[ \t]*\n)*/g, "\n\n").trim();
+  }
+
   document.querySelector("#tracking-list").addEventListener("click", async event => {
     const button = event.target.closest("[data-open-reply]");
     if (!button || button.disabled) return;
@@ -632,7 +644,10 @@
       replyGmail.href = "https://mail.google.com/mail/u/0/#all/" + encodeURIComponent(result.threadId);
       replyGmail.hidden = false;
       replyConsent.hidden = !result.needsConsent;
-      const replies = result.replies?.filter(text => text.trim()) || [];
+      const previews = Array.isArray(result.previewMessages) ? result.previewMessages :
+        (result.replies || []).map(text => ({ text }));
+      const replies = previews.map(item => (item.text.trim() || gmailHtmlToText(item.html)).slice(0, 30000))
+        .filter(Boolean);
       if (replies.length) {
         const application = button.closest(".application-row");
         replyContext = { userId, applicationId: button.dataset.openReply, replyTo: result.replyTo, body: replies.at(-1).slice(0, 8000),

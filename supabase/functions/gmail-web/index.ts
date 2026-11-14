@@ -112,10 +112,10 @@ Deno.serve(async (request: Request) => {
       const decoded = (data: string) => new TextDecoder().decode(
         Uint8Array.from(atob(data.replace(/-/g, "+").replace(/_/g, "/")), char => char.charCodeAt(0)));
       type Part = { headers?: { name: string; value: string }[]; mimeType?: string; filename?: string; body?: { data?: string }; parts?: Part[] };
-      const plainText = (part?: Part): string => {
+      const messageText = (mimeType: string, part?: Part): string => {
         if (!part || part.filename) return "";
-        if (part.mimeType === "text/plain" && part.body?.data) return decoded(part.body.data);
-        return (part.parts || []).map(plainText).filter(Boolean).join("\n");
+        if (part.mimeType === mimeType && part.body?.data) return decoded(part.body.data);
+        return (part.parts || []).map(child => messageText(mimeType, child)).filter(Boolean).join("\n");
       };
       const messages = (await thread.json()).messages || [];
       const original = Number(messages.find((item: { id: string }) => item.id === delivery.message_id)?.internalDate);
@@ -197,9 +197,14 @@ Deno.serve(async (request: Request) => {
         } catch { /* Gmail may have accepted the request before the connection closed. */ }
         return json({ message: "Envoi incertain. Vérifiez le dossier Envoyés dans Gmail avant de réessayer.", uncertain: true }, 502);
       }
-      const replies = incoming.slice(-20).map(item => plainText(item.payload).slice(0, 30000));
+      const previewMessages = incoming.slice(-20).map(item => {
+        const text = messageText("text/plain", item.payload);
+        return { text: text.slice(0, 30000),
+          html: text.trim() ? "" : messageText("text/html", item.payload).slice(0, 120000) };
+      });
+      const replies = previewMessages.map(item => item.text);
       const latestInboundAt = latest ? new Date(Number(latest.internalDate)).toISOString() : null;
-      return json({ threadId, replies, latestInboundAt, replyTo: canReply ? { id: latest?.id, recipient } : null });
+      return json({ threadId, replies, previewMessages, latestInboundAt, replyTo: canReply ? { id: latest?.id, recipient } : null });
     }
 
     if (body?.action === "refresh_replies") {
