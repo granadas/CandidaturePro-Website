@@ -1066,10 +1066,12 @@
 
   librarySelect.addEventListener("change", () => { libraryAdd.disabled = !librarySelect.value; });
   libraryAdd.addEventListener("click", async () => {
-    const documentFile = libraryFiles[librarySelect.value];
+    const option = librarySelect.selectedOptions[0];
+    const documentFile = libraryFiles[option?.value];
     const dossier = sendApplication;
     if (!documentFile || selectedDocuments.length >= 2) return;
     libraryAdd.disabled = true;
+    librarySelect.disabled = true;
     try {
       const session = await ensureSession();
       if (!session) return;
@@ -1081,12 +1083,15 @@
       selectedDocuments.push(new File([blob], name, { type: "application/pdf" }));
       librarySummary.textContent = "Retirer les PDF ajoutés (" + selectedDocuments.map(file => file.name).join(", ") + ")";
       librarySummary.hidden = false;
-      librarySelect.options[librarySelect.selectedIndex].disabled = true;
+      option.disabled = true;
       librarySelect.value = "";
     } catch (error) {
       if (sendDialog.open && sendApplication === dossier) sendStatus.textContent = error.message;
     } finally {
-      libraryAdd.disabled = !librarySelect.value || selectedDocuments.length >= 2;
+      if (sendApplication === dossier) {
+        librarySelect.disabled = false;
+        libraryAdd.disabled = !librarySelect.value || selectedDocuments.length >= 2;
+      }
     }
   });
 
@@ -1127,6 +1132,7 @@
     libraryFiles = [];
     selectedDocuments = [];
     librarySelect.length = 1;
+    librarySelect.disabled = false;
     libraryAdd.disabled = true;
     librarySummary.textContent = "";
     librarySummary.hidden = true;
