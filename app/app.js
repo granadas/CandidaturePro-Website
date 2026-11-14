@@ -79,6 +79,7 @@
 
     const plan = String(profile?.plan || "free").toLowerCase();
     const isPremium = plan === "premium" || plan === "pro";
+    document.querySelector("#cv-targeting").hidden = !hasPremiumCv();
     document.querySelector("#current-plan").textContent = isPremium ? "Premium" : "Free";
     document.querySelector("#settings-account").textContent = email
       ? email + (profile ? " · " + (isPremium ? "Premium" : "Free") : "")
@@ -475,7 +476,9 @@
         '<div class="application-main"><strong>' + escapeHtml(application.company_name) + '</strong>' +
         '<span>' + escapeHtml(application.job_title || "Candidature spontanée") + '</span>' +
         '<small>' + escapeHtml([application.company_city, application.company_email].filter(Boolean).join(" • ")) + '</small>' +
-        sourceLink + '</div>' +
+        sourceLink +
+        (!hidden && hasPremiumCv() ? '<button type="button" class="secondary compact" data-action="adapt-cv">Adapter le CV</button>' : '') +
+        '</div>' +
         (!hidden && application.status === "ready" && application.company_email && !application.sent_at
           ? '<div><label><input type="checkbox" data-batch-choice ' + (batchSelection.has(application.id) ? 'checked' : '') +
             '> Sélectionner</label><button class="secondary compact" data-action="send">Préparer l’envoi</button></div>' : '') +
@@ -908,6 +911,31 @@
 
   const cvDialog = document.querySelector("#cv-dialog");
   const cvForm = document.querySelector("#cv-form");
+  function hasPremiumCv() {
+    return String(profile?.plan || "").toLowerCase() === "premium" &&
+      (!profile.premium_until || Date.parse(profile.premium_until) > Date.now());
+  }
+
+  document.querySelector("#cv-adapt").addEventListener("click", () => {
+    if (!hasPremiumCv() || !getSession()?.user?.id) return;
+    const status = document.querySelector("#cv-adapt-status");
+    const { target, offer, skills, title } = cvForm.elements;
+    const normalize = value => value.normalize("NFKD").replace(/\p{Diacritic}/gu, "")
+      .toLocaleLowerCase("fr").replace(/[^\p{L}\p{N}+#.]+/gu, " ").trim();
+    const offerText = " " + normalize(offer.value) + " ";
+    const entries = skills.value.split(/\n+/).map(value => value.trim()).filter(Boolean);
+    if (!offer.value.trim() || !entries.length) {
+      status.textContent = "Collez l’offre et indiquez vos compétences, une par ligne.";
+      return;
+    }
+    const matches = entries.filter(value => normalize(value) && offerText.includes(" " + normalize(value) + " "));
+    const remainder = entries.filter(value => !matches.includes(value));
+    skills.value = [...matches, ...remainder].join("\n");
+    if (!title.value.trim() && target.value.trim()) title.value = target.value.trim();
+    status.textContent = matches.length ? matches.length + " compétence(s) de votre CV placée(s) en premier." :
+      "Aucune correspondance exacte. Vous pouvez ajuster votre CV avant l’aperçu.";
+  });
+
   cvForm.addEventListener("submit", event => {
     event.preventDefault();
     if (!getSession()?.user?.id) return;
@@ -1249,6 +1277,19 @@
 
   document.querySelector("#applications-list").addEventListener("click", async event => {
     const action = event.target.dataset.action;
+    if (action === "adapt-cv") {
+      const id = event.target.closest("[data-id]")?.dataset.id;
+      const dossier = applications.find(row => row.id === id);
+      if (!dossier || !hasPremiumCv()) return;
+      showView("documents");
+      cvForm.elements.target.value = dossier.job_title || "";
+      cvForm.elements.offer.value = "";
+      document.querySelector("#cv-adapt-status").textContent = "";
+      document.querySelector("#cv-target-context").textContent = [dossier.company_name, dossier.job_title].filter(Boolean).join(" · ");
+      document.querySelector("#cv-targeting").open = true;
+      cvForm.elements.target.focus();
+      return;
+    }
     if (action === "send") {
       openSendDialog(event.target.closest("[data-id]")?.dataset.id);
       return;
@@ -1285,6 +1326,8 @@
     ++adminRequest;
     adminResults.replaceChildren();
     cvForm.reset();
+    document.querySelector("#cv-target-context").textContent = "";
+    document.querySelector("#cv-adapt-status").textContent = "";
     supportForm.reset();
     document.querySelector("#support-report-status").textContent = "";
     document.querySelector("#cv-preview").replaceChildren();
