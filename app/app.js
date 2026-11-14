@@ -19,6 +19,7 @@
     documents: ["Documents", "CV et lettres de motivation"],
     premium: ["Premium", "Votre formule et les conditions Premium"],
     support: ["Support", "Assistance Candidature Pro"],
+    admin: ["Administration", "Liste noire, historique et crédits"],
     settings: ["Paramètres", "Compte, e-mail et préférences"]
   };
 
@@ -68,6 +69,7 @@
     const signedIn = Boolean(session?.user?.id && session?.access_token);
     guestHome.hidden = signedIn;
     appShell.hidden = !signedIn;
+    document.querySelector("#admin-nav").hidden = !(signedIn && profile?.is_admin === true);
     const email = session?.user?.email;
     const firstName = profile?.candidate_first_name?.trim();
     document.querySelector("#account-label").textContent = email || "Version web en préparation";
@@ -86,7 +88,7 @@
   }
 
   function showView(name) {
-    if (appShell.hidden) return;
+    if (appShell.hidden || (name === "admin" && profile?.is_admin !== true)) return;
     const isDashboard = name === "dashboard";
     const isProfile = name === "profile";
     const isApplications = name === "applications";
@@ -103,6 +105,8 @@
     document.querySelector("#documents-view").classList.toggle("active", isDocuments);
     document.querySelector("#premium-view").classList.toggle("active", name === "premium");
     document.querySelector("#support-view").classList.toggle("active", name === "support");
+    document.querySelector("#admin-view").classList.toggle("active", name === "admin");
+    if (name === "admin") loadAdmin();
     document.querySelector("#settings-view").classList.toggle("active", name === "settings");
     document.querySelectorAll(".nav-item[data-view]").forEach(item => item.classList.toggle("active", item.dataset.view === name));
 
@@ -618,6 +622,75 @@
     }
   });
 
+  const adminMode = document.querySelector("#admin-mode");
+  const adminStatus = document.querySelector("#admin-status");
+  const adminResults = document.querySelector("#admin-results");
+  const adminViews = {
+    blacklist: ["admin_list_blacklisted_companies", {}],
+    audit: ["admin_list_audit_log", { p_limit: 100 }],
+    credits: ["admin_get_credit_usage_statistics", { p_month: null }]
+  };
+  let adminRequest = 0;
+
+  async function loadAdmin() {
+    if (profile?.is_admin !== true) return;
+    const userId = getSession()?.user?.id;
+    const request = ++adminRequest;
+    const mode = adminMode.value;
+    const [rpc, args] = adminViews[mode];
+    adminResults.replaceChildren();
+    adminStatus.textContent = "Chargement…";
+    const current = () => request === adminRequest && getSession()?.user?.id === userId;
+    try {
+      const rows = await supabaseRpc(rpc, args);
+      if (!current()) return;
+      adminStatus.textContent = rows.length ? "" : "Aucun résultat.";
+      for (const row of rows) {
+        const card = document.createElement("article");
+        card.className = "application-row";
+        const title = document.createElement("strong");
+        title.textContent = row.company_name || row.label || row.action || "";
+        const details = document.createElement("p");
+        details.textContent = mode === "blacklist" ? [row.city, row.inactive_reason].filter(Boolean).join(" · ") :
+          mode === "audit" ? [row.summary, row.created_at].filter(Boolean).join(" · ") :
+          Object.values(row).filter(value => value !== "" && value != null).join(" · ");
+        card.append(title, details);
+        adminResults.append(card);
+      }
+    } catch (error) {
+      if (current()) adminStatus.textContent = error.message;
+    }
+  }
+
+  adminMode.addEventListener("change", loadAdmin);
+  document.querySelector("#admin-refresh").addEventListener("click", loadAdmin);
+
+  const cvDialog = document.querySelector("#cv-dialog");
+  const cvForm = document.querySelector("#cv-form");
+  cvForm.addEventListener("submit", event => {
+    event.preventDefault();
+    if (!getSession()?.user?.id) return;
+    const data = new FormData(cvForm);
+    const preview = document.querySelector("#cv-preview");
+    preview.replaceChildren();
+    const name = document.createElement("h1");
+    name.textContent = String(data.get("name")).trim();
+    const title = document.createElement("p");
+    title.textContent = [data.get("title"), data.get("contact")].map(value => String(value).trim()).filter(Boolean).join(" · ");
+    preview.append(name, title);
+    for (const [key, label] of [["summary", "Profil"], ["experience", "Expériences"], ["education", "Formation"], ["skills", "Compétences et langues"]]) {
+      const value = String(data.get(key)).trim();
+      if (!value) continue;
+      const heading = document.createElement("h2");
+      heading.textContent = label;
+      const paragraph = document.createElement("p");
+      paragraph.textContent = value;
+      preview.append(heading, paragraph);
+    }
+    cvDialog.showModal();
+  });
+  document.querySelector("#cv-print").addEventListener("click", () => window.print());
+
   const documentsBucket = "candidature-documents";
   const documentKinds = { cv: "CV", lettre: "Lettre de motivation" };
   const documentForm = document.querySelector("#document-form");
@@ -965,6 +1038,10 @@
   signOutButton.addEventListener("click", () => {
     profile = null;
     ++documentsRequest;
+    ++adminRequest;
+    adminResults.replaceChildren();
+    cvForm.reset();
+    document.querySelector("#cv-preview").replaceChildren();
     sessionStorage.removeItem(gmailFlowKey);
     documentForm.reset();
     documentForm.hidden = true;

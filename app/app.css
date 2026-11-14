@@ -59,3 +59,17 @@
 #send-ai{margin:10px 0;padding:12px;border:1px solid #dce3ee;border-radius:12px}
 #send-ai summary{cursor:pointer;font-weight:700}
 #send-ai label{margin:12px 0}
+
+#admin-nav[hidden]{display:none}
+#admin-view .application-row{display:block}
+#documents-view .panel + .panel{margin-top:16px}
+#cv-form label{display:grid;gap:5px}
+#cv-dialog{width:min(740px,calc(100% - 24px));max-width:none;max-height:90dvh;overflow:auto;padding:clamp(18px,4vw,34px)}
+#cv-preview p{white-space:pre-wrap;overflow-wrap:anywhere}
+#cv-preview h2{font-size:1.1rem;border-bottom:1px solid #dce3ee}
+.cv-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}
+@media print{
+ body:has(#cv-dialog[open]) > :not(#cv-dialog){display:none!important}
+ #cv-dialog[open]{position:static;width:auto;max-height:none;overflow:visible;margin:0;padding:0;border:0;box-shadow:none}
+ #cv-dialog::backdrop,.cv-actions{display:none!important}
+}

@@ -32,6 +32,7 @@
         <button class="nav-item" data-view="tracking"><span>◷</span>Suivi</button>
         <button class="nav-item" data-view="profile"><span>◯</span>Mon profil</button>
         <button class="nav-item" data-view="documents"><span>▱</span>Documents</button>
+        <button class="nav-item" data-view="admin" id="admin-nav" hidden>Administration</button>
       </nav>
       <div class="sidebar-bottom">
         <a class="nav-item" href="https://github.com/granadas/CandidaturePro-Releases/releases/latest/download/CandidaturePro_Setup_x64.exe"><span aria-hidden="true">↓</span>Télécharger pour Windows</a>
@@ -224,6 +225,20 @@
 
       <section id="documents-view" class="view">
         <article class="panel">
+          <h2>Créer un CV</h2>
+          <form id="cv-form" class="profile-form">
+            <label>Nom complet<input name="name" maxlength="120" required></label>
+            <label>Titre professionnel<input name="title" maxlength="120" required></label>
+            <label class="wide">Coordonnées<input name="contact" maxlength="240"></label>
+            <label class="wide">Profil<textarea name="summary" maxlength="2000" rows="3"></textarea></label>
+            <label class="wide">Expériences<textarea name="experience" maxlength="6000" rows="5"></textarea></label>
+            <label class="wide">Formation<textarea name="education" maxlength="3000" rows="3"></textarea></label>
+            <label class="wide">Compétences et langues<textarea name="skills" maxlength="3000" rows="3"></textarea></label>
+            <div class="wide"><button type="submit" class="primary">Aperçu et impression PDF</button></div>
+          </form>
+        </article>
+
+        <article class="panel">
           <div class="panel-head"><h2>Mes documents</h2></div>
           <form id="document-form" class="profile-form" hidden>
             <label>Type<select id="document-kind"><option value="cv">CV</option><option value="lettre">Lettre de motivation</option></select></label>
@@ -252,6 +267,15 @@
         </article>
       </section>
 
+      <section id="admin-view" class="view">
+        <article class="panel">
+          <h2>Administration</h2>
+          <label>Vue<select id="admin-mode"><option value="blacklist">Liste noire</option><option value="audit">Historique</option><option value="credits">Crédits fournisseurs</option></select></label>
+          <button type="button" class="secondary" id="admin-refresh">Actualiser</button>
+          <p id="admin-status" role="status"></p>
+          <div id="admin-results" class="applications-list"></div>
+        </article>
+      </section>
       <section id="settings-view" class="view">
         <article class="panel">
           <div class="panel-head"><h2>Mon compte</h2></div>
@@ -267,6 +291,14 @@
       </section>
     </main>
   </div>
+
+  <dialog id="cv-dialog" aria-label="Aperçu du CV">
+    <article id="cv-preview"></article>
+    <form method="dialog" class="cv-actions">
+      <button type="button" class="primary" id="cv-print">Imprimer / enregistrer en PDF</button>
+      <button class="secondary">Fermer</button>
+    </form>
+  </dialog>
 
   <dialog id="reply-dialog" aria-labelledby="reply-title">
     <form method="dialog">
