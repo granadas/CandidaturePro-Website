@@ -730,7 +730,8 @@
           const response = await invokeEdgeFunction("gmail-web", { action: "send_followup",
             applicationId: row.id, recipient: row.company_email, requestId: crypto.randomUUID(), message: messages[index] });
           if (response.sent !== true) throw new Error("Gmail n’a pas confirmé l’envoi.");
-          results.push(row.company_name + " · Relance envoyée");
+          results.push(row.company_name + (response.tracked === false
+            ? " · Relance envoyée, mise à jour du suivi indisponible" : " · Relance envoyée"));
         } catch (error) {
           results.push(row.company_name + " · " + error.message);
         }
@@ -756,7 +757,7 @@
     message.textContent = "Chargement…";
     try {
       const rows = await supabaseFetch(
-        "user_applications?select=id,company_name,company_email,job_title,status,sent_at,next_follow_up_at,last_inbound_at" +
+        "user_applications?select=id,company_name,company_email,job_title,status,sent_at,next_follow_up_at,last_inbound_at,last_follow_up_sent_at,follow_up_delay_days" +
         "&hidden_at=is.null&status=in.(sent,reply_received,interview,accepted,rejected)" +
         "&order=next_follow_up_at.asc.nullslast,last_activity_at.desc"
       );
@@ -774,6 +775,7 @@
           escapeHtml(row.job_title || "Candidature spontanée") + '</span><small>' +
           escapeHtml(statusLabels[row.status]) +
           (row.sent_at ? " · " + trackingDateFormat.format(new Date(row.sent_at)) : "") +
+          (row.last_follow_up_sent_at ? " · Dernière relance le " + trackingDateFormat.format(new Date(row.last_follow_up_sent_at)) : "") +
           (overdue ? " · Relance en retard" : "") + '</small>' +
           (row.status === "sent" && row.company_email && !row.last_inbound_at && row.sent_at
             ? '<label><input type="checkbox" data-followup-choice value="' + escapeHtml(row.id) + '"> Sélectionner pour relance</label>' : '') +
@@ -781,6 +783,7 @@
             escapeHtml(row.id) + '">Lire la réponse</button>' : '') + '</div>' +
           '<form class="application-form tracking-form" data-id="' + escapeHtml(row.id) + '">' +
           '<label>Date de relance<input name="follow-up" type="date" value="' + localDate + '"></label>' +
+          '<label>Délai entre les relances (jours)<input name="follow-up-delay" type="number" required min="1" max="365" value="' + row.follow_up_delay_days + '"></label>' +
           '<button type="submit" class="secondary compact">Enregistrer</button></form></article>';
       }).join("");
     } catch (error) {
@@ -796,6 +799,7 @@
     button.disabled = true;
     try {
       await supabaseWrite("user_applications?id=eq." + encodeURIComponent(form.dataset.id), "PATCH", {
+        follow_up_delay_days: Number(form.elements.namedItem("follow-up-delay").value),
         next_follow_up_at: date ? new Date(date + "T12:00:00").toISOString() : null
       });
       await loadTracking();

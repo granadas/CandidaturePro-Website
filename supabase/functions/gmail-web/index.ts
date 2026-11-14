@@ -136,9 +136,10 @@ Deno.serve(async (request: Request) => {
       const subject = header(parent, "subject").replace(/[\r\n]+/g, " ").trim();
       const canReply = email.test(recipient) && /^<[^<>\s]+>$/.test(reference) && Boolean(subject);
       if (sending) {
+        let previousReminder = null;
         if (followup) {
           const response = await fetch(root + "/rest/v1/user_applications" + filter + "&id=eq." +
-            encodeURIComponent(applicationId) + "&status=eq.sent&hidden_at=is.null&select=company_email,last_inbound_at",
+            encodeURIComponent(applicationId) + "&status=eq.sent&hidden_at=is.null&select=company_email,last_inbound_at,next_follow_up_at",
             { headers: serviceHeaders });
           if (!response.ok) return json({ message: "Impossible de vérifier le dossier." }, 503);
           const [application] = await response.json();
@@ -146,6 +147,7 @@ Deno.serve(async (request: Request) => {
               application.company_email?.trim().toLowerCase() !== recipient) {
             return json({ message: "Ce dossier a changé ou a reçu une réponse. Actualisez le suivi." }, 409);
           }
+          previousReminder = application.next_follow_up_at;
         }
         if (!canReply || (!followup && body.replyId !== latest?.id) || (typeof body.recipient === "string" ? body.recipient.trim().toLowerCase() : "") !== recipient) {
           return json({ message: "Le fil a changé. Rouvrez la réponse avant d’envoyer." }, 409);
@@ -153,15 +155,16 @@ Deno.serve(async (request: Request) => {
         if (typeof body.message !== "string" || !body.message.trim() || body.message.length > 12000) {
           return json({ message: "Renseignez une réponse de 12 000 caractères maximum." }, 400);
         }
-        if (typeof body.requestId !== "string" || !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(body.requestId)) {
+        const requestId = body.requestId ?? crypto.randomUUID();
+        if (typeof requestId !== "string" || !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(requestId)) {
           return json({ message: "Identifiant d’envoi invalide." }, 400);
         }
         const outbox = root + "/rest/v1/web_gmail_thread_sends";
-        const attempt = outbox + filter + "&request_id=eq." + encodeURIComponent(body.requestId);
+        const attempt = outbox + filter + "&request_id=eq." + encodeURIComponent(requestId);
         const writeHeaders = { ...serviceHeaders, "Content-Type": "application/json" };
         const reservation = await fetch(outbox, {
           method: "POST", headers: writeHeaders,
-          body: JSON.stringify({ user_id: id, request_id: body.requestId, application_id: applicationId,
+          body: JSON.stringify({ user_id: id, request_id: requestId, application_id: applicationId,
             kind: followup ? "followup" : "reply" })
         });
         if (reservation.status === 409) {
@@ -181,9 +184,11 @@ Deno.serve(async (request: Request) => {
             body: JSON.stringify({ threadId, raw: encodeMessage(recipient, subjectLine, body.message, [], reference) })
           });
           if (sent.ok && (await sent.json()).id) {
-            await fetch(attempt, { method: "PATCH", headers: writeHeaders,
-              body: JSON.stringify({ confirmed_at: new Date().toISOString() }) });
-            return json({ sent: true });
+            const tracked = await fetch(root + "/rest/v1/rpc/confirm_web_gmail_thread_send", {
+              method: "POST", headers: writeHeaders,
+              body: JSON.stringify({ p_user_id: id, p_request_id: requestId, p_previous_reminder: previousReminder })
+            }).then(async response => response.ok && (await response.json()) === true).catch(() => false);
+            return json({ sent: true, tracked });
           }
           if ([400, 401, 403, 429].includes(sent.status)) {
             const removed = await fetch(attempt, { method: "DELETE", headers: serviceHeaders });
