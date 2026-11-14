@@ -655,6 +655,32 @@
           mode === "audit" ? [row.summary, row.created_at].filter(Boolean).join(" · ") :
           Object.values(row).filter(value => value !== "" && value != null).join(" · ");
         card.append(title, details);
+        if (mode === "blacklist") {
+          const restore = document.createElement("form");
+          restore.innerHTML = '<label>Contact vérifié<input required type="email" name="email" maxlength="254"></label>' +
+            '<label>Type de contact<select name="type"><option value="general">Général</option><option value="hr">RH</option></select></label>' +
+            '<label>Note<input name="note" maxlength="2000"></label>' +
+            '<button class="secondary" type="submit">Retirer de la liste noire</button>';
+          restore.addEventListener("submit", async event => {
+            event.preventDefault();
+            if (!current() || profile?.is_admin !== true) return;
+            const data = new FormData(restore);
+            const button = restore.querySelector("button");
+            button.disabled = true;
+            try {
+              await supabaseRpc("admin_restore_blacklisted_company", {
+                p_company_key: row.company_key, p_company_name: row.company_name, p_sector: row.sector || "",
+                p_email: String(data.get("email")).trim(), p_contact_type: data.get("type"), p_admin_note: data.get("note")
+              });
+              if (current()) await loadAdmin();
+            } catch (error) {
+              if (current()) adminStatus.textContent = error.message;
+            } finally {
+              button.disabled = false;
+            }
+          });
+          card.append(restore);
+        }
         adminResults.append(card);
       }
     } catch (error) {
