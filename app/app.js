@@ -812,6 +812,7 @@
   });
 
   document.querySelector("#application-form").addEventListener("submit", async event => {
+    const form = event.currentTarget;
     event.preventDefault();
     const button = document.querySelector("#application-submit");
     const message = document.querySelector("#application-message");
@@ -828,7 +829,7 @@
         status,
         sent_at: status === "sent" ? new Date().toISOString() : null
       });
-      event.currentTarget.reset();
+      form.reset();
       message.textContent = "Candidature ajoutée.";
       await loadApplications();
     } catch (error) {
