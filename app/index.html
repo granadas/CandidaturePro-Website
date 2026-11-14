@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta name="referrer" content="no-referrer">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#5b21b6">
+  <meta name="description" content="Candidature Pro en ligne : recherchez, préparez, envoyez et suivez vos candidatures.">
+  <title>Candidature Pro — Espace en ligne</title>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <main id="guest-home" class="guest-home">
+    <a class="brand" href="../"><span class="logo">CP</span><span>Candidature Pro</span></a>
+    <div class="guest-content">
+      <p class="guest-kicker">Espace candidat</p>
+      <h1>Retrouvez vos candidatures.</h1>
+      <p>Connectez-vous pour retrouver vos recherches, vos documents et le suivi de vos candidatures.</p>
+      <button id="guest-login" class="primary">Se connecter</button>
+      <a href="../">Découvrir Candidature Pro</a>
+    </div>
+  </main>
+
+  <div class="app-shell" hidden>
+    <aside class="sidebar" aria-label="Navigation principale">
+      <a class="brand" href="../"><span class="logo">CP</span><span>Candidature Pro</span></a>
+      <nav>
+        <button class="nav-item active" data-view="dashboard"><span>⌂</span>Accueil</button>
+        <button class="nav-item" data-view="companies"><span>⌕</span>Entreprises</button>
+        <button class="nav-item" data-view="jobs"><span>▤</span>Postes ouverts</button>
+        <button class="nav-item" data-view="applications"><span>✉</span>Candidatures</button>
+        <button class="nav-item" data-view="tracking"><span>◷</span>Suivi</button>
+        <button class="nav-item" data-view="profile"><span>◯</span>Mon profil</button>
+        <button class="nav-item" data-view="documents"><span>▱</span>Documents</button>
+      </nav>
+      <div class="sidebar-bottom">
+        <a class="nav-item" href="https://github.com/granadas/CandidaturePro-Releases/releases/latest/download/CandidaturePro_Setup_x64.exe"><span aria-hidden="true">↓</span>Télécharger pour Windows</a>
+        <div class="plan"><small>FORMULE ACTUELLE</small><strong id="current-plan">Free</strong><span id="plan-detail">5 candidatures par mois</span></div>
+        <button class="nav-item" data-view="settings"><span>⚙</span>Paramètres</button>
+        <button id="sign-out" class="nav-item danger" hidden><span>↪</span>Déconnexion</button>
+      </div>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <button id="menu-toggle" class="menu-toggle" aria-label="Ouvrir le menu">☰</button>
+        <div><strong id="page-title">Tableau de bord</strong><small id="account-label">Version web en préparation</small></div>
+        <button id="open-login" class="primary">Se connecter</button>
+      </header>
+
+      <section id="dashboard" class="view active">
+        <div class="welcome">
+          <div><span class="eyebrow">VOTRE RECHERCHE D'EMPLOI</span><h1>Bonjour <span id="first-name">👋</span></h1><p>Préparez, envoyez et suivez vos candidatures depuis un seul espace.</p></div>
+          <button class="primary" data-view-link="companies">+ Rechercher des entreprises</button>
+        </div>
+        <div class="stats">
+          <article><span>Candidatures envoyées</span><strong id="stat-sent">0</strong><small>ce mois</small></article>
+          <article><span>Réponses reçues</span><strong id="stat-replies">0</strong><small>à consulter</small></article>
+          <article><span>Relances</span><strong id="stat-followups">0</strong><small>à préparer</small></article>
+          <article><span>Entretiens</span><strong id="stat-interviews">0</strong><small>planifiés</small></article>
+        </div>
+        <div class="dashboard-grid">
+          <article class="panel"><div class="panel-head"><div><small>PROCHAINE ÉTAPE</small><h2>Commencez votre recherche</h2></div><span class="badge">Nouveau</span></div><p>Choisissez un secteur et une ville. Candidature Pro vous aidera ensuite à préparer les dossiers adaptés.</p><button class="secondary" data-view-link="companies">Trouver des entreprises</button></article>
+          <article class="panel checklist"><div class="panel-head"><h2>Préparation du compte</h2><span id="setup-progress">1/4</span></div><div class="check done"><i>✓</i><span><b>Compte Candidature Pro</b><small>Connexion Supabase existante</small></span></div><div class="check"><i>2</i><span><b>Compléter le profil</b><small>Informations pour les candidatures</small></span></div><div class="check"><i>3</i><span><b>Ajouter un CV</b><small>PDF ou création guidée</small></span></div><div class="check"><i>4</i><span><b>Connecter Gmail</b><small>Envoi et suivi des réponses</small></span></div></article>
+        </div>
+      </section>
+
+      <section id="jobs-view" class="view">
+        <article class="panel jobs-search-panel">
+          <div class="panel-head">
+            <div><small>MARCHÉ DE L’EMPLOI SUISSE</small><h2>Trouver un poste ouvert</h2></div>
+            <span class="badge">431 offres actives</span>
+          </div>
+          <form id="jobs-search-form" class="jobs-search-form">
+            <label>Métier ou mot-clé<input id="jobs-query" type="search" maxlength="120" placeholder="Ex. assistant, chauffeur, éducateur"></label>
+            <label>Ville ou région<input id="jobs-city" type="search" maxlength="120" placeholder="Ex. Genève"></label>
+            <label>Secteur
+              <select id="jobs-sector">
+                <option value="">Tous les secteurs</option>
+                <option>Administration / Bureau</option>
+                <option>Automobile</option>
+                <option>Banque / Assurance</option>
+                <option>Commerce / Vente</option>
+                <option>Construction / Bâtiment</option>
+                <option>Crèches / Petite enfance</option>
+                <option>Éducation / Formation</option>
+                <option>Hôtellerie</option>
+                <option>Immobilier</option>
+                <option>Industrie / Production</option>
+                <option>Informatique / Technologie</option>
+                <option>Logistique / Transport</option>
+                <option>Nettoyage / Entretien</option>
+                <option>Restauration</option>
+                <option>Santé</option>
+                <option>Sécurité</option>
+              </select>
+            </label>
+            <button id="jobs-search-submit" class="primary" type="submit">Rechercher</button>
+          </form>
+        </article>
+        <article class="panel jobs-results-panel">
+          <div class="panel-head"><div><small>OFFRES DISPONIBLES</small><h2>Résultats</h2></div><span id="jobs-results-count">0 offre</span></div>
+          <div id="jobs-message" class="list-message" role="status">Chargement des offres récentes…</div>
+          <div id="jobs-results" class="jobs-results"></div>
+        </article>
+      </section>
+
+      <section id="companies-view" class="view">
+        <article class="panel company-search-panel">
+          <div class="panel-head">
+            <div><small>RECHERCHE INTERNET SÉCURISÉE</small><h2>Trouver des entreprises</h2></div>
+            <span class="badge">Cache + Internet</span>
+          </div>
+          <form id="company-search-form" class="company-search-form">
+            <label>Secteur d’activité
+              <select id="company-sector">
+                <option value="">Tous les secteurs</option>
+                <option value="Logistique / Transport">Logistique / Transport</option>
+                <option value="Crèche / Petite enfance">Crèche / Petite enfance</option>
+                <option value="Agence d’intérim / Recrutement">Agence d’intérim / Recrutement</option>
+                <option value="Hôtellerie">Hôtellerie</option>
+                <option value="Restauration">Restauration</option>
+                <option value="Santé">Santé</option>
+                <option value="Éducation / Formation">Éducation / Formation</option>
+                <option value="Automobile">Automobile</option>
+                <option value="Immobilier">Immobilier</option>
+                <option value="Informatique">Informatique</option>
+              </select>
+            </label>
+            <label>Ville<input id="company-city" type="text" value="Genève" maxlength="120" required></label>
+            <label>Rayon
+              <select id="company-radius">
+                <option value="10">10 km</option>
+                <option value="20">20 km</option>
+                <option value="30" selected>30 km</option>
+                <option value="50">50 km</option>
+                <option value="100">100 km</option>
+              </select>
+            </label>
+            <button id="company-search-submit" class="primary" type="submit">Rechercher</button>
+          </form>
+          <div class="search-foot"><span>Free : 5 recherches par mois • Premium : illimité</span><strong id="company-search-source"></strong></div>
+        </article>
+        <article class="panel company-results-panel">
+          <div class="panel-head"><div><small>RÉSULTATS</small><h2>Entreprises trouvées</h2></div><span id="company-results-count">0 résultat</span></div>
+          <div id="company-search-message" class="list-message" role="status">Lancez une recherche pour commencer.</div>
+          <div id="company-results" class="company-results"></div>
+        </article>
+      </section>
+
+      <section id="applications-view" class="view">
+        <div class="applications-layout">
+          <article class="panel application-form-panel">
+            <div class="panel-head"><div><small>NOUVELLE CANDIDATURE</small><h2>Ajouter un dossier</h2></div><span class="badge">En ligne</span></div>
+            <form id="application-form" class="application-form">
+              <label>Entreprise<input id="application-company" type="text" maxlength="200" required></label>
+              <label>Poste recherché<input id="application-job" type="text" maxlength="200"></label>
+              <label>Ville<input id="application-city" type="text" maxlength="150"></label>
+              <label>E-mail de contact<input id="application-email" type="email" maxlength="254"></label>
+              <label class="wide">Statut
+                <select id="application-status">
+                  <option value="draft">Brouillon</option>
+                  <option value="ready">Prête à envoyer</option>
+                  <option value="sent">Envoyée</option>
+                  <option value="reply_received">Réponse reçue</option>
+                  <option value="interview">Entretien</option>
+                  <option value="accepted">Acceptée</option>
+                  <option value="rejected">Refusée</option>
+                </select>
+              </label>
+              <div id="application-message" class="profile-message wide" role="status"></div>
+              <div class="wide"><button id="application-submit" class="primary" type="submit">Ajouter la candidature</button></div>
+            </form>
+          </article>
+          <article class="panel applications-panel">
+            <div class="panel-head">
+              <div><small>VOS DOSSIERS</small><h2>Candidatures enregistrées</h2></div>
+              <label class="inline-toggle"><input id="show-hidden-applications" type="checkbox"> Voir les masquées</label>
+            </div>
+            <div id="applications-message" class="list-message" role="status"></div>
+            <div id="applications-list" class="applications-list"></div>
+          </article>
+        </div>
+      </section>
+
+      <section id="tracking-view" class="view">
+        <article class="panel applications-panel">
+          <div class="panel-head">
+            <h2>Suivi des candidatures</h2>
+            <button class="secondary compact" data-view-link="applications">Voir les dossiers</button>
+          </div>
+          <button id="refresh-replies" class="secondary compact">Actualiser les e-mails reçus</button>
+          <button id="authorize-replies" class="secondary compact" hidden>Autoriser le suivi Gmail</button>
+          <p id="replies-status" role="status"></p>
+          <div id="tracking-message" class="list-message" role="status"></div>
+          <div id="tracking-list" class="applications-list"></div>
+        </article>
+      </section>
+
+      <section id="profile-view" class="view">
+        <article class="panel profile-panel">
+          <div class="panel-head">
+            <div><small>IDENTITÉ DU CANDIDAT</small><h2>Mon profil</h2></div>
+            <span class="badge">Données sécurisées</span>
+          </div>
+          <p>Ces informations seront utilisées pour préparer vos candidatures. Votre formule et vos droits de compte ne sont pas modifiables depuis ce formulaire.</p>
+          <form id="profile-form" class="profile-form">
+            <label>Prénom<input id="profile-first-name" type="text" maxlength="100" autocomplete="given-name"></label>
+            <label>Nom<input id="profile-last-name" type="text" maxlength="100" autocomplete="family-name"></label>
+            <label class="wide">E-mail de candidature<input id="profile-email" type="email" maxlength="254" autocomplete="email"></label>
+            <div id="profile-message" class="profile-message wide" role="status"></div>
+            <div class="wide"><button id="profile-submit" class="primary" type="submit">Enregistrer</button></div>
+          </form>
+        </article>
+      </section>
+
+      <section id="documents-view" class="view">
+        <article class="panel">
+          <div class="panel-head"><h2>Mes documents</h2></div>
+          <form id="document-form" class="profile-form" hidden>
+            <label>Type<select id="document-kind"><option value="cv">CV</option><option value="lettre">Lettre de motivation</option></select></label>
+            <label>Fichier PDF (10 Mo maximum)<input id="document-file" type="file" accept=".pdf,application/pdf" required></label>
+            <div class="wide"><button class="primary" type="submit">Ajouter le PDF</button></div>
+          </form>
+          <p id="documents-message" role="status"></p>
+          <div id="documents-list" class="applications-list"></div>
+        </article>
+      </section>
+
+      <section id="settings-view" class="view">
+        <article class="panel">
+          <div class="panel-head"><h2>Mon compte</h2></div>
+          <p id="settings-account"></p>
+          <button class="secondary" data-view-link="profile">Modifier mon profil</button>
+        </article>
+        <article class="panel">
+          <div class="panel-head"><h2>Gmail</h2></div>
+          <p id="gmail-status" role="status"></p>
+          <button id="gmail-connect" class="secondary" hidden>Connecter Gmail</button>
+          <button id="gmail-disconnect" class="secondary" hidden>Déconnecter Gmail</button>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="reply-dialog" aria-labelledby="reply-title">
+    <form method="dialog">
+      <h2 id="reply-title">Réponses Gmail</h2>
+      <div id="reply-content" role="status" tabindex="0"></div>
+      <div class="reply-actions">
+        <button id="reply-consent" type="button" class="secondary" hidden>Autoriser la lecture dans Candidature Pro</button>
+        <a id="reply-gmail" class="secondary" target="_blank" rel="noopener noreferrer" hidden>Ouvrir le fil dans Gmail</a>
+        <button class="primary" autofocus>Fermer</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="send-dialog">
+    <form id="send-form">
+      <h2>Envoyer via Gmail</h2>
+      <p id="send-recipient"></p>
+      <label>Objet<input id="send-subject" maxlength="120" required></label>
+      <label>Message<textarea id="send-message" rows="8" maxlength="12000" required></textarea></label>
+      <label>CV et lettre en PDF (5 Mo au total)<input id="send-files" type="file" accept=".pdf,application/pdf" multiple></label>
+      <p id="send-status" role="status"></p>
+      <button id="send-submit" class="primary" type="submit">Envoyer</button>
+      <button id="send-cancel" class="secondary" type="button">Fermer</button>
+    </form>
+  </dialog>
+
+  <dialog id="login-dialog">
+    <form id="login-form">
+      <button type="button" id="close-login" class="close" aria-label="Fermer">×</button>
+      <span class="dialog-logo">CP</span>
+      <h2>Connexion</h2>
+      <p>Utilisez le même compte que dans l'application Windows.</p>
+      <label>Adresse e-mail<input id="email" type="email" autocomplete="email" required></label>
+      <label>Mot de passe<input id="password" type="password" autocomplete="current-password" required></label>
+      <div id="login-message" class="message" role="status"></div>
+      <button id="login-submit" class="primary full" type="submit">Se connecter</button>
+      <small>Vos identifiants sont transmis directement au service d'authentification sécurisé de Candidature Pro.</small>
+    </form>
+  </dialog>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
