@@ -747,9 +747,74 @@
     }
   });
 
+  const trackingSearch = document.querySelector("#tracking-search");
+  const trackingFilter = document.querySelector("#tracking-filter");
+  const trackingHidden = document.querySelector("#tracking-hidden");
+  const trackingList = document.querySelector("#tracking-list");
+  const trackingMessage = document.querySelector("#tracking-message");
+  const trackingText = value => (value || "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+
+  function canFollowUp(row) {
+    return row.status === "sent" && row.company_email && !row.last_inbound_at && row.sent_at && !row.hidden_at;
+  }
+
+  function followUpDue(row) {
+    if (!canFollowUp(row)) return false;
+    const due = new Date(row.next_follow_up_at || row.last_follow_up_sent_at || row.sent_at);
+    if (!row.next_follow_up_at) due.setDate(due.getDate() + row.follow_up_delay_days);
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    return due <= today;
+  }
+
+  function applyTrackingFilters() {
+    const query = trackingText(trackingSearch.value.trim());
+    const filters = {
+      waiting: row => row.status === "sent" && !row.last_inbound_at,
+      reply: row => Boolean(row.last_inbound_at) || row.status === "reply_received",
+      interview: row => row.status === "interview",
+      due: followUpDue
+    };
+    const matchesFilter = filters[trackingFilter.value] || (() => true);
+    let visible = 0;
+    trackingRows.forEach((row, index) => {
+      const matchesSearch = trackingText(row.company_name + " " + (row.job_title || "")).includes(query);
+      const item = trackingList.children[index];
+      item.hidden = !(matchesSearch && matchesFilter(row));
+      if (item.hidden) {
+        const choice = item.querySelector("[data-followup-choice]");
+        if (choice) choice.checked = false;
+      } else visible++;
+    });
+    trackingMessage.textContent = visible ? "" : trackingRows.length ? "Aucun dossier ne correspond aux filtres." :
+      trackingHidden.checked ? "Aucun dossier masqué." : "Les candidatures envoyées apparaîtront ici.";
+  }
+
+  trackingSearch.addEventListener("input", applyTrackingFilters);
+  trackingFilter.addEventListener("change", applyTrackingFilters);
+  trackingHidden.addEventListener("change", loadTracking);
+  trackingList.addEventListener("click", async event => {
+    const button = event.target.closest("[data-tracking-visibility]");
+    if (!button || button.disabled) return;
+    const row = trackingRows.find(item => item.id === button.dataset.trackingVisibility);
+    if (!row) return;
+    button.disabled = true;
+    try {
+      await supabaseWrite("user_applications?id=eq." + encodeURIComponent(row.id), "PATCH", {
+        hidden_at: row.hidden_at ? null : new Date().toISOString()
+      });
+      await loadTracking();
+    } catch (error) {
+      trackingMessage.textContent = error.message;
+    } finally {
+      button.disabled = false;
+    }
+  });
+
   async function loadTracking() {
     const message = document.querySelector("#tracking-message");
     const list = document.querySelector("#tracking-list");
+    const showHidden = trackingHidden.checked;
     const userId = getSession()?.user?.id;
     trackingRows = [];
     list.replaceChildren();
@@ -760,14 +825,18 @@
     message.textContent = "Chargement…";
     try {
       const rows = await supabaseFetch(
-        "user_applications?select=id,company_name,company_email,job_title,status,sent_at,next_follow_up_at,last_inbound_at,last_follow_up_sent_at,follow_up_delay_days" +
-        "&hidden_at=is.null&status=in.(sent,reply_received,interview,accepted,rejected)" +
+        "user_applications?select=id,company_name,company_email,job_title,status,sent_at,next_follow_up_at,last_inbound_at,last_follow_up_sent_at,follow_up_delay_days,hidden_at" +
+        "&status=in.(sent,reply_received,interview,accepted,rejected)" +
         "&order=next_follow_up_at.asc.nullslast,last_activity_at.desc"
       );
-      if (getSession()?.user?.id !== userId) return;
-      trackingRows = rows;
-      message.textContent = rows.length ? "" : "Les candidatures envoyées apparaîtront ici.";
-      list.innerHTML = rows.map(row => {
+      if (getSession()?.user?.id !== userId || trackingHidden.checked !== showHidden) return;
+      const activeRows = rows.filter(row => !row.hidden_at);
+      document.querySelector("#tracking-sent-count").textContent = activeRows.filter(row => row.sent_at).length;
+      document.querySelector("#tracking-reply-count").textContent = activeRows.filter(row => row.last_inbound_at || row.status === "reply_received").length;
+      document.querySelector("#tracking-interview-count").textContent = activeRows.filter(row => row.status === "interview").length;
+      document.querySelector("#tracking-due-count").textContent = activeRows.filter(followUpDue).length;
+      trackingRows = showHidden ? rows.filter(row => row.hidden_at) : activeRows;
+      list.innerHTML = trackingRows.map(row => {
         const followUp = row.next_follow_up_at ? new Date(row.next_follow_up_at) : null;
         const localDate = followUp
           ? new Date(followUp.getTime() - followUp.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
@@ -780,15 +849,18 @@
           (row.sent_at ? " · " + trackingDateFormat.format(new Date(row.sent_at)) : "") +
           (row.last_follow_up_sent_at ? " · Dernière relance le " + trackingDateFormat.format(new Date(row.last_follow_up_sent_at)) : "") +
           (overdue ? " · Relance en retard" : "") + '</small>' +
-          (row.status === "sent" && row.company_email && !row.last_inbound_at && row.sent_at
+          (canFollowUp(row)
             ? '<label><input type="checkbox" data-followup-choice value="' + escapeHtml(row.id) + '"> Sélectionner pour relance</label>' : '') +
           (row.last_inbound_at ? '<button type="button" class="secondary compact" data-open-reply="' +
-            escapeHtml(row.id) + '">Lire la réponse</button>' : '') + '</div>' +
+            escapeHtml(row.id) + '">Lire la réponse</button>' : '') +
+          '<button type="button" class="secondary compact" data-tracking-visibility="' + escapeHtml(row.id) + '">' +
+          (row.hidden_at ? "Réafficher" : "Masquer du suivi") + '</button></div>' +
           '<form class="application-form tracking-form" data-id="' + escapeHtml(row.id) + '">' +
           '<label>Date de relance<input name="follow-up" type="date" value="' + localDate + '"></label>' +
           '<label>Délai entre les relances (jours)<input name="follow-up-delay" type="number" required min="1" max="365" value="' + row.follow_up_delay_days + '"></label>' +
           '<button type="submit" class="secondary compact">Enregistrer</button></form></article>';
       }).join("");
+      applyTrackingFilters();
     } catch (error) {
       if (getSession()?.user?.id === userId) message.textContent = error.message;
     }

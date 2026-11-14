@@ -97,3 +97,28 @@
 #followup-drafts label,#followup-drafts textarea{display:block;width:100%;margin-bottom:12px}
 #followup-status{white-space:pre-wrap;overflow-wrap:anywhere}
 #tracking-list [data-followup-choice]{width:auto}
+
+.tracking-stats,
+.tracking-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(145px, 100%), 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.tracking-stats > div {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.tracking-stats span { color: var(--muted); }
+.tracking-stats strong { font-size: 23px; }
+.tracking-filters .inline-toggle { align-self: end; min-height: 44px; white-space: normal; }
+#tracking-list [hidden] { display: none; }
+#tracking-list .application-main button { justify-self: start; margin-top: 6px; }
+#tracking-list .application-main input[type="checkbox"] { width: auto; }
+#tracking-list .application-main label { display: flex; align-items: center; margin-top: 6px; }

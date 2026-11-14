@@ -205,6 +205,23 @@
           <button id="refresh-replies" class="secondary compact">Actualiser les e-mails reçus</button>
           <button id="authorize-replies" class="secondary compact" hidden>Autoriser le suivi Gmail</button>
           <p id="replies-status" role="status"></p>
+          <div class="tracking-stats" aria-label="Résumé du suivi">
+            <div><span>Envoyées</span><strong id="tracking-sent-count">—</strong></div>
+            <div><span>Avec réponse</span><strong id="tracking-reply-count">—</strong></div>
+            <div><span>Entretiens</span><strong id="tracking-interview-count">—</strong></div>
+            <div><span>Relances à faire</span><strong id="tracking-due-count">—</strong></div>
+          </div>
+          <div class="tracking-filters">
+            <label>Rechercher un dossier<input id="tracking-search" type="search" placeholder="Entreprise ou poste"></label>
+            <label>Filtrer le suivi<select id="tracking-filter">
+              <option value="">Toutes</option>
+              <option value="waiting">Sans réponse</option>
+              <option value="reply">Avec réponse</option>
+              <option value="interview">Entretiens</option>
+              <option value="due">Relances à faire</option>
+            </select></label>
+            <label class="inline-toggle"><input id="tracking-hidden" type="checkbox"> Voir les dossiers masqués</label>
+          </div>
           <button id="followup-batch" type="button" class="secondary compact">Préparer les relances sélectionnées</button>
           <div id="tracking-message" class="list-message" role="status"></div>
           <div id="tracking-list" class="applications-list"></div>
