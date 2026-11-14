@@ -243,6 +243,16 @@
     </main>
   </div>
 
+  <dialog id="reply-dialog">
+    <form method="dialog">
+      <h2>Réponses Gmail</h2>
+      <div id="reply-content" role="status" style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:50vh;overflow:auto"></div>
+      <button id="reply-consent" type="button" class="secondary" hidden>Autoriser la lecture dans Candidature Pro</button>
+      <a id="reply-gmail" target="_blank" rel="noopener noreferrer" hidden>Ouvrir le fil dans Gmail</a>
+      <button class="secondary">Fermer</button>
+    </form>
+  </dialog>
+
   <dialog id="send-dialog">
     <form id="send-form">
       <h2>Envoyer via Gmail</h2>

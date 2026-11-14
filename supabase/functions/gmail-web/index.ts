@@ -1,5 +1,6 @@
 const scope = "https://www.googleapis.com/auth/gmail.send";
 const metadataScope = "https://www.googleapis.com/auth/gmail.metadata";
+const readScope = "https://www.googleapis.com/auth/gmail.readonly";
 const tokenEndpoint = "https://oauth2.googleapis.com/token";
 
 Deno.serve(async (request: Request) => {
@@ -67,6 +68,62 @@ Deno.serve(async (request: Request) => {
 
     if (!configured) return json({ message: "La connexion Gmail web attend la configuration Google." }, 503);
 
+    if (body?.action === "open_reply") {
+      const applicationId = body.applicationId;
+      if (typeof applicationId !== "string" || !/^[0-9a-f-]{36}$/i.test(applicationId)) {
+        return json({ message: "Dossier invalide." }, 400);
+      }
+      const [deliveryResponse, connectionResponse] = await Promise.all([
+        fetch(root + "/rest/v1/web_gmail_deliveries" + filter + "&application_id=eq." +
+          encodeURIComponent(applicationId) + "&select=message_id", { headers: serviceHeaders }),
+        fetch(endpoint + filter + "&select=refresh_token", { headers: serviceHeaders })
+      ]);
+      if (!deliveryResponse.ok || !connectionResponse.ok) return json({ message: "Fil Gmail indisponible." }, 503);
+      const [delivery] = await deliveryResponse.json();
+      const [connection] = await connectionResponse.json();
+      if (!delivery?.message_id || !connection) return json({ message: "Aucun fil Gmail associé à ce dossier." }, 404);
+      const refresh = await fetch(tokenEndpoint, {
+        method: "POST",
+        body: new URLSearchParams({ refresh_token: connection.refresh_token, client_id: clientId,
+          client_secret: clientSecret, grant_type: "refresh_token" })
+      });
+      const token = await refresh.json().catch(() => null);
+      if (!refresh.ok || !token?.access_token) return json({ message: "Reconnectez Gmail dans les paramètres." }, 409);
+      if (typeof token.scope === "string" && !token.scope.split(" ").some((item: string) => item === metadataScope || item === readScope)) {
+        return json({ message: "Autorisez le suivi Gmail depuis Actualiser les e-mails reçus." }, 409);
+      }
+      const message = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/" +
+        encodeURIComponent(delivery.message_id) + "?format=minimal", {
+        headers: { Authorization: "Bearer " + token.access_token }
+      });
+      if (!message.ok) return json({ message: "Impossible de retrouver ce fil dans Gmail." }, 502);
+      const { threadId } = await message.json();
+      if (typeof threadId !== "string" || !threadId) return json({ message: "Fil Gmail introuvable." }, 404);
+      if (body.preview !== true) return json({ threadId });
+      if (typeof token.scope === "string" && !token.scope.split(" ").includes(readScope)) {
+        return json({ threadId, needsConsent: true });
+      }
+      const thread = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/threads/" +
+        encodeURIComponent(threadId) + "?format=full", { headers: { Authorization: "Bearer " + token.access_token } });
+      if (thread.status === 403) return json({ threadId, needsConsent: true });
+      if (!thread.ok) return json({ message: "Impossible de lire la réponse Gmail." }, 502);
+      const decoded = (data: string) => new TextDecoder().decode(
+        Uint8Array.from(atob(data.replace(/-/g, "+").replace(/_/g, "/")), char => char.charCodeAt(0)));
+      type Part = { mimeType?: string; filename?: string; body?: { data?: string }; parts?: Part[] };
+      const plainText = (part?: Part): string => {
+        if (!part || part.filename) return "";
+        if (part.mimeType === "text/plain" && part.body?.data) return decoded(part.body.data);
+        return (part.parts || []).map(plainText).filter(Boolean).join("\n");
+      };
+      const messages = (await thread.json()).messages || [];
+      const original = Number(messages.find((item: { id: string }) => item.id === delivery.message_id)?.internalDate);
+      const replies = messages.filter((item: { id: string; internalDate: string; labelIds?: string[] }) =>
+        item.id !== delivery.message_id && Number(item.internalDate) > original &&
+        !(item.labelIds || []).some(label => ["SENT", "DRAFT", "SPAM", "TRASH"].includes(label))
+      ).slice(-20).map((item: { payload?: Part }) => plainText(item.payload).slice(0, 30000));
+      return json({ threadId, replies });
+    }
+
     if (body?.action === "refresh_replies") {
       const read = await fetch(endpoint + filter + "&select=refresh_token", { headers: serviceHeaders });
       if (!read.ok) return json({ message: "Connexion Gmail indisponible." }, 503);
@@ -79,7 +136,7 @@ Deno.serve(async (request: Request) => {
       });
       const token = await refresh.json().catch(() => null);
       if (!refresh.ok || !token?.access_token) return json({ message: "Reconnectez Gmail dans les paramètres." }, 409);
-      if (typeof token.scope === "string" && !token.scope.split(" ").includes(metadataScope)) return json({ needsConsent: true });
+      if (typeof token.scope === "string" && !token.scope.split(" ").some((item: string) => item === metadataScope || item === readScope)) return json({ needsConsent: true });
       const gmailHeaders = { Authorization: "Bearer " + token.access_token };
       const rest = root + "/rest/v1/";
       const deliveries = await fetch(rest + "web_gmail_deliveries" + filter +
@@ -195,7 +252,7 @@ Deno.serve(async (request: Request) => {
       const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
       url.search = new URLSearchParams({
         client_id: clientId, redirect_uri: redirect, response_type: "code",
-        scope: body.readReplies === true ? scope + " " + metadataScope : scope, state: body.state, code_challenge: body.challenge,
+        scope: body.readReplies === true ? scope + " " + readScope : scope, state: body.state, code_challenge: body.challenge,
         code_challenge_method: "S256", access_type: "offline", prompt: "consent"
       }).toString();
       return json({ url: url.href });
@@ -214,7 +271,7 @@ Deno.serve(async (request: Request) => {
         return json({ message: "Google n’a pas accordé l’autorisation Gmail. Relancez la connexion." }, 422);
       }
       const readReplies = body.readReplies === true;
-      if (readReplies && !token.scope.split(" ").includes(metadataScope)) {
+      if (readReplies && !token.scope.split(" ").includes(readScope)) {
         return json({ message: "Google n’a pas accordé l’accès au suivi des réponses." }, 422);
       }
       const saved = await fetch(endpoint + "?on_conflict=user_id&select=user_id", {

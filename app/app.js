@@ -489,6 +489,38 @@
     }
   }
 
+  const replyDialog = document.querySelector("#reply-dialog");
+  const replyContent = document.querySelector("#reply-content");
+  const replyGmail = document.querySelector("#reply-gmail");
+  const replyConsent = document.querySelector("#reply-consent");
+  replyConsent.addEventListener("click", () => startGmailConnection(replyConsent, true));
+
+  document.querySelector("#tracking-list").addEventListener("click", async event => {
+    const button = event.target.closest("[data-open-reply]");
+    if (!button || button.disabled) return;
+    const userId = getSession()?.user?.id;
+    button.disabled = true;
+    replyGmail.hidden = true;
+    replyConsent.hidden = true;
+    replyContent.textContent = "Chargement…";
+    replyDialog.showModal();
+    try {
+      const result = await invokeEdgeFunction("gmail-web", {
+        action: "open_reply", applicationId: button.dataset.openReply, preview: true
+      });
+      if (!userId || getSession()?.user?.id !== userId) return;
+      replyGmail.href = "https://mail.google.com/mail/u/0/#all/" + encodeURIComponent(result.threadId);
+      replyGmail.hidden = false;
+      replyConsent.hidden = !result.needsConsent;
+      replyContent.textContent = result.needsConsent ? "Autorisez la lecture pour afficher le message ici." :
+        result.replies?.filter(Boolean).join("\n\n────────\n\n") || "Le contenu de ce message est disponible dans Gmail.";
+    } catch (error) {
+      if (getSession()?.user?.id === userId) replyContent.textContent = error.message;
+    } finally {
+      button.disabled = false;
+    }
+  });
+
   const trackingDateFormat = new Intl.DateTimeFormat("fr-CH", { dateStyle: "medium" });
 
   async function loadTracking() {
@@ -503,7 +535,7 @@
     message.textContent = "Chargement…";
     try {
       const rows = await supabaseFetch(
-        "user_applications?select=id,company_name,job_title,status,sent_at,next_follow_up_at" +
+        "user_applications?select=id,company_name,job_title,status,sent_at,next_follow_up_at,last_inbound_at" +
         "&hidden_at=is.null&status=in.(sent,reply_received,interview,accepted,rejected)" +
         "&order=next_follow_up_at.asc.nullslast,last_activity_at.desc"
       );
@@ -520,7 +552,9 @@
           escapeHtml(row.job_title || "Candidature spontanée") + '</span><small>' +
           escapeHtml(statusLabels[row.status]) +
           (row.sent_at ? " · " + trackingDateFormat.format(new Date(row.sent_at)) : "") +
-          (overdue ? " · Relance en retard" : "") + '</small></div>' +
+          (overdue ? " · Relance en retard" : "") + '</small>' +
+          (row.last_inbound_at ? '<button type="button" class="secondary compact" data-open-reply="' +
+            escapeHtml(row.id) + '">Lire la réponse</button>' : '') + '</div>' +
           '<form class="application-form tracking-form" data-id="' + escapeHtml(row.id) + '">' +
           '<label>Date de relance<input name="follow-up" type="date" value="' + localDate + '"></label>' +
           '<button type="submit" class="secondary compact">Enregistrer</button></form></article>';
