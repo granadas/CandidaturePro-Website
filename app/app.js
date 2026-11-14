@@ -442,6 +442,7 @@
   function renderApplications() {
     const list = document.querySelector("#applications-list");
     const filter = document.querySelector("#applications-filter").value;
+    updateBatchSelection();
     const visible = applications.filter(row => !filter || (filter === "sent"
       ? Boolean(row.sent_at) || ["sent", "reply_received", "interview", "accepted", "rejected"].includes(row.status)
       : row.status === filter));
@@ -476,7 +477,8 @@
         '<small>' + escapeHtml([application.company_city, application.company_email].filter(Boolean).join(" • ")) + '</small>' +
         sourceLink + '</div>' +
         (!hidden && application.status === "ready" && application.company_email && !application.sent_at
-          ? '<button class="secondary compact" data-action="send">Préparer l’envoi</button>' : '') +
+          ? '<div><label><input type="checkbox" data-batch-choice ' + (batchSelection.has(application.id) ? 'checked' : '') +
+            '> Sélectionner</label><button class="secondary compact" data-action="send">Préparer l’envoi</button></div>' : '') +
         '<label class="status-field"><span>Statut</span><select data-action="status">' + options + '</select></label>' +
         '<button class="secondary compact" data-action="' + (hidden ? "restore" : "hide") + '">' +
         (hidden ? "Réafficher" : "Masquer") + '</button></article>';
@@ -1277,6 +1279,8 @@
   signOutButton.addEventListener("click", () => {
     profile = null;
     if (replyDialog.open) replyDialog.close();
+    cancelBatch();
+    batchSelection.clear();
     ++documentsRequest;
     ++adminRequest;
     adminResults.replaceChildren();
@@ -1316,6 +1320,57 @@
       submit.disabled = false;
       submit.textContent = "Se connecter";
     }
+  });
+
+  const batchSelection = new Set();
+  let batchQueue = [];
+  let batchSize = 0;
+  const batchStart = document.querySelector("#batch-start");
+  const batchProgress = document.querySelector("#batch-progress");
+
+  function readyForBatch(row) {
+    return row && row.status === "ready" && row.company_email && !row.hidden_at && !row.sent_at;
+  }
+
+  function updateBatchSelection() {
+    for (const id of batchSelection) {
+      if (!readyForBatch(applications.find(row => row.id === id))) batchSelection.delete(id);
+    }
+    batchStart.disabled = !batchSelection.size;
+    batchStart.textContent = batchSelection.size ? "Préparer la sélection (" + batchSelection.size + ")" : "Préparer la sélection";
+  }
+
+  document.querySelector("#applications-list").addEventListener("change", event => {
+    if (!event.target.matches("[data-batch-choice]")) return;
+    const id = event.target.closest("[data-id]").dataset.id;
+    if (event.target.checked) batchSelection.add(id);
+    else batchSelection.delete(id);
+    updateBatchSelection();
+  });
+
+  document.querySelector("#batch-select").addEventListener("click", () => {
+    document.querySelectorAll("#applications-list [data-batch-choice]").forEach(input => {
+      batchSelection.add(input.closest("[data-id]").dataset.id);
+    });
+    renderApplications();
+  });
+
+  function nextBatchApplication() {
+    while (batchQueue.length) {
+      const id = batchQueue.shift();
+      if (readyForBatch(applications.find(row => row.id === id))) {
+        openSendDialog(id);
+        return;
+      }
+    }
+    batchSize = 0;
+  }
+
+  batchStart.addEventListener("click", () => {
+    updateBatchSelection();
+    batchQueue = [...batchSelection];
+    batchSize = batchQueue.length;
+    nextBatchApplication();
   });
 
   const sendDialog = document.querySelector("#send-dialog");
@@ -1447,6 +1502,8 @@
     const dossier = applications.find(application => application.id === id);
     if (!dossier?.company_email || !getSession()?.user?.id) return;
     sendApplication = dossier;
+    batchProgress.hidden = !batchSize;
+    batchProgress.textContent = batchSize ? "Dossier " + (batchSize - batchQueue.length) + " sur " + batchSize : "";
     sendForm.reset();
     libraryFiles = [];
     selectedDocuments = [];
@@ -1470,9 +1527,18 @@
     });
   }
 
-  document.querySelector("#send-cancel").addEventListener("click", () => sendDialog.close());
+  function cancelBatch() {
+    batchQueue = [];
+    batchSize = 0;
+  }
+
+  document.querySelector("#send-cancel").addEventListener("click", () => {
+    cancelBatch();
+    sendDialog.close();
+  });
   sendDialog.addEventListener("cancel", event => {
     if (sendSubmit.disabled) event.preventDefault();
+    else cancelBatch();
   });
   sendForm.addEventListener("submit", async event => {
     event.preventDefault();
@@ -1537,9 +1603,12 @@
         subject: draft.subject, message: draft.message
       });
       if (getSession()?.user?.id !== userId) return;
+      batchSelection.delete(application.id);
       sendDialog.close();
       await Promise.all([loadApplications(), loadDashboard().catch(() => {})]);
+      if (getSession()?.user?.id !== userId) return;
       document.querySelector("#applications-message").textContent = "Candidature envoyée via Gmail.";
+      nextBatchApplication();
     } catch (error) {
       if (getSession()?.user?.id === userId) sendStatus.textContent = error.message;
     } finally {

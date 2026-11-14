@@ -186,6 +186,10 @@
                 <option value="ready">Prêtes à envoyer</option><option value="sent">Envoyées et suivies</option>
               </select>
             </label>
+            <div class="batch-actions">
+              <button type="button" id="batch-select" class="secondary compact">Sélectionner les dossiers prêts affichés</button>
+              <button type="button" id="batch-start" class="primary compact" disabled>Préparer la sélection</button>
+            </div>
             <div id="applications-message" class="list-message" role="status"></div>
             <div id="applications-list" class="applications-list"></div>
           </article>
@@ -333,6 +337,7 @@
     <form id="send-form">
       <h2 id="send-title">Préparer l’envoi</h2>
       <p id="send-recipient"></p>
+      <p id="batch-progress" hidden></p>
       <label>Objet<input id="send-subject" maxlength="120" required></label>
       <label>Message<textarea id="send-message" rows="8" maxlength="12000" required></textarea></label>
       <label>CV et lettre en PDF (5 Mo au total)<input id="send-files" type="file" accept=".pdf,application/pdf" multiple></label>

@@ -80,3 +80,6 @@
 #reply-editor label{display:block;margin-top:12px}
 #reply-draft{display:block;width:100%;margin-top:4px}
 #reply-editor .reply-actions{padding:10px 0 0;background:transparent;border:0;justify-content:flex-start}
+
+.batch-actions{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+#applications-list [data-batch-choice]{width:auto;margin-right:5px}
