@@ -121,7 +121,7 @@
     if (isCompanies) renderCompanies();
     if (isJobs) loadJobs();
     if (isTracking) loadTracking();
-    if (isDocuments) loadDocuments();
+    if (isDocuments) { loadDocuments(); loadCvVariants(); }
     if (name === "settings") loadGmail();
     sidebar.classList.remove("open");
   }
@@ -911,6 +911,74 @@
 
   const cvDialog = document.querySelector("#cv-dialog");
   const cvForm = document.querySelector("#cv-form");
+  const cvVariants = document.querySelector("#cv-variants");
+  const cvLabel = document.querySelector("#cv-label");
+  const cvSaveStatus = document.querySelector("#cv-save-status");
+  const cvFieldNames = ["name", "title", "contact", "summary", "experience", "education", "skills", "target", "offer"];
+  let savedCvVariants = [];
+  let editingCvId = null;
+
+  async function loadCvVariants() {
+    const userId = getSession()?.user?.id;
+    if (!userId) return;
+    try {
+      const rows = await supabaseFetch("web_cv_variants?select=id,label,fields&order=updated_at.desc&limit=200");
+      if (getSession()?.user?.id !== userId) return;
+      savedCvVariants = rows;
+      cvVariants.length = 1;
+      for (const row of rows) cvVariants.add(new Option(row.label, row.id));
+      cvVariants.value = editingCvId || "";
+    } catch (error) {
+      if (getSession()?.user?.id === userId) cvSaveStatus.textContent = error.message;
+    }
+  }
+
+  document.querySelector("#cv-load").addEventListener("click", () => {
+    const variant = savedCvVariants.find(row => row.id === cvVariants.value);
+    if (!variant) return;
+    for (const name of cvFieldNames) cvForm.elements.namedItem(name).value = typeof variant.fields[name] === "string" ? variant.fields[name] : "";
+    cvLabel.value = variant.label;
+    editingCvId = variant.id;
+    document.querySelector("#cv-target-context").textContent = "";
+    cvSaveStatus.textContent = "Variante ouverte.";
+  });
+
+  document.querySelector("#cv-new").addEventListener("click", () => {
+    cvForm.reset();
+    editingCvId = null;
+    document.querySelector("#cv-target-context").textContent = "";
+    document.querySelector("#cv-adapt-status").textContent = "";
+    cvSaveStatus.textContent = "";
+  });
+
+  for (const [buttonId, copy] of [["cv-save", false], ["cv-save-copy", true]]) {
+    document.querySelector("#" + buttonId).addEventListener("click", async () => {
+      const userId = getSession()?.user?.id;
+      if (!userId || cvForm.dataset.saving || !cvForm.reportValidity()) return;
+      const fields = Object.fromEntries(cvFieldNames.map(name => [name, cvForm.elements.namedItem(name).value.trim()]));
+      const label = cvLabel.value.trim() || fields.title;
+      if (!label || !fields.name || !fields.title) {
+        cvSaveStatus.textContent = "Renseignez le nom et le titre du CV.";
+        return;
+      }
+      const id = copy ? null : editingCvId;
+      cvForm.dataset.saving = "true";
+      try {
+        const rows = await supabaseWrite("web_cv_variants" + (id ? "?id=eq." + encodeURIComponent(id) : ""), id ? "PATCH" : "POST",
+          { label, fields, updated_at: new Date().toISOString() });
+        if (getSession()?.user?.id !== userId) return;
+        if (!rows?.[0]?.id) throw new Error("La variante a été supprimée ou n’est plus accessible.");
+        editingCvId = rows[0].id;
+        await loadCvVariants();
+        if (getSession()?.user?.id === userId) cvSaveStatus.textContent = "Variante enregistrée.";
+      } catch (error) {
+        if (getSession()?.user?.id === userId) cvSaveStatus.textContent = error.message;
+      } finally {
+        delete cvForm.dataset.saving;
+      }
+    });
+  }
+
   function hasPremiumCv() {
     return String(profile?.plan || "").toLowerCase() === "premium" &&
       (!profile.premium_until || Date.parse(profile.premium_until) > Date.now());
@@ -1326,6 +1394,10 @@
     ++adminRequest;
     adminResults.replaceChildren();
     cvForm.reset();
+    savedCvVariants = [];
+    editingCvId = null;
+    cvVariants.length = 1;
+    cvSaveStatus.textContent = "";
     document.querySelector("#cv-target-context").textContent = "";
     document.querySelector("#cv-adapt-status").textContent = "";
     supportForm.reset();

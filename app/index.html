@@ -231,6 +231,10 @@
         <article class="panel">
           <h2>Créer un CV</h2>
           <form id="cv-form" class="profile-form">
+            <label>CV enregistrés<select id="cv-variants"><option value="">Choisir un CV</option></select></label>
+            <div><button type="button" class="secondary" id="cv-load">Ouvrir</button>
+              <button type="button" class="secondary" id="cv-new">Nouveau</button></div>
+            <label class="wide">Nom de la variante<input id="cv-label" maxlength="120"></label>
             <label>Nom complet<input name="name" maxlength="120" required></label>
             <label>Titre professionnel<input name="title" maxlength="120" required></label>
             <label class="wide">Coordonnées<input name="contact" maxlength="240"></label>
@@ -246,7 +250,10 @@
               <button class="secondary" type="button" id="cv-adapt">Prioriser les compétences pertinentes</button>
               <p id="cv-adapt-status" role="status"></p>
             </details>
-            <div class="wide"><button type="submit" class="primary">Aperçu et impression PDF</button></div>
+            <div class="wide"><button type="submit" class="primary">Aperçu et impression PDF</button>
+            <button type="button" class="secondary" id="cv-save">Enregistrer la variante</button>
+            <button type="button" class="secondary" id="cv-save-copy">Enregistrer une copie</button>
+            <p id="cv-save-status" role="status"></p></div>
           </form>
         </article>
 
