@@ -116,6 +116,7 @@
     document.querySelector("#account-label").dataset.pageSubtitle = subtitle;
     if (!getSession()) document.querySelector("#account-label").textContent = subtitle;
 
+    if (isDashboard) ensureSession().then(session => session && updateTrackingCounts(session)).catch(() => {});
     if (isProfile) renderProfile();
     if (isApplications) loadApplications();
     if (isCompanies) renderCompanies();
@@ -1165,12 +1166,37 @@
     return year + "-" + month + "-01";
   }
 
+  async function updateTrackingCounts(session) {
+    const queries = {
+      replies: "last_inbound_at=not.is.null",
+      followups: "next_follow_up_at=not.is.null&status=in.(sent,reply_received,interview)",
+      interviews: "status=eq.interview"
+    };
+    await Promise.all(Object.entries(queries).map(async ([key, filter]) => {
+      const node = document.querySelector("#stat-" + key);
+      try {
+        const response = await fetch(config.supabaseUrl + "/rest/v1/user_applications?select=id&limit=1&hidden_at=is.null&" + filter, {
+          method: "HEAD",
+          headers: {
+            apikey: config.supabasePublishableKey,
+            Authorization: "Bearer " + session.access_token,
+            Prefer: "count=exact"
+          }
+        });
+        const count = response.headers.get("content-range")?.split("/").at(-1);
+        if (getSession()?.user?.id === session.user.id) node.textContent = response.ok && /^\d+$/.test(count || "") ? count : "—";
+      } catch {
+        if (getSession()?.user?.id === session.user.id) node.textContent = "—";
+      }
+    }));
+  }
+
   async function loadDashboard() {
     const session = await ensureSession();
     if (!session?.user?.id) {
       profile = null;
       renderAccount();
-      document.querySelector("#stat-sent").textContent = "0";
+      for (const node of document.querySelectorAll("[id^=stat-]")) node.textContent = "0";
       return;
     }
 
@@ -1181,12 +1207,14 @@
       supabaseFetch("candidature_usage?user_id=eq." + userId + "&month_start=eq." + month + "&select=application_key")
     ]);
 
+    if (getSession()?.user?.id !== session.user.id) return;
     profile = Array.isArray(profiles) ? profiles[0] || null : null;
     document.querySelector("#stat-sent").textContent = String(Array.isArray(usage) ? usage.length : 0);
     const hasProfile = Boolean(profile?.candidate_first_name && profile?.candidate_last_name);
     document.querySelector("#setup-progress").textContent = hasProfile ? "2/4" : "1/4";
     renderAccount();
     renderProfile();
+    await updateTrackingCounts(session);
   }
 
   document.querySelector("#profile-form").addEventListener("submit", async event => {
