@@ -49,3 +49,9 @@
 .reply-actions a{text-decoration:none}
 .reply-actions [hidden]{display:none}
 @media(max-width:480px){.reply-actions>*{width:100%;text-align:center}}
+
+#send-dialog{width:min(680px,calc(100% - 24px));max-width:none}
+#send-dialog form{padding:clamp(16px,4vw,28px)}
+#send-dialog [hidden]{display:none}
+#send-review{padding:16px;background:#f5f7fc;border-radius:12px;overflow-wrap:anywhere}
+#send-preview-message{white-space:pre-wrap;max-height:42dvh;overflow:auto}

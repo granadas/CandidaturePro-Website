@@ -255,15 +255,21 @@
     </form>
   </dialog>
 
-  <dialog id="send-dialog">
+  <dialog id="send-dialog" aria-labelledby="send-title">
     <form id="send-form">
-      <h2>Envoyer via Gmail</h2>
+      <h2 id="send-title">Préparer l’envoi</h2>
       <p id="send-recipient"></p>
       <label>Objet<input id="send-subject" maxlength="120" required></label>
       <label>Message<textarea id="send-message" rows="8" maxlength="12000" required></textarea></label>
       <label>CV et lettre en PDF (5 Mo au total)<input id="send-files" type="file" accept=".pdf,application/pdf" multiple></label>
+      <section id="send-review" hidden tabindex="-1" aria-label="Aperçu du message">
+        <h3 id="send-preview-subject"></h3>
+        <p id="send-preview-message"></p>
+        <p id="send-preview-files"></p>
+        <button id="send-edit" class="secondary" type="button">Modifier</button>
+      </section>
       <p id="send-status" role="status"></p>
-      <button id="send-submit" class="primary" type="submit">Envoyer</button>
+      <button id="send-submit" class="primary" type="submit">Contrôle final</button>
       <button id="send-cancel" class="secondary" type="button">Fermer</button>
     </form>
   </dialog>

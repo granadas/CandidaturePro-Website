@@ -984,12 +984,34 @@
   const sendSubmit = document.querySelector("#send-submit");
   const sendStatus = document.querySelector("#send-status");
   let sendApplication = null;
+  let reviewed = null;
+  const sendReview = document.querySelector("#send-review");
+  const sendTitle = document.querySelector("#send-title");
+  const sendInputs = ["subject", "message", "files"].map(name => document.querySelector("#send-" + name));
+
+  function editSendDraft() {
+    reviewed = null;
+    sendReview.hidden = true;
+    for (const input of sendInputs) {
+      input.disabled = false;
+      input.closest("label").hidden = false;
+    }
+    sendTitle.textContent = "Préparer l’envoi";
+    sendSubmit.textContent = "Contrôle final";
+    sendStatus.textContent = "";
+  }
+
+  document.querySelector("#send-edit").addEventListener("click", () => {
+    editSendDraft();
+    sendInputs[0].focus();
+  });
 
   function openSendDialog(id) {
     const dossier = applications.find(application => application.id === id);
     if (!dossier?.company_email || !getSession()?.user?.id) return;
     sendApplication = dossier;
     sendForm.reset();
+    editSendDraft();
     sendSubmit.disabled = false;
     sendStatus.textContent = "";
     document.querySelector("#send-recipient").textContent = "Destinataire · " + dossier.company_email;
@@ -1006,14 +1028,44 @@
     event.preventDefault();
     if (sendSubmit.disabled || !sendApplication) return;
     const userId = getSession()?.user?.id;
+    if (!reviewed) {
+      const [subject, message, fileInput] = sendInputs;
+      const draft = { subject: subject.value.trim(), message: message.value.trim(), files: Array.from(fileInput.files) };
+      if (!draft.subject || !draft.message) {
+        sendStatus.textContent = "Renseignez l’objet et le message.";
+        return;
+      }
+      if (draft.files.length > 2 || draft.files.some(file => !/\.pdf$/i.test(file.name)) ||
+          draft.files.reduce((total, file) => total + file.size, 0) > 5 * 1024 * 1024) {
+        sendStatus.textContent = "Choisissez au maximum deux PDF de 5 Mo au total.";
+        return;
+      }
+      reviewed = draft;
+      for (const input of sendInputs) {
+        input.disabled = true;
+        input.closest("label").hidden = true;
+      }
+      document.querySelector("#send-preview-subject").textContent = draft.subject;
+      document.querySelector("#send-preview-message").textContent = draft.message;
+      document.querySelector("#send-preview-files").textContent = draft.files.length
+        ? "Pièces jointes · " + draft.files.map(file => file.name).join(", ")
+        : "Aucune pièce jointe";
+      sendStatus.textContent = "";
+      sendTitle.textContent = "Contrôle final";
+      sendSubmit.textContent = "Confirmer l’envoi via Gmail";
+      sendReview.hidden = false;
+      sendReview.focus();
+      return;
+    }
+    const draft = reviewed;
+    const application = sendApplication;
+    const editButton = document.querySelector("#send-edit");
+    editButton.disabled = true;
     sendSubmit.disabled = true;
     document.querySelector("#send-cancel").disabled = true;
     sendStatus.textContent = "Envoi en cours…";
     try {
-      const files = Array.from(document.querySelector("#send-files").files);
-      if (files.length > 2 || files.reduce((total, file) => total + file.size, 0) > 5 * 1024 * 1024) {
-        throw new Error("Choisissez au maximum deux PDF de 5 Mo au total.");
-      }
+      const files = draft.files;
       const attachments = await Promise.all(files.map(async file => {
         if (!/\.pdf$/i.test(file.name) || await file.slice(0, 5).text() !== "%PDF-") {
           throw new Error("Les pièces jointes doivent être des PDF.");
@@ -1027,9 +1079,8 @@
       }));
       if (!userId || getSession()?.user?.id !== userId) return;
       await invokeEdgeFunction("gmail-web", {
-        action: "send", attachments, applicationId: sendApplication.id, recipient: sendApplication.company_email,
-        subject: document.querySelector("#send-subject").value.trim(),
-        message: document.querySelector("#send-message").value
+        action: "send", attachments, applicationId: application.id, recipient: application.company_email,
+        subject: draft.subject, message: draft.message
       });
       if (getSession()?.user?.id !== userId) return;
       sendDialog.close();
@@ -1039,6 +1090,7 @@
       if (getSession()?.user?.id === userId) sendStatus.textContent = error.message;
     } finally {
       sendSubmit.disabled = false;
+      editButton.disabled = false;
       document.querySelector("#send-cancel").disabled = false;
     }
   });
