@@ -1070,7 +1070,7 @@
     }
   });
 
-  gmailConnect.addEventListener("click", () => startGmailConnection(gmailConnect, false));
+  gmailConnect.addEventListener("click", () => startGmailConnection(gmailConnect, true));
   authorizeReplies.addEventListener("click", () => startGmailConnection(authorizeReplies, true));
 
   async function startGmailConnection(button, readReplies) {
@@ -1084,10 +1084,10 @@
       if (getSession()?.user?.id !== userId) return;
       const url = new URL(result.url);
       if (url.origin !== "https://accounts.google.com" || url.pathname !== "/o/oauth2/v2/auth") throw new Error("Adresse Google inattendue.");
-      sessionStorage.setItem(gmailFlowKey, JSON.stringify({ verifier, state, userId, readReplies, startedAt: Date.now() }));
+      sessionStorage.setItem(gmailFlowKey, JSON.stringify({ verifier, state, userId, readReplies, fromTracking: button !== gmailConnect, startedAt: Date.now() }));
       location.assign(url.href);
     } catch (error) {
-      (readReplies ? repliesStatus : gmailStatus).textContent = error.message;
+      (button === gmailConnect ? gmailStatus : repliesStatus).textContent = error.message;
     } finally {
       button.disabled = false;
     }
@@ -1113,17 +1113,17 @@
     catch { flow = null; }
     sessionStorage.removeItem(gmailFlowKey);
     history.replaceState(null, "", url.pathname);
-    showView(flow?.readReplies ? "tracking" : "settings");
+    showView(flow?.readReplies && flow?.fromTracking ? "tracking" : "settings");
     try {
       if (!flow || flow.state !== url.searchParams.get("state") || Date.now() - flow.startedAt > 10 * 60 * 1000 ||
           !flow.userId || flow.userId !== getSession()?.user?.id) throw new Error("La demande de connexion Gmail a expiré. Réessayez.");
       if (url.searchParams.has("error")) throw new Error("Connexion Gmail annulée.");
       await invokeEdgeFunction("gmail-web", { action: "exchange", code: url.searchParams.get("code"), verifier: flow.verifier, readReplies: flow.readReplies === true });
-      if (flow.readReplies) refreshReplies.click();
+      if (flow.readReplies && flow.fromTracking) refreshReplies.click();
       else await loadGmail();
     } catch (error) {
       await loadGmail();
-      (flow?.readReplies ? repliesStatus : gmailStatus).textContent = error.message;
+      (flow?.fromTracking ? repliesStatus : gmailStatus).textContent = error.message;
     }
   }
 
