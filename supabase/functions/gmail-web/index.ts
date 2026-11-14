@@ -153,6 +153,26 @@ Deno.serve(async (request: Request) => {
         if (typeof body.message !== "string" || !body.message.trim() || body.message.length > 12000) {
           return json({ message: "Renseignez une réponse de 12 000 caractères maximum." }, 400);
         }
+        if (typeof body.requestId !== "string" || !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(body.requestId)) {
+          return json({ message: "Identifiant d’envoi invalide." }, 400);
+        }
+        const outbox = root + "/rest/v1/web_gmail_thread_sends";
+        const attempt = outbox + filter + "&request_id=eq." + encodeURIComponent(body.requestId);
+        const writeHeaders = { ...serviceHeaders, "Content-Type": "application/json" };
+        const reservation = await fetch(outbox, {
+          method: "POST", headers: writeHeaders,
+          body: JSON.stringify({ user_id: id, request_id: body.requestId, application_id: applicationId,
+            kind: followup ? "followup" : "reply" })
+        });
+        if (reservation.status === 409) {
+          const previous = await fetch(attempt + "&select=confirmed_at,application_id,kind", { headers: serviceHeaders });
+          const [row] = previous.ok ? await previous.json() : [];
+          if (row?.confirmed_at && row.application_id === applicationId && row.kind === (followup ? "followup" : "reply")) {
+            return json({ sent: true });
+          }
+          return json({ message: "Cet envoi a déjà été demandé. Vérifiez le dossier Envoyés dans Gmail.", uncertain: true }, 409);
+        }
+        if (!reservation.ok) return json({ message: "Impossible de réserver l’envoi.", uncertain: true }, 503);
         const subjectLine = /^re:/i.test(subject) ? subject : "Re: " + subject;
         try {
           const sent = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
@@ -160,8 +180,15 @@ Deno.serve(async (request: Request) => {
             headers: { Authorization: "Bearer " + token.access_token, "Content-Type": "application/json" },
             body: JSON.stringify({ threadId, raw: encodeMessage(recipient, subjectLine, body.message, [], reference) })
           });
-          if (sent.ok && (await sent.json()).id) return json({ sent: true });
-          if ([400, 401, 403, 429].includes(sent.status)) return json({ message: "Gmail a refusé la réponse." }, 422);
+          if (sent.ok && (await sent.json()).id) {
+            await fetch(attempt, { method: "PATCH", headers: writeHeaders,
+              body: JSON.stringify({ confirmed_at: new Date().toISOString() }) });
+            return json({ sent: true });
+          }
+          if ([400, 401, 403, 429].includes(sent.status)) {
+            const removed = await fetch(attempt, { method: "DELETE", headers: serviceHeaders });
+            if (removed.ok) return json({ message: "Gmail a refusé le message." }, 422);
+          }
         } catch { /* Gmail may have accepted the request before the connection closed. */ }
         return json({ message: "Envoi incertain. Vérifiez le dossier Envoyés dans Gmail avant de réessayer.", uncertain: true }, 502);
       }

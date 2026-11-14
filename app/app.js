@@ -573,12 +573,14 @@
     if (!message) { replyEditorStatus.textContent = "Rédigez votre réponse."; return; }
     if (!window.confirm("Envoyer cette réponse à " + context.replyTo.recipient + " ?")) return;
     replySend.disabled = true;
+    context.requestId ||= crypto.randomUUID();
     try {
       const result = await invokeEdgeFunction("gmail-web", { action: "send_reply",
-        applicationId: context.applicationId, replyId: context.replyTo.id, recipient: context.replyTo.recipient, message });
+        applicationId: context.applicationId, replyId: context.replyTo.id, recipient: context.replyTo.recipient, requestId: context.requestId, message });
       if (replyContext !== context) return;
       if (result.sent !== true) throw new Error("Gmail n’a pas confirmé l’envoi.");
       replyDraft.value = "";
+      context.requestId = null;
       replyEditorStatus.textContent = "Réponse envoyée dans le fil Gmail.";
     } catch (error) {
       if (replyContext === context) replyEditorStatus.textContent = error.message;
@@ -726,7 +728,7 @@
         followupStatus.textContent = "Relance " + (index + 1) + " sur " + rows.length + "…";
         try {
           const response = await invokeEdgeFunction("gmail-web", { action: "send_followup",
-            applicationId: row.id, recipient: row.company_email, message: messages[index] });
+            applicationId: row.id, recipient: row.company_email, requestId: crypto.randomUUID(), message: messages[index] });
           if (response.sent !== true) throw new Error("Gmail n’a pas confirmé l’envoi.");
           results.push(row.company_name + " · Relance envoyée");
         } catch (error) {
