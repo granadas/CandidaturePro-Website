@@ -1015,25 +1015,49 @@
     }
   }
 
-  gmailConnect.addEventListener("click", async () => {
-    gmailConnect.disabled = true;
+  const refreshReplies = document.querySelector("#refresh-replies");
+  const authorizeReplies = document.querySelector("#authorize-replies");
+  const repliesStatus = document.querySelector("#replies-status");
+
+  refreshReplies.addEventListener("click", async () => {
+    refreshReplies.disabled = true;
+    authorizeReplies.hidden = true;
+    repliesStatus.textContent = "Recherche des réponses Gmail…";
+    try {
+      const result = await invokeEdgeFunction("gmail-web", { action: "refresh_replies" });
+      authorizeReplies.hidden = !result.needsConsent;
+      repliesStatus.textContent = result.needsConsent ? "Autorisez Gmail pour vérifier les réponses à vos candidatures." :
+        result.updated ? result.updated + " candidature(s) mise(s) à jour." : "Aucune nouvelle réponse dans les 20 derniers envois web.";
+      await loadTracking();
+    } catch (error) {
+      repliesStatus.textContent = error.message;
+    } finally {
+      refreshReplies.disabled = false;
+    }
+  });
+
+  gmailConnect.addEventListener("click", () => startGmailConnection(gmailConnect, false));
+  authorizeReplies.addEventListener("click", () => startGmailConnection(authorizeReplies, true));
+
+  async function startGmailConnection(button, readReplies) {
+    button.disabled = true;
     const userId = getSession()?.user?.id;
     try {
       const verifier = gmailEncode(crypto.getRandomValues(new Uint8Array(32)));
       const state = gmailEncode(crypto.getRandomValues(new Uint8Array(32)));
       const challenge = gmailEncode(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))));
-      const result = await invokeEdgeFunction("gmail-web", { action: "start", challenge, state });
+      const result = await invokeEdgeFunction("gmail-web", { action: "start", challenge, state, readReplies });
       if (getSession()?.user?.id !== userId) return;
       const url = new URL(result.url);
       if (url.origin !== "https://accounts.google.com" || url.pathname !== "/o/oauth2/v2/auth") throw new Error("Adresse Google inattendue.");
-      sessionStorage.setItem(gmailFlowKey, JSON.stringify({ verifier, state, userId, startedAt: Date.now() }));
+      sessionStorage.setItem(gmailFlowKey, JSON.stringify({ verifier, state, userId, readReplies, startedAt: Date.now() }));
       location.assign(url.href);
     } catch (error) {
-      gmailStatus.textContent = error.message;
+      (readReplies ? repliesStatus : gmailStatus).textContent = error.message;
     } finally {
-      gmailConnect.disabled = false;
+      button.disabled = false;
     }
-  });
+  }
 
   gmailDisconnect.addEventListener("click", async () => {
     gmailDisconnect.disabled = true;
@@ -1055,16 +1079,17 @@
     catch { flow = null; }
     sessionStorage.removeItem(gmailFlowKey);
     history.replaceState(null, "", url.pathname);
-    showView("settings");
+    showView(flow?.readReplies ? "tracking" : "settings");
     try {
       if (!flow || flow.state !== url.searchParams.get("state") || Date.now() - flow.startedAt > 10 * 60 * 1000 ||
           !flow.userId || flow.userId !== getSession()?.user?.id) throw new Error("La demande de connexion Gmail a expiré. Réessayez.");
       if (url.searchParams.has("error")) throw new Error("Connexion Gmail annulée.");
-      await invokeEdgeFunction("gmail-web", { action: "exchange", code: url.searchParams.get("code"), verifier: flow.verifier });
-      await loadGmail();
+      await invokeEdgeFunction("gmail-web", { action: "exchange", code: url.searchParams.get("code"), verifier: flow.verifier, readReplies: flow.readReplies === true });
+      if (flow.readReplies) refreshReplies.click();
+      else await loadGmail();
     } catch (error) {
       await loadGmail();
-      gmailStatus.textContent = error.message;
+      (flow?.readReplies ? repliesStatus : gmailStatus).textContent = error.message;
     }
   }
 

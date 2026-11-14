@@ -1,4 +1,5 @@
 const scope = "https://www.googleapis.com/auth/gmail.send";
+const metadataScope = "https://www.googleapis.com/auth/gmail.metadata";
 const tokenEndpoint = "https://oauth2.googleapis.com/token";
 
 Deno.serve(async (request: Request) => {
@@ -66,6 +67,73 @@ Deno.serve(async (request: Request) => {
 
     if (!configured) return json({ message: "La connexion Gmail web attend la configuration Google." }, 503);
 
+    if (body?.action === "refresh_replies") {
+      const read = await fetch(endpoint + filter + "&select=refresh_token", { headers: serviceHeaders });
+      if (!read.ok) return json({ message: "Connexion Gmail indisponible." }, 503);
+      const [connection] = await read.json();
+      if (!connection) return json({ needsConsent: true });
+      const refresh = await fetch(tokenEndpoint, {
+        method: "POST",
+        body: new URLSearchParams({ refresh_token: connection.refresh_token, client_id: clientId,
+          client_secret: clientSecret, grant_type: "refresh_token" })
+      });
+      const token = await refresh.json().catch(() => null);
+      if (!refresh.ok || !token?.access_token) return json({ message: "Reconnectez Gmail dans les paramètres." }, 409);
+      if (typeof token.scope === "string" && !token.scope.split(" ").includes(metadataScope)) return json({ needsConsent: true });
+      const gmailHeaders = { Authorization: "Bearer " + token.access_token };
+      const rest = root + "/rest/v1/";
+      const deliveries = await fetch(rest + "web_gmail_deliveries" + filter +
+        "&select=application_id,message_id&message_id=not.is.null&order=reserved_at.desc&limit=20", { headers: serviceHeaders });
+      if (!deliveries.ok) return json({ message: "Dossiers envoyés indisponibles." }, 503);
+      let updated = 0;
+      for (const delivery of await deliveries.json()) {
+        const message = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/" +
+          encodeURIComponent(delivery.message_id) + "?format=minimal", { headers: gmailHeaders });
+        if (message.status === 403) {
+          const error = await message.json().catch(() => null);
+          if ((JSON.stringify(error) || "").includes("ACCESS_TOKEN_SCOPE_INSUFFICIENT") ||
+              error?.error?.errors?.some((item: { reason?: string }) => item.reason === "insufficientPermissions")) {
+            return json({ needsConsent: true });
+          }
+        }
+        if (message.status === 404) continue;
+        if (!message.ok) return json({ message: "Impossible de consulter les fils Gmail. Réessayez." }, 502);
+        const sent = await message.json();
+        if (!sent.threadId) continue;
+        const thread = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/threads/" +
+          encodeURIComponent(sent.threadId) + "?format=metadata&metadataHeaders=Date&fields=messages(id,internalDate,labelIds,payload(headers))", { headers: gmailHeaders });
+        if (thread.status === 404) continue;
+        if (!thread.ok) return json({ message: "Impossible de consulter les fils Gmail. Réessayez." }, 502);
+        const messages = (await thread.json()).messages || [];
+        type GmailMessage = { id: string; internalDate?: string; labelIds?: string[];
+          payload?: { headers?: { name: string; value: string }[] } };
+        const timestamp = (item?: GmailMessage) => item?.internalDate
+          ? Number(item.internalDate)
+          : Date.parse(item?.payload?.headers?.find(header => header.name.toLowerCase() === "date")?.value || "");
+        const originalDate = timestamp(messages.find((item: GmailMessage) => item.id === delivery.message_id));
+        if (!Number.isFinite(originalDate)) continue;
+        const latest = messages.reduce((date: number, item: GmailMessage) => {
+          if (item.id === delivery.message_id) return date;
+          const received = timestamp(item);
+          const labels = item.labelIds || [];
+          return Number.isFinite(received) && !labels.some(label => ["SENT", "DRAFT", "SPAM", "TRASH"].includes(label))
+            ? Math.max(date, received) : date;
+        }, originalDate);
+        if (latest <= originalDate) continue;
+        const date = new Date(latest).toISOString();
+        const changed = await fetch(rest + "user_applications" + filter + "&id=eq." +
+          encodeURIComponent(delivery.application_id) +
+          "&hidden_at=is.null&status=in.(sent,reply_received)&or=(last_inbound_at.is.null,last_inbound_at.lt." + encodeURIComponent(date) + ")&select=id", {
+          method: "PATCH",
+          headers: { ...serviceHeaders, "Content-Type": "application/json", Prefer: "return=representation" },
+          body: JSON.stringify({ status: "reply_received", last_inbound_at: date })
+        });
+        if (!changed.ok) return json({ message: "Impossible d’enregistrer une réponse. Réessayez." }, 503);
+        updated += (await changed.json()).length;
+      }
+      return json({ updated });
+    }
+
     if (body?.action === "send") {
       const { applicationId, recipient, subject, message } = body;
       const email = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)+$/;
@@ -127,7 +195,7 @@ Deno.serve(async (request: Request) => {
       const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
       url.search = new URLSearchParams({
         client_id: clientId, redirect_uri: redirect, response_type: "code",
-        scope, state: body.state, code_challenge: body.challenge,
+        scope: body.readReplies === true ? scope + " " + metadataScope : scope, state: body.state, code_challenge: body.challenge,
         code_challenge_method: "S256", access_type: "offline", prompt: "consent"
       }).toString();
       return json({ url: url.href });
@@ -145,10 +213,14 @@ Deno.serve(async (request: Request) => {
       if (!response.ok || !token?.refresh_token || !token?.scope?.split(" ").includes(scope)) {
         return json({ message: "Google n’a pas accordé l’autorisation Gmail. Relancez la connexion." }, 422);
       }
+      const readReplies = body.readReplies === true;
+      if (readReplies && !token.scope.split(" ").includes(metadataScope)) {
+        return json({ message: "Google n’a pas accordé l’accès au suivi des réponses." }, 422);
+      }
       const saved = await fetch(endpoint + "?on_conflict=user_id&select=user_id", {
         method: "POST",
-        headers: { ...serviceHeaders, "Content-Type": "application/json", Prefer: "resolution=ignore-duplicates,return=representation" },
-        body: JSON.stringify({ user_id: id, refresh_token: token.refresh_token })
+        headers: { ...serviceHeaders, "Content-Type": "application/json", Prefer: "resolution=" + (readReplies ? "merge-duplicates" : "ignore-duplicates") + ",return=representation" },
+        body: JSON.stringify({ user_id: id, refresh_token: token.refresh_token, connected_at: new Date().toISOString() })
       });
       if (!saved.ok) return json({ message: "Impossible d’enregistrer la connexion Gmail." }, 503);
       if (!(await saved.json()).length) return json({ message: "Un compte Gmail est déjà lié. Déconnectez-le avant d’en choisir un autre." }, 409);
