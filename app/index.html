@@ -263,14 +263,21 @@
         <article class="panel">
           <h2>Contacter le support</h2>
           <p>Décrivez le problème et indiquez l’écran concerné.</p>
-          <a class="secondary" href="mailto:jobrufali@gmail.com?subject=Support%20Candidature%20Pro%20Web">Écrire au support</a>
+          <form id="support-report" class="profile-form">
+            <label class="wide">Catégorie<select name="category"><option>Problème technique</option><option>Suggestion</option><option>Autre</option></select></label>
+            <label class="wide">Titre<input name="title" required maxlength="180"></label>
+            <label class="wide">Description<textarea name="description" required maxlength="8000" rows="5"></textarea></label>
+            <label class="wide">Étapes pour reproduire le problème<textarea name="steps" maxlength="5000" rows="3"></textarea></label>
+            <div class="wide"><button class="primary" type="submit">Envoyer le signalement</button></div>
+            <p id="support-report-status" role="status" class="wide"></p>
+          </form>
         </article>
       </section>
 
       <section id="admin-view" class="view">
         <article class="panel">
           <h2>Administration</h2>
-          <label>Vue<select id="admin-mode"><option value="blacklist">Liste noire</option><option value="audit">Historique</option><option value="credits">Crédits fournisseurs</option></select></label>
+          <label>Vue<select id="admin-mode"><option value="blacklist">Liste noire</option><option value="audit">Historique</option><option value="credits">Crédits fournisseurs</option><option value="contacts">Changements de contact</option><option value="invalid">E-mails incorrects</option><option value="verification">Vérifications entreprises</option><option value="reports">Signalements</option><option value="users">Utilisateurs</option></select></label>
           <button type="button" class="secondary" id="admin-refresh">Actualiser</button>
           <p id="admin-status" role="status"></p>
           <div id="admin-results" class="applications-list"></div>

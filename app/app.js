@@ -628,7 +628,12 @@
   const adminViews = {
     blacklist: ["admin_list_blacklisted_companies", {}],
     audit: ["admin_list_audit_log", { p_limit: 100 }],
-    credits: ["admin_get_credit_usage_statistics", { p_month: null }]
+    credits: ["admin_get_credit_usage_statistics", { p_month: null }],
+    contacts: ["admin_list_company_email_change_requests", {}],
+    invalid: ["admin_list_invalid_company_email_reports", {}],
+    verification: ["admin_list_company_manual_verifications", {}],
+    reports: ["admin_list_support_reports", {}],
+    users: ["admin_list_users", { p_search: "" }]
   };
   let adminRequest = 0;
 
@@ -649,11 +654,16 @@
         const card = document.createElement("article");
         card.className = "application-row";
         const title = document.createElement("strong");
-        title.textContent = row.company_name || row.label || row.action || "";
+        title.textContent = row.company_name || row.label || row.title || row.email || row.action || "";
         const details = document.createElement("p");
         details.textContent = mode === "blacklist" ? [row.city, row.inactive_reason].filter(Boolean).join(" · ") :
           mode === "audit" ? [row.summary, row.created_at].filter(Boolean).join(" · ") :
-          Object.values(row).filter(value => value !== "" && value != null).join(" · ");
+          mode === "credits" ? [row.category, row.credits + " crédits", row.estimated_cost_chf + " CHF", row.detail].filter(Boolean).join(" · ") :
+          mode === "contacts" ? [row.city, row.current_email, row.proposed_email, row.reply_subject, row.reply_body].filter(Boolean).join(" · ") :
+          mode === "invalid" ? [row.email, row.reason, row.reply_subject, row.reply_body].filter(Boolean).join(" · ") :
+          mode === "verification" ? [row.city, row.address, row.website, row.status].filter(Boolean).join(" · ") :
+          mode === "reports" ? [row.category, row.description, row.steps, row.status].filter(Boolean).join(" · ") :
+          [row.plan, row.is_admin ? "Administrateur" : "", row.last_seen_at].filter(Boolean).join(" · ");
         card.append(title, details);
         if (mode === "blacklist") {
           const restore = document.createElement("form");
@@ -681,6 +691,33 @@
           });
           card.append(restore);
         }
+        if (mode === "contacts" || mode === "invalid") {
+          const review = document.createElement("form");
+          review.innerHTML = '<label>Note administrateur<input name="note" maxlength="2000"></label>' +
+            '<button type="submit" class="primary" value="approve">' +
+            (mode === "contacts" ? "Approuver le changement" : "Confirmer l’adresse invalide") +
+            '</button> <button type="submit" class="secondary" value="reject">Refuser</button>';
+          review.addEventListener("submit", async event => {
+            event.preventDefault();
+            if (!event.submitter || !current() || profile?.is_admin !== true) return;
+            const approved = event.submitter.value === "approve";
+            const note = new FormData(review).get("note");
+            const buttons = review.querySelectorAll("button");
+            buttons.forEach(button => button.disabled = true);
+            try {
+              const done = mode === "contacts"
+                ? await supabaseRpc("admin_review_company_email_change_request", { p_request_id: row.id, p_approve: approved, p_admin_note: note })
+                : await supabaseRpc("admin_review_invalid_company_email_report", { p_report_id: row.id, p_confirm_invalid: approved, p_admin_note: note });
+              if (done !== true) throw new Error("La décision n’a pas été enregistrée.");
+              if (current()) await loadAdmin();
+            } catch (error) {
+              if (current()) adminStatus.textContent = error.message;
+            } finally {
+              buttons.forEach(button => button.disabled = false);
+            }
+          });
+          card.append(review);
+        }
         adminResults.append(card);
       }
     } catch (error) {
@@ -690,6 +727,38 @@
 
   adminMode.addEventListener("change", loadAdmin);
   document.querySelector("#admin-refresh").addEventListener("click", loadAdmin);
+
+  const supportForm = document.querySelector("#support-report");
+  supportForm.addEventListener("submit", async event => {
+    event.preventDefault();
+    const userId = getSession()?.user?.id;
+    if (!userId) return;
+    const button = supportForm.querySelector("button");
+    if (button.disabled) return;
+    const message = document.querySelector("#support-report-status");
+    const data = new FormData(supportForm);
+    const title = String(data.get("title")).trim();
+    const description = String(data.get("description")).trim();
+    if (!title || !description) {
+      message.textContent = "Renseignez le titre et la description.";
+      return;
+    }
+    button.disabled = true;
+    message.textContent = "Enregistrement…";
+    try {
+      const receipt = await supabaseRpc("submit_support_report", {
+        p_category: data.get("category"), p_title: title, p_description: description,
+        p_steps: String(data.get("steps")).trim(), p_app_version: "Web", p_os_version: ""
+      });
+      if (getSession()?.user?.id !== userId) return;
+      supportForm.reset();
+      message.textContent = "Signalement reçu. Référence · " + receipt;
+    } catch (error) {
+      if (getSession()?.user?.id === userId) message.textContent = error.message;
+    } finally {
+      button.disabled = false;
+    }
+  });
 
   const cvDialog = document.querySelector("#cv-dialog");
   const cvForm = document.querySelector("#cv-form");
@@ -1067,6 +1136,8 @@
     ++adminRequest;
     adminResults.replaceChildren();
     cvForm.reset();
+    supportForm.reset();
+    document.querySelector("#support-report-status").textContent = "";
     document.querySelector("#cv-preview").replaceChildren();
     sessionStorage.removeItem(gmailFlowKey);
     documentForm.reset();
