@@ -122,3 +122,5 @@
 #tracking-list .application-main button { justify-self: start; margin-top: 6px; }
 #tracking-list .application-main input[type="checkbox"] { width: auto; }
 #tracking-list .application-main label { display: flex; align-items: center; margin-top: 6px; }
+
+#followup-reschedule[hidden] { display: none; }

@@ -749,8 +749,7 @@
   let followupRows = [];
 
   document.querySelector("#followup-batch").addEventListener("click", () => {
-    const selection = new Set([...document.querySelectorAll("[data-followup-choice]:checked")].map(input => input.value));
-    followupRows = trackingRows.filter(row => selection.has(row.id));
+    followupRows = selectedFollowUps();
     if (!followupRows.length) {
       document.querySelector("#tracking-message").textContent = "Sélectionnez les dossiers à relancer.";
       return;
@@ -872,7 +871,70 @@
     });
     trackingMessage.textContent = visible ? "" : trackingRows.length ? "Aucun dossier ne correspond aux filtres." :
       trackingHidden.checked ? "Aucun dossier masqué." : "Les candidatures envoyées apparaîtront ici.";
+    updateFollowupSelection();
   }
+
+  const followupReschedule = document.querySelector("#followup-reschedule");
+  const followupSelectionStatus = document.querySelector("#followup-selection-status");
+  const followupBatch = document.querySelector("#followup-batch");
+  const followupSelectDue = document.querySelector("#followup-select-due");
+
+  function selectedFollowUps() {
+    const selection = new Set([...trackingList.querySelectorAll("[data-followup-choice]:checked")].map(input => input.value));
+    return trackingRows.filter(row => selection.has(row.id) && canFollowUp(row));
+  }
+
+  function updateFollowupSelection() {
+    const count = selectedFollowUps().length;
+    followupBatch.disabled = count === 0;
+    followupReschedule.hidden = count === 0;
+    followupSelectDue.disabled = !trackingRows.some(followUpDue);
+    followupSelectionStatus.textContent = count ? count + " dossier(s) sélectionné(s)." : "";
+  }
+
+  followupSelectDue.addEventListener("click", () => {
+    trackingFilter.value = "due";
+    trackingSearch.value = "";
+    applyTrackingFilters();
+    for (const item of trackingList.children) {
+      const choice = item.querySelector("[data-followup-choice]");
+      if (choice) choice.checked = !item.hidden;
+    }
+    updateFollowupSelection();
+  });
+
+  trackingList.addEventListener("change", event => {
+    if (event.target.matches("[data-followup-choice]")) updateFollowupSelection();
+  });
+
+  followupReschedule.addEventListener("submit", async event => {
+    event.preventDefault();
+    const button = followupReschedule.querySelector("button");
+    const rows = selectedFollowUps();
+    const userId = getSession()?.user?.id;
+    if (button.disabled || !rows.length || !userId) return;
+    const date = followupReschedule.elements.date.value;
+    const delay = Number(followupReschedule.elements.delay.value);
+    button.disabled = true;
+    try {
+      const ids = rows.map(row => encodeURIComponent(row.id)).join(",");
+      const result = await supabaseWrite("user_applications?id=in.(" + ids +
+        ")&status=eq.sent&last_inbound_at=is.null&hidden_at=is.null&select=id", "PATCH", {
+        follow_up_delay_days: delay,
+        next_follow_up_at: new Date(date + "T12:00:00").toISOString()
+      });
+      if (getSession()?.user?.id !== userId) return;
+      await loadTracking();
+      if (getSession()?.user?.id === userId) {
+        followupSelectionStatus.textContent = result.length + " relance(s) reportée(s)." +
+          (result.length < rows.length ? " Certains dossiers ont changé entre-temps." : "");
+      }
+    } catch (error) {
+      if (getSession()?.user?.id === userId) followupSelectionStatus.textContent = error.message;
+    } finally {
+      button.disabled = false;
+    }
+  });
 
   trackingSearch.addEventListener("input", applyTrackingFilters);
   trackingFilter.addEventListener("change", applyTrackingFilters);
@@ -902,6 +964,7 @@
     const userId = getSession()?.user?.id;
     trackingRows = [];
     list.replaceChildren();
+    updateFollowupSelection();
     if (!userId) {
       message.textContent = "Connectez-vous pour consulter le suivi.";
       return;
