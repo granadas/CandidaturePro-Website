@@ -387,6 +387,21 @@
     </form>
   </dialog>
 
+  <dialog id="application-edit-dialog" aria-labelledby="application-edit-title">
+    <form id="application-edit-form">
+      <h2 id="application-edit-title">Modifier la candidature</h2>
+      <label>Entreprise<input name="company" required maxlength="200"></label>
+      <label>Poste recherché<input name="job" maxlength="200"></label>
+      <label>Ville<input name="city" maxlength="150"></label>
+      <label>E-mail de contact<input name="email" type="email" maxlength="254"></label>
+      <p id="application-edit-status" role="status"></p>
+      <div class="batch-actions">
+        <button type="submit" class="primary compact">Enregistrer</button>
+        <button type="button" id="application-edit-close" class="secondary compact">Fermer</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog id="tracking-details-dialog" aria-labelledby="tracking-details-title">
     <form id="tracking-details-form">
       <h2 id="tracking-details-title">Modifier le suivi</h2>

@@ -483,6 +483,10 @@
     }
   }
 
+  function canEditApplication(row) {
+    return !row.hidden_at && !row.sent_at && ["draft", "ready"].includes(row.status);
+  }
+
   function renderApplications() {
     const list = document.querySelector("#applications-list");
     const filter = document.querySelector("#applications-filter").value;
@@ -520,6 +524,7 @@
         '<span>' + escapeHtml(application.job_title || "Candidature spontanée") + '</span>' +
         '<small>' + escapeHtml([application.company_city, application.company_email].filter(Boolean).join(" • ")) + '</small>' +
         sourceLink +
+        (canEditApplication(application) ? '<button type="button" class="secondary compact" data-action="edit">Modifier le dossier</button>' : "") +
         (!hidden && hasPremiumCv() ? '<button type="button" class="secondary compact" data-action="adapt-cv">Adapter le CV</button>' : '') +
         '</div>' +
         (!hidden && application.status === "ready" && application.company_email && !application.sent_at
@@ -544,7 +549,7 @@
       const includeHidden = document.querySelector("#show-hidden-applications").checked;
       const filter = includeHidden ? "" : "&hidden_at=is.null";
       applications = await supabaseFetch(
-        "user_applications?select=id,company_name,company_city,company_email,job_title,status,source_url,hidden_at,last_activity_at,sent_at" +
+        "user_applications?select=id,company_name,company_city,company_email,job_title,status,source_url,hidden_at,last_activity_at,sent_at,updated_at" +
         filter + "&order=last_activity_at.desc"
       );
       renderApplications();
@@ -1887,8 +1892,79 @@
     }
   });
 
+  const applicationEditDialog = document.querySelector("#application-edit-dialog");
+  const applicationEditForm = document.querySelector("#application-edit-form");
+  const applicationEditStatus = document.querySelector("#application-edit-status");
+  const applicationEditClose = document.querySelector("#application-edit-close");
+  const applicationEditSave = applicationEditForm.querySelector("[type=submit]");
+  let applicationBeingEdited = null;
+
+  function openApplicationEditor(row) {
+    if (!row || !canEditApplication(row) || applicationEditDialog.open) return;
+    applicationBeingEdited = row;
+    applicationEditForm.elements.company.value = row.company_name || "";
+    applicationEditForm.elements.job.value = row.job_title || "";
+    applicationEditForm.elements.city.value = row.company_city || "";
+    applicationEditForm.elements.email.value = row.company_email || "";
+    applicationEditStatus.textContent = "";
+    applicationEditDialog.showModal();
+  }
+
+  applicationEditClose.addEventListener("click", () => applicationEditDialog.close());
+  applicationEditDialog.addEventListener("cancel", event => {
+    if (applicationEditSave.disabled) event.preventDefault();
+  });
+  applicationEditDialog.addEventListener("close", () => {
+    applicationBeingEdited = null;
+    applicationEditForm.reset();
+  });
+  applicationEditForm.addEventListener("submit", async event => {
+    event.preventDefault();
+    const row = applicationBeingEdited;
+    const userId = getSession()?.user?.id;
+    const fields = applicationEditForm.elements;
+    if (!row || !userId || applicationEditSave.disabled) return;
+    const companyName = fields.company.value.trim();
+    if (!companyName) { applicationEditStatus.textContent = "Indiquez le nom de l’entreprise."; return; }
+
+    applicationEditSave.disabled = applicationEditClose.disabled = true;
+    applicationEditStatus.textContent = "";
+    try {
+      const saved = await supabaseWrite("user_applications?id=eq." + encodeURIComponent(row.id) +
+        "&sent_at=is.null&hidden_at=is.null&status=in.(draft,ready)&select=id" +
+        "&updated_at=eq." + encodeURIComponent(row.updated_at), "PATCH", {
+        company_name: companyName,
+        job_title: fields.job.value.trim() || null,
+        company_city: fields.city.value.trim() || null,
+        company_email: fields.email.value.trim() || null,
+        last_activity_at: new Date().toISOString()
+      });
+      if (getSession()?.user?.id !== userId) return;
+      if (!saved.length) {
+        await loadApplications();
+        applicationEditStatus.textContent = "Le dossier a changé. Copiez vos modifications, puis rouvrez-le pour les appliquer.";
+        return;
+      }
+      batchSelection.delete(row.id);
+      applicationEditDialog.close();
+      await loadApplications();
+      if (getSession()?.user?.id === userId) {
+        document.querySelector("#applications-message").textContent = "Dossier modifié.";
+      }
+    } catch (error) {
+      if (getSession()?.user?.id === userId) applicationEditStatus.textContent = error.message;
+    } finally {
+      applicationEditSave.disabled = applicationEditClose.disabled = false;
+    }
+  });
+
   document.querySelector("#applications-list").addEventListener("click", async event => {
     const action = event.target.dataset.action;
+    if (action === "edit") {
+      const id = event.target.closest("[data-id]")?.dataset.id;
+      openApplicationEditor(applications.find(row => row.id === id));
+      return;
+    }
     if (action === "adapt-cv") {
       const id = event.target.closest("[data-id]")?.dataset.id;
       const dossier = applications.find(row => row.id === id);

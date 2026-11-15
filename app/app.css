@@ -124,11 +124,14 @@
 #tracking-list .application-main label { display: flex; align-items: center; margin-top: 6px; }
 
 #followup-reschedule[hidden] { display: none; }
+#application-edit-form,
 #tracking-details-form {
   display: grid;
   gap: 14px;
   padding: 20px;
 }
+#application-edit-form h2,
+#application-edit-status,
 #tracking-details-form h2,
 #tracking-details-status { margin: 0; }
 #tracking-details-form textarea { width: 100%; font: inherit; }
