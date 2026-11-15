@@ -84,8 +84,7 @@
     loginButton.textContent = email ? "Mon compte" : "Se connecter";
     signOutButton.hidden = !email;
 
-    const plan = String(profile?.plan || "free").toLowerCase();
-    const isPremium = plan === "premium" || plan === "pro";
+    const isPremium = hasPremiumCv();
     document.querySelector("#cv-targeting").hidden = !hasPremiumCv();
     document.querySelectorAll("#cv-form [name=template] option:not([value=classic])").forEach(option => { option.disabled = !hasPremiumCv(); });
     document.querySelector("#current-plan").textContent = isPremium ? "Premium" : "Free";
@@ -1848,11 +1847,18 @@
     }
   });
 
-  function currentMonthStart() {
-    const now = new Date();
-    const year = now.getUTCFullYear();
-    const month = String(now.getUTCMonth() + 1).padStart(2, "0");
-    return year + "-" + month + "-01";
+  async function loadSendQuota() {
+    const response = await supabaseRpc("get_my_candidature_quota", {});
+    const quota = Array.isArray(response) ? response[0] : response;
+    if (typeof quota?.premium !== "boolean" || !Number.isSafeInteger(quota.used) || quota.used < 0 ||
+        !Number.isSafeInteger(quota.limit) || quota.limit < 0) throw new Error("Quota indisponible.");
+    return { ...quota, remaining: Math.max(0, quota.limit - quota.used) };
+  }
+
+  function describeSendQuota(quota) {
+    if (!quota) return "Quota indisponible";
+    if (quota.premium) return "Envois illimités";
+    return quota.remaining + " envoi(s) restant(s) sur " + quota.limit + " ce mois";
   }
 
   async function updateTrackingCounts(session) {
@@ -1886,19 +1892,20 @@
       profile = null;
       renderAccount();
       for (const node of document.querySelectorAll("[id^=stat-]")) node.textContent = "0";
+      document.querySelector("#monthly-quota-detail").textContent = "Ce mois";
       return;
     }
 
     const userId = encodeURIComponent(session.user.id);
-    const month = currentMonthStart();
-    const [profiles, usage] = await Promise.all([
+    const [profiles, quota] = await Promise.all([
       supabaseFetch("profiles?id=eq." + userId + "&select=candidate_first_name,candidate_last_name,candidate_email,plan,premium_until,is_admin"),
-      supabaseFetch("candidature_usage?user_id=eq." + userId + "&month_start=eq." + month + "&select=application_key")
+      loadSendQuota().catch(() => null)
     ]);
 
     if (getSession()?.user?.id !== session.user.id) return;
     profile = Array.isArray(profiles) ? profiles[0] || null : null;
-    document.querySelector("#stat-sent").textContent = String(Array.isArray(usage) ? usage.length : 0);
+    document.querySelector("#stat-sent").textContent = quota ? String(quota.used) : "—";
+    document.querySelector("#monthly-quota-detail").textContent = describeSendQuota(quota);
     const hasProfile = Boolean(profile?.candidate_first_name && profile?.candidate_last_name);
     document.querySelector("#setup-progress").textContent = hasProfile ? "2/4" : "1/4";
     renderAccount();
@@ -2377,7 +2384,18 @@
     }
     batchStatus.textContent = "";
     batchConfirm.hidden = false;
+    const quotaMessage = document.querySelector("#batch-quota");
+    quotaMessage.textContent = "Vérification du quota…";
     batchDialog.showModal();
+    const drafts = batchDrafts;
+    const userId = getSession()?.user?.id;
+    loadSendQuota().catch(() => null).then(quota => {
+      if (!batchDialog.open || batchDrafts !== drafts || getSession()?.user?.id !== userId) return;
+      const exceedsQuota = quota && !quota.premium && drafts.length > quota.remaining;
+      quotaMessage.textContent = describeSendQuota(quota) + (exceedsQuota
+        ? ". Le lot dépasse le quota restant. Les dossiers au-delà du plafond seront refusés."
+        : ".");
+    });
   }
 
   document.querySelector("#batch-cancel").addEventListener("click", () => batchDialog.close());

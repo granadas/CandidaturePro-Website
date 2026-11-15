@@ -57,7 +57,7 @@
           <button class="primary" data-view-link="companies">+ Rechercher des entreprises</button>
         </div>
         <div class="stats">
-          <article><span>Candidatures envoyées</span><strong id="stat-sent">0</strong><small>ce mois</small></article>
+          <article><span>Candidatures comptabilisées</span><strong id="stat-sent">—</strong><small id="monthly-quota-detail">Ce mois</small></article>
           <article><span>Réponses reçues</span><strong id="stat-replies">0</strong><small>à consulter</small></article>
           <article><span>Relances</span><strong id="stat-followups">0</strong><small>à préparer</small></article>
           <article><span>Entretiens</span><strong id="stat-interviews">0</strong><small>planifiés</small></article>
@@ -456,6 +456,7 @@
     <form id="batch-form">
       <h2 id="batch-title">Confirmer l’envoi groupé</h2>
       <ul id="batch-recipients"></ul>
+      <p id="batch-quota" role="status"></p>
       <p id="batch-status" role="status"></p>
       <button class="primary" id="batch-confirm" type="submit">Envoyer les dossiers</button>
       <button class="secondary" id="batch-cancel" type="button">Fermer</button>
