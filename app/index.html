@@ -359,6 +359,15 @@
     </main>
   </div>
 
+  <dialog id="document-preview-dialog" aria-labelledby="document-preview-title">
+    <h2 id="document-preview-title">Aperçu PDF</h2>
+    <iframe id="document-preview-frame" title="Aperçu du document PDF"></iframe>
+    <form method="dialog" class="batch-actions">
+      <a id="document-preview-download" class="secondary compact">Télécharger</a>
+      <button class="secondary compact">Fermer</button>
+    </form>
+  </dialog>
+
   <dialog id="cv-dialog" aria-label="Aperçu du CV">
     <article id="cv-preview"></article>
     <form method="dialog" class="cv-actions">

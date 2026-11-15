@@ -135,3 +135,10 @@
 #tracking-details-form h2,
 #tracking-details-status { margin: 0; }
 #tracking-details-form textarea { width: 100%; font: inherit; }
+
+#document-preview-dialog {
+  width: min(900px, calc(100% - 24px));
+  padding: 18px;
+}
+#document-preview-title { margin: 0 0 12px; overflow-wrap: anywhere; }
+#document-preview-frame { width: 100%; height: min(68dvh, 760px); border: 0; }

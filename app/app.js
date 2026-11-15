@@ -1595,6 +1595,40 @@
     return groups.flat();
   }
 
+  const documentPreview = document.querySelector("#document-preview-dialog");
+  const documentPreviewFrame = document.querySelector("#document-preview-frame");
+  const documentPreviewDownload = document.querySelector("#document-preview-download");
+  let documentPreviewUrl = null;
+  let documentPreviewRequest = 0;
+
+  documentPreview.addEventListener("close", () => {
+    documentPreviewFrame.removeAttribute("src");
+    documentPreviewDownload.removeAttribute("href");
+    if (documentPreviewUrl) URL.revokeObjectURL(documentPreviewUrl);
+    documentPreviewUrl = null;
+  });
+
+  async function getDocumentBlob(userId, file) {
+    const session = await ensureSession();
+    if (session?.user?.id !== userId) throw new Error("Reconnectez-vous pour accéder à ce document.");
+    const response = await documentRequest(session, "authenticated/" + documentsBucket + "/" +
+      file.prefix + "/" + encodeURIComponent(file.name));
+    return response.blob();
+  }
+
+  async function previewDocument(userId, file, name) {
+    const request = ++documentPreviewRequest;
+    const blob = await getDocumentBlob(userId, file);
+    if (await blob.slice(0, 5).text() !== "%PDF-") throw new Error("Ce document ne peut pas être affiché comme PDF.");
+    if (getSession()?.user?.id !== userId || request !== documentPreviewRequest || documentPreview.open) return;
+    documentPreviewUrl = URL.createObjectURL(blob.slice(0, blob.size, "application/pdf"));
+    documentPreviewFrame.src = documentPreviewUrl;
+    documentPreviewDownload.href = documentPreviewUrl;
+    documentPreviewDownload.download = name;
+    document.querySelector("#document-preview-title").textContent = name;
+    documentPreview.showModal();
+  }
+
   async function loadDocuments() {
     const request = ++documentsRequest;
     documentForm.hidden = true;
@@ -1621,10 +1655,7 @@
         button.addEventListener("click", async () => {
           button.disabled = true;
           try {
-            const active = await ensureSession();
-            if (active?.user?.id !== session.user.id) throw new Error("Reconnectez-vous pour télécharger ce document.");
-            const response = await documentRequest(active, "authenticated/" + documentsBucket + "/" + file.prefix + "/" + encodeURIComponent(file.name));
-            const blob = await response.blob();
+            const blob = await getDocumentBlob(session.user.id, file);
             if (getSession()?.user?.id !== session.user.id) return;
             const url = URL.createObjectURL(blob);
             const link = document.createElement("a");
@@ -1638,7 +1669,18 @@
             button.disabled = false;
           }
         });
-        row.append(title, button);
+        const open = document.createElement("button");
+        open.type = "button";
+        open.className = "secondary";
+        open.textContent = "Aperçu";
+        open.addEventListener("click", async () => {
+          open.disabled = true;
+          try { await previewDocument(session.user.id, file, name); }
+          catch (error) {
+            if (getSession()?.user?.id === session.user.id) documentsMessage.textContent = error.message;
+          } finally { open.disabled = false; }
+        });
+        row.append(title, open, button);
         documentsList.append(row);
       }
       documentForm.hidden = false;
@@ -2031,6 +2073,8 @@
     sessionStorage.removeItem(gmailFlowKey);
     documentForm.reset();
     documentForm.hidden = true;
+    ++documentPreviewRequest;
+    if (documentPreview.open) documentPreview.close();
     documentsList.replaceChildren();
     documentsMessage.textContent = "";
     document.querySelector("#tracking-list").replaceChildren();
