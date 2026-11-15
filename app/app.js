@@ -1680,7 +1680,40 @@
             if (getSession()?.user?.id === session.user.id) documentsMessage.textContent = error.message;
           } finally { open.disabled = false; }
         });
-        row.append(title, open, button);
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "secondary";
+        remove.textContent = "Supprimer";
+        remove.addEventListener("click", async () => {
+          const userId = session.user.id;
+          if (remove.disabled || getSession()?.user?.id !== userId ||
+              !window.confirm("Supprimer définitivement « " + name + " » de vos documents ?")) return;
+          remove.disabled = open.disabled = button.disabled = true;
+          try {
+            const active = await ensureSession();
+            if (active?.user?.id !== userId) return;
+            const response = await documentRequest(active, documentsBucket, {
+              method: "DELETE",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ prefixes: [file.prefix + "/" + file.name] })
+            });
+            const removed = await response.json();
+            if (getSession()?.user?.id !== userId) return;
+            await loadDocuments();
+            if (getSession()?.user?.id === userId) {
+              documentsMessage.textContent = Array.isArray(removed) && removed.length
+                ? "Document supprimé." : "Aucun document supprimé. Il a peut-être déjà été retiré.";
+            }
+          } catch (error) {
+            if (getSession()?.user?.id === userId) documentsMessage.textContent = error.message;
+          } finally {
+            remove.disabled = open.disabled = button.disabled = false;
+          }
+        });
+        const actions = document.createElement("div");
+        actions.className = "batch-actions";
+        actions.append(open, button, remove);
+        row.append(title, actions);
         documentsList.append(row);
       }
       documentForm.hidden = false;
