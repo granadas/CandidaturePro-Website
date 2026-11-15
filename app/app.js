@@ -360,6 +360,7 @@
         '<span>' + escapeHtml(company.address || company.city) + '</span>' +
         '<small>' + escapeHtml([company.sector, company.email, company.phone].filter(Boolean).join(" • ")) + '</small></div>' +
         '<div class="company-card-actions">' + website +
+        (!company.email && company.name ? '<button type="button" class="secondary compact" data-action="verify-company">Faire vérifier le contact</button>' : "") +
         '<button class="primary compact" data-action="add-company">Ajouter aux candidatures</button></div></article>';
     }).join("");
   }
@@ -1991,26 +1992,40 @@
   });
 
   document.querySelector("#company-results").addEventListener("click", async event => {
-    if (event.target.dataset.action !== "add-company") return;
-    const card = event.target.closest("[data-company-index]");
-    const company = companyResults[Number(card.dataset.companyIndex)];
+    const button = event.target.closest("[data-action]");
+    const action = button?.dataset.action;
+    const userId = getSession()?.user?.id;
+    if (!userId || button?.disabled || !["add-company", "verify-company"].includes(action)) return;
+    const card = button.closest("[data-company-index]");
+    const company = companyResults[Number(card?.dataset.companyIndex)];
     if (!company) return;
-    const button = event.target;
+    const verifying = action === "verify-company";
+    const message = document.querySelector("#company-search-message");
+    const label = button.textContent;
     button.disabled = true;
-    button.textContent = "Ajout…";
+    button.textContent = verifying ? "Demande en cours…" : "Ajout…";
     try {
-      await supabaseWrite("user_applications", "POST", {
-        company_name: company.name,
-        company_city: company.city || null,
-        company_email: company.email || null,
-        status: "draft",
-        source: "web"
-      });
-      button.textContent = "Ajoutée ✓";
+      if (verifying) {
+        const request = await supabaseRpc("queue_company_manual_verification_v2", {
+          p_company_name: company.name, p_city: company.city, p_address: company.address,
+          p_website: safeExternalUrl(company.website), p_sector: company.sector,
+          p_source: "company_search", p_country: "CH"
+        });
+        if (getSession()?.user?.id !== userId) return;
+        if (!request) throw new Error("La demande de vérification n’a pas pu être confirmée.");
+        button.textContent = "Demande enregistrée";
+      } else {
+        const result = await supabaseRpc("add_web_company_application", {
+          p_company: company.name, p_city: company.city, p_email: company.email
+        });
+        if (getSession()?.user?.id !== userId) return;
+        button.textContent = result.created ? "Ajoutée ✓" :
+          result.hidden ? "Déjà dans les dossiers masqués" : "Déjà dans les candidatures";
+      }
     } catch (error) {
       button.disabled = false;
-      button.textContent = "Réessayer";
-      document.querySelector("#company-search-message").textContent = error.message;
+      button.textContent = label;
+      if (getSession()?.user?.id === userId) message.textContent = error.message;
     }
   });
 
