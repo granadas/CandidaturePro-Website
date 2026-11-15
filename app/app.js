@@ -980,6 +980,7 @@
     blacklist: ["admin_list_blacklisted_companies", {}],
     audit: ["admin_list_audit_log", { p_limit: 100 }],
     credits: ["admin_get_credit_usage_statistics", { p_month: null }],
+    "job-market": ["admin_job_market_refresh_statistics", {}],
     contacts: ["admin_list_company_email_change_requests", {}],
     invalid: ["admin_list_invalid_company_email_reports", {}],
     verification: ["admin_list_company_manual_verifications", {}],
@@ -1056,6 +1057,50 @@
     return form;
   }
 
+  function renderAdminJobMarket(row, current) {
+    const form = document.createElement("form");
+    form.className = "profile-form";
+    form.innerHTML = '<p id="job-market-summary" class="wide"></p>' +
+      '<label>Ville suisse<input name="city" value="Genève" required maxlength="120"></label>' +
+      '<label>Rayon<select name="radius"><option>10 km</option><option selected>30 km</option><option>50 km</option><option>100 km</option></select></label>' +
+      '<label class="wide">Métier ou mot-clé<input name="query" maxlength="120"></label>' +
+      '<div class="wide"><button type="submit" class="primary">Actualiser les postes maintenant</button></div>' +
+      '<p class="wide" role="status"></p>';
+    form.querySelector("#job-market-summary").textContent = row
+      ? (row.month_credits_used ?? 0) + "/100 crédits Serper ce mois · " + (row.month_runs ?? 0) + " actualisation(s)" +
+        (row.last_started_at ? " · Dernière exécution le " + trackingDateFormat.format(new Date(row.last_started_at)) : "")
+      : "Aucune statistique d’actualisation disponible.";
+    const button = form.querySelector("button");
+    const status = form.querySelector("[role=status]");
+    form.addEventListener("submit", async event => {
+      event.preventDefault();
+      if (!current() || profile?.is_admin !== true || adminJobRefreshRunning) return;
+      const city = form.elements.city.value.trim();
+      if (!city) { status.textContent = "Indiquez une ville suisse."; return; }
+      if (!window.confirm("Actualiser les offres pour " + city + " ? Cette recherche utilise des crédits Serper.")) return;
+      adminJobRefreshRunning = button.disabled = true;
+      status.textContent = "Actualisation en cours…";
+      try {
+        const result = await invokeEdgeFunction("job-market-refresh", {
+          city, radius: form.elements.radius.value, query: form.elements.query.value.trim()
+        }, false);
+        if (!current()) return;
+        const outcome = result.status === "completed"
+          ? (result.added ?? 0) + " offre(s) ajoutée(s) · " + (result.credits ?? 0) + " crédit(s) utilisé(s)."
+          : result.message || "Actualisation interrompue.";
+        await loadAdmin();
+        if (adminMode.value === "job-market" && profile?.is_admin === true) adminStatus.textContent = outcome;
+      } catch (error) {
+        if (current()) status.textContent = error.message;
+      } finally {
+        adminJobRefreshRunning = button.disabled = false;
+      }
+    });
+    adminResults.append(form);
+  }
+
+  let adminJobRefreshRunning = false;
+
   async function loadAdmin() {
     if (profile?.is_admin !== true) return;
     const userId = getSession()?.user?.id;
@@ -1068,6 +1113,11 @@
     try {
       const rows = await supabaseRpc(rpc, args);
       if (!current()) return;
+      if (mode === "job-market") {
+        adminStatus.textContent = "";
+        renderAdminJobMarket(rows[0], current);
+        return;
+      }
       adminStatus.textContent = rows.length ? "" : "Aucun résultat.";
       for (const row of rows) {
         const card = document.createElement("article");
