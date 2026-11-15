@@ -1956,24 +1956,19 @@
     if (event.target.dataset.action !== "add-job") return;
     const card = event.target.closest("[data-job-index]");
     const job = jobResults[Number(card.dataset.jobIndex)];
-    if (!job) return;
+    const userId = getSession()?.user?.id;
+    if (!job || !userId || event.target.disabled) return;
     const button = event.target;
     button.disabled = true;
     button.textContent = "Ajout…";
     try {
-      await supabaseWrite("user_applications", "POST", {
-        company_name: job.company_name,
-        company_city: job.location || null,
-        job_title: job.title,
-        source_url: safeExternalUrl(job.url) || null,
-        status: "draft",
-        source: "web"
-      });
-      button.textContent = "Ajoutée ✓";
+      const result = await supabaseRpc("add_web_job_application", { p_job_id: job.id });
+      if (getSession()?.user?.id !== userId) return;
+      button.textContent = result.created ? "Ajoutée ✓" : result.hidden ? "Déjà dans les dossiers masqués" : "Déjà dans les candidatures";
     } catch (error) {
       button.disabled = false;
       button.textContent = "Réessayer";
-      document.querySelector("#jobs-message").textContent = error.message;
+      if (getSession()?.user?.id === userId) document.querySelector("#jobs-message").textContent = error.message;
     }
   });
 
