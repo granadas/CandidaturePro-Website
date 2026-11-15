@@ -3,6 +3,21 @@ const metadataScope = "https://www.googleapis.com/auth/gmail.metadata";
 const readScope = "https://www.googleapis.com/auth/gmail.readonly";
 const tokenEndpoint = "https://oauth2.googleapis.com/token";
 
+type MailHeader = { name: string; value: string };
+
+function isAutomaticAcknowledgment(headers: MailHeader[] = []) {
+  const values = new Map(headers.map(({ name, value }) => [name.toLowerCase(), value.trim().toLowerCase()]));
+  const sender = values.get("from") || "";
+  const contentType = values.get("content-type") || "";
+  if (/mailer-daemon|postmaster@/.test(sender) || /delivery-status|multipart\/report/.test(contentType) ||
+      values.get("return-path") === "<>") return false;
+  const submitted = values.get("auto-submitted")?.split(";")[0].trim();
+  return submitted === "auto-replied" || ["x-autoreply", "x-autorespond"].some(name => {
+    const value = values.get(name)?.split(";")[0].trim();
+    return Boolean(value && value !== "no");
+  });
+}
+
 Deno.serve(async (request: Request) => {
   const previewRedirect = Deno.env.get("GMAIL_WEB_REDIRECT_URI") || "";
   const productionRedirect = "https://candidaturepro.ch/app/";
@@ -142,11 +157,15 @@ Deno.serve(async (request: Request) => {
         let previousReminder = null;
         if (followup) {
           const response = await fetch(root + "/rest/v1/user_applications" + filter + "&id=eq." +
-            encodeURIComponent(applicationId) + "&status=eq.sent&hidden_at=is.null&select=company_email,last_inbound_at,next_follow_up_at",
+            encodeURIComponent(applicationId) + "&status=in.(sent,reply_received)&hidden_at=is.null&select=status,company_email,last_inbound_at,last_human_reply_at,last_automatic_reply_at,next_follow_up_at",
             { headers: serviceHeaders });
           if (!response.ok) return json({ message: "Impossible de vérifier le dossier." }, 503);
           const [application] = await response.json();
-          if (!application || application.last_inbound_at || incoming.length ||
+          const eligible = application && !application.last_human_reply_at &&
+            (application.last_inbound_at
+              ? application.last_inbound_at === application.last_automatic_reply_at
+              : application.status === "sent");
+          if (!eligible || !Number.isFinite(original) || incoming.some(item => !isAutomaticAcknowledgment(item.payload?.headers)) ||
               application.company_email?.trim().toLowerCase() !== recipient) {
             return json({ message: "Ce dossier a changé ou a reçu une réponse. Actualisez le suivi." }, 409);
           }
@@ -251,7 +270,7 @@ Deno.serve(async (request: Request) => {
         const sent = await message.json();
         if (!sent.threadId) return { updated: 0 };
         const thread = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/threads/" +
-          encodeURIComponent(sent.threadId) + "?format=metadata&metadataHeaders=Date&metadataHeaders=Auto-Submitted&metadataHeaders=X-Autoreply&metadataHeaders=X-Autorespond&fields=messages(id,internalDate,labelIds,payload(headers))", { headers: gmailHeaders, signal: AbortSignal.timeout(7000) });
+          encodeURIComponent(sent.threadId) + "?format=metadata&metadataHeaders=Date&metadataHeaders=Auto-Submitted&metadataHeaders=X-Autoreply&metadataHeaders=X-Autorespond&metadataHeaders=From&metadataHeaders=Content-Type&metadataHeaders=Return-Path&fields=messages(id,internalDate,labelIds,payload(headers))", { headers: gmailHeaders, signal: AbortSignal.timeout(7000) });
         if (thread.status === 404) return { updated: 0 };
         if (!thread.ok) throw new Error("Impossible de consulter les fils Gmail. Réessayez.");
         const messages = (await thread.json()).messages || [];
@@ -269,13 +288,7 @@ Deno.serve(async (request: Request) => {
             ["SENT", "DRAFT", "SPAM", "TRASH"].includes(label))) continue;
           const received = timestamp(item);
           if (!Number.isFinite(received) || received <= originalDate) continue;
-          const automated = (item.payload?.headers || []).some(({ name, value }) => {
-            const header = name.toLowerCase();
-            const marker = value.trim().toLowerCase().split(";")[0].trim();
-            return header === "auto-submitted" ? Boolean(marker && marker !== "no") :
-              ["x-autoreply", "x-autorespond"].includes(header) && Boolean(marker && marker !== "no");
-          });
-          if (automated) automatic = Math.max(automatic, received);
+          if (isAutomaticAcknowledgment(item.payload?.headers)) automatic = Math.max(automatic, received);
           else human = Math.max(human, received);
         }
         if (automatic === originalDate && human === originalDate) return { updated: 0 };

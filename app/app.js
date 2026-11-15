@@ -831,7 +831,10 @@
   const closedFollowUpStatuses = new Set(["interview", "accepted", "rejected"]);
 
   function canFollowUp(row) {
-    return row.status === "sent" && row.company_email && !row.last_inbound_at && row.sent_at && !row.hidden_at;
+    const awaitingReply = !row.last_human_reply_at &&
+      (row.last_inbound_at ? row.last_inbound_at === row.last_automatic_reply_at : row.status === "sent");
+    return ["sent", "reply_received"].includes(row.status) && awaitingReply &&
+      row.company_email && row.sent_at && !row.hidden_at;
   }
 
   function followUpDue(row) {
@@ -929,7 +932,7 @@
     try {
       const ids = rows.map(row => encodeURIComponent(row.id)).join(",");
       const result = await supabaseWrite("user_applications?id=in.(" + ids +
-        ")&status=eq.sent&last_inbound_at=is.null&hidden_at=is.null&select=id", "PATCH", {
+        ")&status=in.(sent,reply_received)&last_human_reply_at=is.null&hidden_at=is.null&select=id", "PATCH", {
         follow_up_delay_days: delay,
         next_follow_up_at: new Date(date + "T12:00:00").toISOString()
       });
