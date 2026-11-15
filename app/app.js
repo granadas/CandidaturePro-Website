@@ -2348,6 +2348,15 @@
     renderApplications();
   });
 
+  async function verifyReviewedApplication(draft) {
+    const rows = await supabaseFetch("user_applications?id=eq." + encodeURIComponent(draft.applicationId) +
+      "&select=id,company_email,status,sent_at,hidden_at,updated_at");
+    const row = rows[0];
+    if (!readyForBatch(row) || row.company_email !== draft.recipient || row.updated_at !== draft.updatedAt) {
+      throw new Error("Dossier modifié depuis le contrôle final. Rouvrez-le pour vérifier son contenu.");
+    }
+  }
+
   function nextBatchApplication() {
     while (batchQueue.length) {
       const id = batchQueue.shift();
@@ -2362,7 +2371,8 @@
     recipients.replaceChildren();
     for (const draft of batchDrafts) {
       const item = document.createElement("li");
-      item.textContent = draft.recipient + " · " + draft.subject;
+      const files = draft.files.map(file => file.name).join(", ");
+      item.textContent = [draft.companyName, draft.recipient, draft.subject, files || "Aucune pièce jointe"].join(" · ");
       recipients.append(item);
     }
     batchStatus.textContent = "";
@@ -2390,14 +2400,15 @@
         batchStatus.textContent = "Envoi " + (outcomes.length + 1) + " sur " + uniqueDrafts.length + "…";
         try {
           const attachments = await encodeSendFiles(draft.files);
+          await verifyReviewedApplication(draft);
           if (getSession()?.user?.id !== userId) break;
           await invokeEdgeFunction("gmail-web", { action: "send", applicationId: draft.applicationId,
             recipient: draft.recipient, subject: draft.subject, message: draft.message, attachments });
           removeSendDraft(userId, draft.applicationId);
           batchSelection.delete(draft.applicationId);
-          outcomes.push(draft.recipient + " · Envoyée");
+          outcomes.push(draft.companyName + " · " + draft.recipient + " · Envoyée");
         } catch (error) {
-          outcomes.push(draft.recipient + " · " + error.message);
+          outcomes.push(draft.companyName + " · " + draft.recipient + " · " + error.message);
         }
       }
       batchStatus.replaceChildren(...outcomes.map(line => {
@@ -2794,10 +2805,11 @@
       sendReview.focus();
       return;
     }
-    const draft = reviewed;
     const application = sendApplication;
+    const draft = { ...reviewed, applicationId: application.id, recipient: application.company_email,
+      companyName: application.company_name, updatedAt: application.updated_at };
     if (batchSize) {
-      batchDrafts.push({ ...draft, applicationId: application.id, recipient: application.company_email });
+      batchDrafts.push(draft);
       sendDialog.close();
       nextBatchApplication();
       return;
@@ -2809,6 +2821,7 @@
     sendStatus.textContent = "Envoi en cours…";
     try {
       const attachments = await encodeSendFiles(draft.files);
+      await verifyReviewedApplication(draft);
       if (!userId || getSession()?.user?.id !== userId) return;
       await invokeEdgeFunction("gmail-web", {
         action: "send", attachments, applicationId: application.id, recipient: application.company_email,
