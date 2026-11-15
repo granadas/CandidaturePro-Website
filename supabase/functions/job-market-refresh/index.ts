@@ -1,5 +1,3 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-
 const sectors = [
   "Hôtellerie", "Restauration", "Logistique / Transport", "Industrie / Production",
   "Construction / Bâtiment", "Nettoyage / Entretien", "Commerce / Vente",
@@ -25,17 +23,17 @@ function jobIdentity(title: string) {
 
 Deno.serve(async (req: Request) => {
   const origin = req.headers.get("Origin");
-  const headers = new Headers({ "Content-Type": "application/json", "Vary": "Origin" });
-  const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers });
+  const responseHeaders = new Headers({ "Content-Type": "application/json", "Vary": "Origin" });
+  const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: responseHeaders });
   if (origin) {
     if (!["https://candidaturepro.ch", "https://feature-web-app-foundation.candidaturepro.pages.dev"].includes(origin)) {
       return json({ message: "Origine non autorisée." }, 403);
     }
-    headers.set("Access-Control-Allow-Origin", origin);
-    headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-    headers.set("Access-Control-Allow-Headers", "authorization, apikey, content-type");
+    responseHeaders.set("Access-Control-Allow-Origin", origin);
+    responseHeaders.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    responseHeaders.set("Access-Control-Allow-Headers", "authorization, apikey, content-type");
   }
-  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers });
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: responseHeaders });
   if (req.method !== "POST") return json({ message: "Méthode non autorisée." }, 405);
 
   const url = Deno.env.get("SUPABASE_URL") ?? "";
