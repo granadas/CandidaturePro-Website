@@ -820,6 +820,8 @@
   const trackingMessage = document.querySelector("#tracking-message");
   const trackingText = value => (value || "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 
+  const closedFollowUpStatuses = new Set(["interview", "accepted", "rejected"]);
+
   function canFollowUp(row) {
     return row.status === "sent" && row.company_email && !row.last_inbound_at && row.sent_at && !row.hidden_at;
   }
@@ -985,7 +987,8 @@
       document.querySelector("#tracking-due-count").textContent = activeRows.filter(followUpDue).length;
       trackingRows = showHidden ? rows.filter(row => row.hidden_at) : activeRows;
       list.innerHTML = trackingRows.map(row => {
-        const followUp = row.next_follow_up_at ? new Date(row.next_follow_up_at) : null;
+        const showReminder = !closedFollowUpStatuses.has(row.status);
+        const followUp = showReminder && row.next_follow_up_at ? new Date(row.next_follow_up_at) : null;
         const localDate = followUp
           ? new Date(followUp.getTime() - followUp.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
           : "";
@@ -1007,10 +1010,10 @@
           '<button type="button" class="secondary compact" data-tracking-edit="' + escapeHtml(row.id) + '">Modifier le statut ou la note</button>' +
           '<button type="button" class="secondary compact" data-tracking-visibility="'  + escapeHtml(row.id) + '">' +
           (row.hidden_at ? "Réafficher" : "Masquer du suivi") + '</button></div>' +
-          '<form class="application-form tracking-form" data-id="' + escapeHtml(row.id) + '">' +
+          (showReminder ? '<form class="application-form tracking-form" data-id="' + escapeHtml(row.id) + '">' +
           '<label>Date de relance<input name="follow-up" type="date" value="' + localDate + '"></label>' +
           '<label>Délai entre les relances (jours)<input name="follow-up-delay" type="number" required min="1" max="365" value="' + row.follow_up_delay_days + '"></label>' +
-          '<button type="submit" class="secondary compact">Enregistrer</button></form></article>';
+          '<button type="submit" class="secondary compact">Enregistrer</button></form>' : "") + '</article>';
       }).join("");
       applyTrackingFilters();
     } catch (error) {
@@ -1023,13 +1026,16 @@
     const form = event.target;
     const date = form.elements.namedItem("follow-up").value;
     const button = form.querySelector("button");
+    if (button.disabled) return;
     button.disabled = true;
     try {
-      await supabaseWrite("user_applications?id=eq." + encodeURIComponent(form.dataset.id), "PATCH", {
+      const saved = await supabaseWrite("user_applications?id=eq." + encodeURIComponent(form.dataset.id) +
+        "&status=not.in.(interview,accepted,rejected)&select=id", "PATCH", {
         follow_up_delay_days: Number(form.elements.namedItem("follow-up-delay").value),
         next_follow_up_at: date ? new Date(date + "T12:00:00").toISOString() : null
       });
       await loadTracking();
+      if (!saved.length) trackingMessage.textContent = "Le rappel n’a pas été modifié car le dossier a changé.";
     } catch (error) {
       document.querySelector("#tracking-message").textContent = error.message;
     } finally {
@@ -1071,7 +1077,8 @@
       const notes = trackingDetailsForm.elements.notes.value.trim() || null;
       const result = await supabaseWrite("user_applications?id=eq." + encodeURIComponent(row.id) +
         "&updated_at=eq." + encodeURIComponent(row.updated_at) + "&select=id", "PATCH", {
-        status, notes, last_activity_at: new Date().toISOString()
+        status, notes, last_activity_at: new Date().toISOString(),
+        ...(closedFollowUpStatuses.has(status) ? { next_follow_up_at: null } : {})
       });
       if (getSession()?.user?.id !== userId) return;
       if (!result.length) {
@@ -1678,7 +1685,7 @@
   async function updateTrackingCounts(session) {
     const queries = {
       replies: "last_inbound_at=not.is.null",
-      followups: "next_follow_up_at=not.is.null&status=in.(sent,reply_received,interview)",
+      followups: "next_follow_up_at=not.is.null&status=in.(sent,reply_received)",
       interviews: "status=eq.interview"
     };
     await Promise.all(Object.entries(queries).map(async ([key, filter]) => {
