@@ -475,6 +475,12 @@
       <details id="send-ai">
         <summary>Préparer une lettre avec l’IA</summary>
         <label>Description de l’offre<textarea id="send-ai-offer" maxlength="6000" rows="3"></textarea></label>
+        <div class="batch-actions">
+          <button id="send-ai-profile" class="secondary compact" type="button">Reprendre mes compétences et langues</button>
+          <label>CV enregistré<select id="send-ai-variant"><option value="">Choisir un CV</option></select></label>
+          <button id="send-ai-use-variant" class="secondary compact" type="button">Reprendre le contenu du CV</button>
+        </div>
+        <p id="send-ai-source-status" role="status"></p>
         <label>Expérience et compétences pertinentes<textarea id="send-ai-cv" maxlength="4000" rows="3"></textarea></label>
         <button id="send-ai-generate" class="secondary" type="button">Générer la lettre</button>
       </details>

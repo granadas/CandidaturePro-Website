@@ -2357,6 +2357,84 @@
   const sendAi = document.querySelector("#send-ai");
   const sendAiButton = document.querySelector("#send-ai-generate");
 
+  const sendAiContext = document.querySelector("#send-ai-cv");
+  const sendAiSourceStatus = document.querySelector("#send-ai-source-status");
+  const sendAiProfile = document.querySelector("#send-ai-profile");
+  const sendAiVariant = document.querySelector("#send-ai-variant");
+  const sendAiUseVariant = document.querySelector("#send-ai-use-variant");
+  let letterCvRequest = 0;
+
+  function applyLetterContext(parts) {
+    const text = parts.filter(value => typeof value === "string" && value.trim()).join("\n\n");
+    if (!text) {
+      sendAiSourceStatus.textContent = "Cette source ne contient aucun élément à reprendre.";
+      return;
+    }
+    if (sendAiContext.value.trim() && !window.confirm("Remplacer le texte actuel du champ Expérience et compétences ?")) return;
+    sendAiContext.value = text.slice(0, sendAiContext.maxLength);
+    sendAiSourceStatus.textContent = text.length > sendAiContext.maxLength
+      ? "Texte inséré dans la limite de 4 000 caractères. Relisez-le avant de générer la lettre."
+      : "Texte ajouté. Vous pouvez le modifier avant de générer la lettre.";
+  }
+
+  sendAi.addEventListener("toggle", async () => {
+    const userId = getSession()?.user?.id;
+    if (!sendAi.open || !sendDialog.open || !userId || reviewed) return;
+    const request = ++letterCvRequest;
+    try {
+      const rows = await supabaseFetch("web_cv_variants?select=id,label&order=updated_at.desc&limit=200");
+      if (request !== letterCvRequest || getSession()?.user?.id !== userId || !sendDialog.open) return;
+      const selected = sendAiVariant.value;
+      sendAiVariant.length = 1;
+      for (const row of rows) sendAiVariant.add(new Option(row.label, row.id));
+      sendAiVariant.value = rows.some(row => row.id === selected) ? selected : "";
+    } catch (error) {
+      if (request === letterCvRequest && sendDialog.open && getSession()?.user?.id === userId) {
+        sendAiSourceStatus.textContent = error.message;
+      }
+    }
+  });
+
+  sendAiUseVariant.addEventListener("click", async () => {
+    const userId = getSession()?.user?.id;
+    const id = sendAiVariant.value;
+    const request = letterCvRequest;
+    const current = () => sendDialog.open && !reviewed && request === letterCvRequest && getSession()?.user?.id === userId;
+    if (!userId || sendAiUseVariant.disabled) return;
+    if (!id) { sendAiSourceStatus.textContent = "Choisissez un CV enregistré."; return; }
+    sendAiUseVariant.disabled = true;
+    try {
+      const rows = await supabaseFetch("web_cv_variants?id=eq." + encodeURIComponent(id) + "&select=fields");
+      if (!current() || sendAiVariant.value !== id) return;
+      const fields = rows[0]?.fields;
+      if (!fields) { sendAiSourceStatus.textContent = "Le CV sélectionné n’est plus disponible."; return; }
+      applyLetterContext([fields.summary, fields.experience, fields.skills, fields.education]);
+    } catch (error) {
+      if (current()) sendAiSourceStatus.textContent = error.message;
+    } finally {
+      sendAiUseVariant.disabled = false;
+    }
+  });
+
+  sendAiProfile.addEventListener("click", async () => {
+    const userId = getSession()?.user?.id;
+    const dossier = sendApplication;
+    const request = letterCvRequest;
+    if (!userId || !dossier || sendAiProfile.disabled) return;
+    sendAiProfile.disabled = true;
+    try {
+      const details = await fetchProfileDetails(userId);
+      if (!sendDialog.open || sendApplication !== dossier || request !== letterCvRequest ||
+          reviewed || getSession()?.user?.id !== userId) return;
+      applyLetterContext([details.skills, details.languages]);
+    } catch (error) {
+      if (sendDialog.open && sendApplication === dossier && request === letterCvRequest &&
+          getSession()?.user?.id === userId) sendAiSourceStatus.textContent = error.message;
+    } finally {
+      sendAiProfile.disabled = false;
+    }
+  });
+
   sendAiButton.addEventListener("click", async () => {
     const dossier = sendApplication;
     const userId = getSession()?.user?.id;
@@ -2523,6 +2601,9 @@
     librarySummary.textContent = "";
     librarySummary.hidden = true;
     sendAi.open = false;
+    ++letterCvRequest;
+    sendAiVariant.length = 1;
+    sendAiSourceStatus.textContent = "";
     editSendDraft();
     sendSubmit.disabled = false;
     sendStatus.textContent = "";
