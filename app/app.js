@@ -972,7 +972,7 @@
     message.textContent = "Chargement…";
     try {
       const rows = await supabaseFetch(
-        "user_applications?select=id,company_name,company_email,job_title,status,sent_at,next_follow_up_at,last_inbound_at,last_follow_up_sent_at,follow_up_delay_days,hidden_at,last_automatic_reply_at,last_human_reply_at,last_reply_read_at" +
+        "user_applications?select=id,company_name,company_email,job_title,status,sent_at,next_follow_up_at,last_inbound_at,last_follow_up_sent_at,follow_up_delay_days,hidden_at,last_automatic_reply_at,last_human_reply_at,last_reply_read_at,notes,updated_at" +
         "&status=in.(sent,reply_received,interview,accepted,rejected)" +
         "&order=next_follow_up_at.asc.nullslast,last_activity_at.desc"
       );
@@ -1004,7 +1004,8 @@
             ? '<label><input type="checkbox" data-followup-choice value="' + escapeHtml(row.id) + '"> Sélectionner pour relance</label>' : '') +
           (row.last_inbound_at ? '<button type="button" class="secondary compact" data-open-reply="' +
             escapeHtml(row.id) + '">Lire la réponse</button>' : '') +
-          '<button type="button" class="secondary compact" data-tracking-visibility="' + escapeHtml(row.id) + '">' +
+          '<button type="button" class="secondary compact" data-tracking-edit="' + escapeHtml(row.id) + '">Modifier le statut ou la note</button>' +
+          '<button type="button" class="secondary compact" data-tracking-visibility="'  + escapeHtml(row.id) + '">' +
           (row.hidden_at ? "Réafficher" : "Masquer du suivi") + '</button></div>' +
           '<form class="application-form tracking-form" data-id="' + escapeHtml(row.id) + '">' +
           '<label>Date de relance<input name="follow-up" type="date" value="' + localDate + '"></label>' +
@@ -1033,6 +1034,58 @@
       document.querySelector("#tracking-message").textContent = error.message;
     } finally {
       button.disabled = false;
+    }
+  });
+
+  const trackingDetails = document.querySelector("#tracking-details-dialog");
+  const trackingDetailsForm = document.querySelector("#tracking-details-form");
+  const trackingDetailsStatus = document.querySelector("#tracking-details-status");
+  const trackingDetailsClose = document.querySelector("#tracking-details-close");
+  const trackingDetailsSave = trackingDetailsForm.querySelector("[type=submit]");
+  let trackingDetailsRow = null;
+
+  trackingList.addEventListener("click", event => {
+    const button = event.target.closest("[data-tracking-edit]");
+    if (!button || trackingDetails.open) return;
+    trackingDetailsRow = trackingRows.find(row => row.id === button.dataset.trackingEdit);
+    if (!trackingDetailsRow) return;
+    document.querySelector("#tracking-details-title").textContent = trackingDetailsRow.company_name;
+    trackingDetailsForm.elements.status.value = trackingDetailsRow.status;
+    trackingDetailsForm.elements.notes.value = trackingDetailsRow.notes || "";
+    trackingDetailsStatus.textContent = "";
+    trackingDetails.showModal();
+  });
+
+  trackingDetailsClose.addEventListener("click", () => trackingDetails.close());
+  trackingDetails.addEventListener("cancel", event => {
+    if (trackingDetailsSave.disabled) event.preventDefault();
+  });
+  trackingDetailsForm.addEventListener("submit", async event => {
+    event.preventDefault();
+    const row = trackingDetailsRow;
+    const userId = getSession()?.user?.id;
+    if (!row || !userId || trackingDetailsSave.disabled) return;
+    trackingDetailsSave.disabled = trackingDetailsClose.disabled = true;
+    try {
+      const status = trackingDetailsForm.elements.status.value;
+      const notes = trackingDetailsForm.elements.notes.value.trim() || null;
+      const result = await supabaseWrite("user_applications?id=eq." + encodeURIComponent(row.id) +
+        "&updated_at=eq." + encodeURIComponent(row.updated_at) + "&select=id", "PATCH", {
+        status, notes, last_activity_at: new Date().toISOString()
+      });
+      if (getSession()?.user?.id !== userId) return;
+      if (!result.length) {
+        await loadTracking();
+        trackingDetailsStatus.textContent = "Le dossier a changé depuis son ouverture. Copiez votre note, puis rouvrez le dossier.";
+        return;
+      }
+      trackingDetails.close();
+      await loadTracking();
+      if (getSession()?.user?.id === userId) trackingMessage.textContent = "Suivi enregistré.";
+    } catch (error) {
+      trackingDetailsStatus.textContent = error.message;
+    } finally {
+      trackingDetailsSave.disabled = trackingDetailsClose.disabled = false;
     }
   });
 

@@ -387,6 +387,25 @@
     </form>
   </dialog>
 
+  <dialog id="tracking-details-dialog" aria-labelledby="tracking-details-title">
+    <form id="tracking-details-form">
+      <h2 id="tracking-details-title">Modifier le suivi</h2>
+      <label>Statut<select name="status" required>
+        <option value="sent">Envoyée</option>
+        <option value="reply_received">Réponse reçue</option>
+        <option value="interview">Entretien</option>
+        <option value="accepted">Acceptée</option>
+        <option value="rejected">Refusée</option>
+      </select></label>
+      <label>Note interne<textarea name="notes" rows="5" maxlength="5000"></textarea></label>
+      <p id="tracking-details-status" role="status"></p>
+      <div class="batch-actions">
+        <button type="submit" class="primary compact">Enregistrer</button>
+        <button type="button" id="tracking-details-close" class="secondary compact">Fermer</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog id="followup-dialog" aria-labelledby="followup-title">
     <form id="followup-form">
       <h2 id="followup-title">Relances en lot</h2>
