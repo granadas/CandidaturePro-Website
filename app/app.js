@@ -415,6 +415,36 @@
     return String(value || "").trim().replace(/[%(),]/g, " ").replace(/\s+/g, " ");
   }
 
+  const jobPlatforms = [
+    ["Jobup", "https://www.jobup.ch/en/jobs/"],
+    ["jobs.ch", "https://www.jobs.ch/fr/offres-emplois/"],
+    ["JobScout24", "https://www.jobscout24.ch/fr/jobs/"],
+    ["Indeed Suisse", "https://ch.indeed.com/jobs", "q", "l"]
+  ];
+
+  function renderJobPlatforms(query, city) {
+    const links = jobPlatforms.map(([name, address, termKey = "term", cityKey = "location"]) => {
+      const url = new URL(address);
+      if (query) url.searchParams.set(termKey, query);
+      if (city) url.searchParams.set(cityKey, city);
+      const link = document.createElement("a");
+      link.className = "secondary compact";
+      link.href = url.href;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.textContent = name;
+      return link;
+    });
+    document.querySelector("#job-platforms").replaceChildren(...links);
+  }
+
+  document.querySelector("#open-all-jobs").addEventListener("click", () => {
+    document.querySelector("#jobs-query").value = "";
+    document.querySelector("#jobs-sector").value = "";
+    document.querySelector("#jobs-city").value = document.querySelector("#company-city").value.trim() || "Genève";
+    showView("jobs");
+  });
+
   async function loadJobs() {
     const message = document.querySelector("#jobs-message");
     if (!getSession()) {
@@ -427,6 +457,7 @@
     const query = cleanSearchTerm(document.querySelector("#jobs-query").value);
     const city = cleanSearchTerm(document.querySelector("#jobs-city").value);
     const sector = document.querySelector("#jobs-sector").value;
+    renderJobPlatforms(query, city);
     const filters = ["active=eq.true"];
     if (query) {
       const pattern = encodeURIComponent("*" + query + "*");

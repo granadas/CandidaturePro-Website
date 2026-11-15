@@ -72,11 +72,11 @@
         <article class="panel jobs-search-panel">
           <div class="panel-head">
             <div><small>MARCHÉ DE L’EMPLOI SUISSE</small><h2>Trouver un poste ouvert</h2></div>
-            <span class="badge">431 offres actives</span>
+            <button type="button" class="secondary compact" data-view-link="companies">Retour aux entreprises</button>
           </div>
           <form id="jobs-search-form" class="jobs-search-form">
             <label>Métier ou mot-clé<input id="jobs-query" type="search" maxlength="120" placeholder="Ex. assistant, chauffeur, éducateur"></label>
-            <label>Ville ou région<input id="jobs-city" type="search" maxlength="120" placeholder="Ex. Genève"></label>
+            <label>Ville ou région<input id="jobs-city" type="search" maxlength="120" placeholder="Ex. Genève" value="Genève"></label>
             <label>Secteur
               <select id="jobs-sector">
                 <option value="">Tous les secteurs</option>
@@ -101,6 +101,11 @@
             <button id="jobs-search-submit" class="primary" type="submit">Rechercher</button>
           </form>
         </article>
+        <article class="panel applications-panel">
+          <h2>Plateformes d’emploi en Suisse</h2>
+          <p>Ouvrez la recherche sur une plateforme sans utiliser de crédit Candidature Pro.</p>
+          <div id="job-platforms" class="batch-actions"></div>
+        </article>
         <article class="panel jobs-results-panel">
           <div class="panel-head"><div><small>OFFRES DISPONIBLES</small><h2>Résultats</h2></div><span id="jobs-results-count">0 offre</span></div>
           <div id="jobs-message" class="list-message" role="status">Chargement des offres récentes…</div>
@@ -112,7 +117,7 @@
         <article class="panel company-search-panel">
           <div class="panel-head">
             <div><small>RECHERCHE INTERNET SÉCURISÉE</small><h2>Trouver des entreprises</h2></div>
-            <span class="badge">Cache + Internet</span>
+            <button type="button" id="open-all-jobs" class="secondary compact">Voir tous les postes ouverts</button>
           </div>
           <form id="company-search-form" class="company-search-form">
             <label>Secteur d’activité
