@@ -993,11 +993,20 @@
     const form = document.createElement("form");
     form.className = "profile-form";
     if (mode === "verification") {
-      form.innerHTML = '<label>Adresse vérifiée<input name="email" type="email" maxlength="254"></label>' +
+      form.innerHTML = '<label>Entreprise<input name="company" required maxlength="200"></label>' +
+        '<label>Secteur<select name="sector" required></select></label>' +
+        '<label>Adresse vérifiée<input name="email" type="email" maxlength="254"></label>' +
         '<label>Type de contact<select name="type"><option value="general">Général</option><option value="hr">RH</option></select></label>' +
         '<label class="wide">Note<input name="note" maxlength="2000"></label>' +
         '<div class="wide"><button type="submit" class="primary" value="email">Valider le contact</button> ' +
-        '<button type="submit" class="secondary" value="inactive">Marquer fermée ou inexistante</button></div>';
+        '<button type="submit" class="secondary" value="not_found">Clôturer sans contact</button> ' +
+        '<button type="submit" class="secondary" value="inactive">Ajouter à la liste noire</button></div>';
+      form.elements.company.value = row.company_name || "";
+      for (const option of document.querySelector("#company-sector").options) {
+        if (option.value) form.elements.sector.append(option.cloneNode(true));
+      }
+      form.elements.sector.prepend(new Option("Choisir un secteur", ""));
+      form.elements.sector.value = row.sector || "";
     } else if (mode === "reports") {
       form.innerHTML = '<label>Statut<select name="status"><option value="new">Nouveau</option><option value="in_progress">En cours</option>' +
         '<option value="resolved">Résolu</option><option value="closed">Clôturé</option></select></label>' +
@@ -1018,14 +1027,29 @@
       const data = new FormData(form);
       const action = event.submitter?.value;
       const email = String(data.get("email") || "").trim();
-      if (mode === "verification" && (!["email", "inactive"].includes(action) || (action === "email" && !email))) {
+      if (mode === "verification" && (!["email", "not_found", "inactive"].includes(action) || (action === "email" && !email))) {
         adminStatus.textContent = "Indiquez une adresse vérifiée pour valider le contact.";
         return;
       }
+      if (mode === "verification" && !String(data.get("company")).trim()) {
+        adminStatus.textContent = "Indiquez le nom de l’entreprise.";
+        return;
+      }
+      if (mode === "verification" && action === "inactive" &&
+          !window.confirm("Ajouter cette entreprise à la liste noire ? Elle sera masquée aux utilisateurs.")) return;
       buttons.forEach(button => button.disabled = true);
       try {
         let done;
         if (mode === "verification") {
+          const company = String(data.get("company")).trim();
+          const sector = data.get("sector");
+          if (company !== row.company_name || sector !== row.sector) {
+            const corrected = await supabaseRpc("admin_correct_company_manual_verification", {
+              p_request_id: row.id, p_company_name: company, p_sector: sector
+            });
+            if (corrected === false) throw new Error("La correction du dossier n’a pas été enregistrée.");
+          }
+          if (!current()) return;
           done = await supabaseRpc("admin_resolve_company_manual_verification", {
             p_request_id: row.id, p_action: action, p_email: action === "email" ? email : "",
             p_contact_type: data.get("type"), p_admin_note: data.get("note")
@@ -1125,7 +1149,7 @@
         const title = document.createElement("strong");
         title.textContent = row.company_name || row.label || row.title || row.email || row.action || "";
         const details = document.createElement("p");
-        details.textContent = mode === "blacklist" ? [row.city, row.inactive_reason].filter(Boolean).join(" · ") :
+        details.textContent = mode === "blacklist" ? [row.city, row.sector, row.inactive_reason, row.inactive_at ? trackingDateFormat.format(new Date(row.inactive_at)) : ""].filter(Boolean).join(" · ") :
           mode === "audit" ? [row.summary, row.created_at].filter(Boolean).join(" · ") :
           mode === "credits" ? [row.category, row.credits + " crédits", row.estimated_cost_chf + " CHF", row.detail].filter(Boolean).join(" · ") :
           mode === "contacts" ? [row.city, row.current_email, row.proposed_email, row.reply_subject, row.reply_body].filter(Boolean).join(" · ") :
