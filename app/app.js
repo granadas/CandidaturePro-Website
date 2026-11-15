@@ -125,7 +125,7 @@
     if (!getSession()) document.querySelector("#account-label").textContent = subtitle;
 
     if (isDashboard) ensureSession().then(session => session && updateTrackingCounts(session)).catch(() => {});
-    if (isProfile) renderProfile();
+    if (isProfile) loadCandidateProfile();
     if (isApplications) loadApplications();
     if (isCompanies) renderCompanies();
     if (isJobs) loadJobs();
@@ -269,12 +269,42 @@
     return result;
   }
 
+  const profileDetailFields = ["phone", "city", "desired_jobs", "skills", "languages"];
+  let profileDetailsUser = null;
+  let profileDetailsRequest = 0;
+
+  async function fetchProfileDetails(userId) {
+    const rows = await supabaseFetch("web_candidate_profile_details?user_id=eq." +
+      encodeURIComponent(userId) + "&select=" + profileDetailFields.join(","));
+    return rows[0] || {};
+  }
+
+  async function loadCandidateProfile() {
+    const userId = getSession()?.user?.id;
+    const form = document.querySelector("#profile-form");
+    const status = document.querySelector("#profile-message");
+    renderProfile();
+    if (!userId || profileDetailsUser === userId) return;
+    form.querySelectorAll("input, textarea, button").forEach(element => { element.disabled = true; });
+    status.textContent = "Chargement du profil…";
+    const request = ++profileDetailsRequest;
+    try {
+      const details = await fetchProfileDetails(userId);
+      if (getSession()?.user?.id !== userId || request !== profileDetailsRequest) return;
+      for (const field of profileDetailFields) form.elements.namedItem(field).value = details[field] || "";
+      profileDetailsUser = userId;
+      renderProfile();
+    } catch (error) {
+      if (getSession()?.user?.id === userId && request === profileDetailsRequest) status.textContent = error.message + " Rouvrez Mon profil pour réessayer.";
+    }
+  }
+
   function renderProfile() {
     const session = getSession();
     const form = document.querySelector("#profile-form");
     const message = document.querySelector("#profile-message");
     const enabled = Boolean(session?.user?.id);
-    form.querySelectorAll("input, button").forEach(element => { element.disabled = !enabled; });
+    form.querySelectorAll("input, textarea, button").forEach(element => { element.disabled = !enabled || profileDetailsUser !== session?.user?.id; });
     document.querySelector("#profile-first-name").value = profile?.candidate_first_name || "";
     document.querySelector("#profile-last-name").value = profile?.candidate_last_name || "";
     document.querySelector("#profile-email").value = profile?.candidate_email || session?.user?.email || "";
@@ -1444,6 +1474,37 @@
   let savedCvVariants = [];
   let editingCvId = null;
 
+  document.querySelector("#cv-use-profile").addEventListener("click", async event => {
+    const button = event.currentTarget;
+    const userId = getSession()?.user?.id;
+    if (!userId || button.disabled) return;
+    const variant = editingCvId;
+    button.disabled = true;
+    try {
+      const details = await fetchProfileDetails(userId);
+      if (getSession()?.user?.id !== userId || editingCvId !== variant) return;
+      const suggestions = {
+        name: [profile?.candidate_first_name, profile?.candidate_last_name].filter(Boolean).join(" "),
+        title: (details.desired_jobs || "").split(/[;\n]/)[0].trim(),
+        contact: [profile?.candidate_email || getSession().user.email, details.phone, details.city].filter(Boolean).join(" · "),
+        skills: [details.skills, details.languages].filter(Boolean).join("\n")
+      };
+      let filled = 0;
+      for (const [name, value] of Object.entries(suggestions)) {
+        const input = cvForm.elements.namedItem(name);
+        if (!input.value.trim() && value) {
+          input.value = value.slice(0, input.maxLength);
+          filled++;
+        }
+      }
+      cvSaveStatus.textContent = filled ? "Champs vides complétés avec le profil." : "Aucun champ vide à compléter avec le profil.";
+    } catch (error) {
+      if (getSession()?.user?.id === userId) cvSaveStatus.textContent = error.message;
+    } finally {
+      button.disabled = false;
+    }
+  });
+
   async function loadCvVariants() {
     const userId = getSession()?.user?.id;
     if (!userId) return;
@@ -1846,17 +1907,25 @@
 
   document.querySelector("#profile-form").addEventListener("submit", async event => {
     event.preventDefault();
+    const userId = getSession()?.user?.id;
+    if (!userId || profileDetailsUser !== userId) return;
+    const details = Object.fromEntries(profileDetailFields.map(field =>
+      ["p_" + field, event.currentTarget.elements.namedItem(field).value]));
     const button = document.querySelector("#profile-submit");
+    if (button.disabled) return;
     const message = document.querySelector("#profile-message");
     button.disabled = true;
     button.textContent = "Enregistrement…";
     message.textContent = "";
     try {
-      profile = await supabaseRpc("update_own_candidate_profile", {
+      const updated = await supabaseRpc("save_web_candidate_profile", {
+        ...details,
         p_first_name: document.querySelector("#profile-first-name").value,
         p_last_name: document.querySelector("#profile-last-name").value,
         p_email: document.querySelector("#profile-email").value
       });
+      if (getSession()?.user?.id !== userId) return;
+      profile = updated;
       renderAccount();
       renderProfile();
       document.querySelector("#setup-progress").textContent =
@@ -2114,6 +2183,9 @@
   });
   signOutButton.addEventListener("click", () => {
     profile = null;
+    profileDetailsUser = null;
+    ++profileDetailsRequest;
+    document.querySelector("#profile-form").reset();
     if (replyDialog.open) replyDialog.close();
     cancelBatch();
     clearSendDrafts();

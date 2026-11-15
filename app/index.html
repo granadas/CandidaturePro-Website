@@ -258,6 +258,11 @@
             <label>Prénom<input id="profile-first-name" type="text" maxlength="100" autocomplete="given-name"></label>
             <label>Nom<input id="profile-last-name" type="text" maxlength="100" autocomplete="family-name"></label>
             <label class="wide">E-mail de candidature<input id="profile-email" type="email" maxlength="254" autocomplete="email"></label>
+            <label>Téléphone<input name="phone" type="tel" maxlength="60" autocomplete="tel"></label>
+            <label>Ville<input name="city" maxlength="150" autocomplete="address-level2"></label>
+            <label class="wide">Métiers recherchés<textarea name="desired_jobs" rows="2" maxlength="1000"></textarea></label>
+            <label class="wide">Compétences<textarea name="skills" rows="3" maxlength="3000"></textarea></label>
+            <label class="wide">Langues<textarea name="languages" rows="2" maxlength="1000"></textarea></label>
             <div id="profile-message" class="profile-message wide" role="status"></div>
             <div class="wide"><button id="profile-submit" class="primary" type="submit">Enregistrer</button></div>
           </form>
@@ -275,6 +280,7 @@
             <label class="wide">Modèle<select name="template"><option value="classic">Classique</option>
               <option value="modern">Contemporain</option><option value="compact">Compact</option></select></label>
             <label class="wide">Nom de la variante<input id="cv-label" maxlength="120"></label>
+            <div class="wide"><button type="button" class="secondary" id="cv-use-profile">Compléter avec mon profil</button></div>
             <label>Nom complet<input name="name" maxlength="120" required></label>
             <label>Titre professionnel<input name="title" maxlength="120" required></label>
             <label class="wide">Coordonnées<input name="contact" maxlength="240"></label>
