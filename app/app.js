@@ -123,7 +123,10 @@
     document.querySelector("#account-label").dataset.pageSubtitle = subtitle;
     if (!getSession()) document.querySelector("#account-label").textContent = subtitle;
 
-    if (isDashboard) ensureSession().then(session => session && updateTrackingCounts(session)).catch(() => {});
+    if (isDashboard) {
+      ensureSession().then(session => session && updateTrackingCounts(session)).catch(() => {});
+      if (syncReplies) syncGmailRepliesAutomatically();
+    }
     if (isProfile) loadCandidateProfile();
     if (isApplications) loadApplications();
     if (isCompanies) renderCompanies();
@@ -761,7 +764,8 @@
           await supabaseWrite("user_applications?id=eq." + encodeURIComponent(id) +
             "&or=(last_reply_read_at.is.null,last_reply_read_at.lt." + date + ")", "PATCH",
             { last_reply_read_at: result.latestInboundAt });
-          if (getSession()?.user?.id === userId) await loadTracking();
+          const session = getSession();
+          if (session?.user?.id === userId) await Promise.all([loadTracking(), updateTrackingCounts(session)]);
         } catch {
           if (request === replyRequest && replyDialog.open) {
             replyEditorStatus.textContent = "La lecture n’a pas pu être enregistrée.";
@@ -1874,6 +1878,11 @@
     const request = ++trackingCountsRequest;
     const counts = await supabaseRpc("get_my_web_tracking_counts", {}).catch(() => null);
     if (request !== trackingCountsRequest || getSession()?.user?.id !== session.user.id) return;
+    const badge = document.querySelector("#tracking-unread-badge");
+    const unread = counts?.replies;
+    badge.hidden = !Number.isSafeInteger(unread) || unread <= 0;
+    badge.textContent = badge.hidden ? "" : unread > 99 ? "99+" : String(unread);
+    badge.setAttribute("aria-label", badge.hidden ? "" : unread + " dossier(s) avec une réponse non lue");
     for (const key of ["replies", "followups", "interviews"]) {
       const amount = counts?.[key];
       document.querySelector("#stat-" + key).textContent = Number.isSafeInteger(amount) && amount >= 0 ? String(amount) : "—";
@@ -2944,9 +2953,12 @@
   const trackingVisible = () => !appShell.hidden && !document.hidden &&
     document.querySelector("#tracking-view").classList.contains("active");
 
+  const gmailSyncVisible = () => !appShell.hidden && !document.hidden &&
+    (trackingVisible() || document.querySelector("#dashboard").classList.contains("active"));
+
   function syncGmailRepliesAutomatically() {
     const userId = getSession()?.user?.id;
-    if (userId && trackingVisible() &&
+    if (userId && gmailSyncVisible() &&
         (lastGmailSyncUser !== userId || Date.now() - lastGmailSync >= gmailSyncInterval)) {
       syncGmailReplies(false);
     }
@@ -2976,7 +2988,7 @@
         }
         after = result.next || null;
         if (after && manual) repliesStatus.textContent = checked + " dossiers vérifiés…";
-        if (after && !manual && !trackingVisible()) {
+        if (after && !manual && !gmailSyncVisible()) {
           lastGmailSync = 0;
           return;
         }
@@ -2988,7 +3000,10 @@
     } finally {
       refreshReplies.disabled = false;
       gmailSyncRunning = false;
-      if (updated && getSession()?.user?.id === userId && trackingVisible()) await loadTracking();
+      const session = getSession();
+      if (updated && session?.user?.id === userId) {
+        await Promise.all([updateTrackingCounts(session), trackingVisible() ? loadTracking() : null]);
+      }
     }
   }
 
@@ -3064,8 +3079,9 @@
   async function bootstrap() {
     await ensureSession();
     renderAccount();
-    showView("dashboard");
+    showView("dashboard", false);
     await finishGmailConnection();
+    syncGmailRepliesAutomatically();
     const url = new URL(location.href);
     if (url.searchParams.has("connexion")) {
       url.searchParams.delete("connexion");

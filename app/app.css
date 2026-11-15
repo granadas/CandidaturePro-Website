@@ -142,3 +142,15 @@
 }
 #document-preview-title { margin: 0 0 12px; overflow-wrap: anywhere; }
 #document-preview-frame { width: 100%; height: min(68dvh, 760px); border: 0; }
+
+#tracking-unread-badge {
+  width: auto;
+  min-width: 22px;
+  margin-inline-start: auto;
+  border-radius: 999px;
+  padding: 1px 6px;
+  background: var(--purple2);
+  color: white;
+  font-size: 12px;
+}
+#tracking-unread-badge[hidden] { display: none; }
