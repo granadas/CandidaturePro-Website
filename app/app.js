@@ -2063,18 +2063,34 @@
   document.querySelector("#show-hidden-applications").addEventListener("change", loadApplications);
 
   document.querySelector("#applications-list").addEventListener("change", async event => {
-    if (event.target.dataset.action !== "status") return;
-    const row = event.target.closest("[data-id]");
-    const status = event.target.value;
+    const select = event.target;
+    const userId = getSession()?.user?.id;
+    if (select.dataset.action !== "status" || select.disabled || !userId) return;
+    const id = select.closest("[data-id]")?.dataset.id;
+    const row = applications.find(item => item.id === id);
+    const status = select.value;
+    if (!row || !Object.hasOwn(statusLabels, status) || row.status === status) return;
+    const message = document.querySelector("#applications-message");
+    const now = new Date().toISOString();
+    select.disabled = true;
     try {
-      await supabaseWrite("user_applications?id=eq." + encodeURIComponent(row.dataset.id), "PATCH", {
+      const saved = await supabaseWrite("user_applications?id=eq." + encodeURIComponent(row.id) +
+        "&updated_at=eq." + encodeURIComponent(row.updated_at) + "&select=id", "PATCH", {
         status,
-        sent_at: status === "sent" ? new Date().toISOString() : undefined,
-        last_activity_at: new Date().toISOString()
+        sent_at: status === "sent" && !row.sent_at ? now : undefined,
+        last_activity_at: now,
+        ...(closedFollowUpStatuses.has(status) ? { next_follow_up_at: null } : {})
       });
+      if (getSession()?.user?.id !== userId) return;
       await loadApplications();
+      if (!saved.length && getSession()?.user?.id === userId) message.textContent = "Le dossier a changé. Vérifiez son statut avant de réessayer.";
     } catch (error) {
-      document.querySelector("#applications-message").textContent = error.message;
+      if (getSession()?.user?.id === userId) {
+        select.value = row.status;
+        message.textContent = error.message;
+      }
+    } finally {
+      select.disabled = false;
     }
   });
 
@@ -2083,11 +2099,57 @@
   const applicationEditStatus = document.querySelector("#application-edit-status");
   const applicationEditClose = document.querySelector("#application-edit-close");
   const applicationEditSave = applicationEditForm.querySelector("[type=submit]");
+  const applicationProposeEmail = document.querySelector("#application-propose-email");
   let applicationBeingEdited = null;
+  let proposedEmailRequest = null;
+
+  function toggleApplicationEditActions(disabled) {
+    applicationEditSave.disabled = applicationEditClose.disabled = applicationProposeEmail.disabled = disabled;
+  }
+
+  applicationProposeEmail.addEventListener("click", async () => {
+    const row = applicationBeingEdited;
+    const userId = getSession()?.user?.id;
+    const fields = applicationEditForm.elements;
+    if (!row || !userId || applicationProposeEmail.disabled) return;
+    const email = fields.email.value.trim();
+    const previousEmail = (row.company_email || "").trim();
+    if (!email || email.toLowerCase() === previousEmail.toLowerCase() || !fields.email.reportValidity()) {
+      applicationEditStatus.textContent = "Saisissez une adresse e-mail différente pour la proposer.";
+      return;
+    }
+    if (fields.company.value.trim() !== (row.company_name || "").trim() ||
+        fields.city.value.trim() !== (row.company_city || "").trim()) {
+      applicationEditStatus.textContent = "Enregistrez d’abord le nom et la ville corrigés, puis rouvrez le dossier.";
+      return;
+    }
+    if (proposedEmailRequest?.email !== email) {
+      proposedEmailRequest = { email, id: "manual-" + crypto.randomUUID() };
+    }
+    toggleApplicationEditActions(true);
+    applicationEditStatus.textContent = "Enregistrement de la proposition…";
+    try {
+      const result = await supabaseRpc("submit_company_email_change_request", {
+        p_company_name: row.company_name, p_city: row.company_city || "",
+        p_current_email: previousEmail, p_proposed_email: email,
+        p_reply_subject: "Proposition depuis une candidature",
+        p_reply_body: "Adresse proposée par le candidat pour vérification.",
+        p_source_message_id: proposedEmailRequest.id
+      });
+      if (getSession()?.user?.id !== userId || applicationBeingEdited !== row) return;
+      if (!result) throw new Error("La proposition n’a pas pu être confirmée.");
+      applicationEditStatus.textContent = "Proposition enregistrée. Enregistrez le dossier si vous souhaitez aussi utiliser cette adresse pour votre candidature.";
+    } catch (error) {
+      if (getSession()?.user?.id === userId && applicationBeingEdited === row) applicationEditStatus.textContent = error.message;
+    } finally {
+      toggleApplicationEditActions(false);
+    }
+  });
 
   function openApplicationEditor(row) {
     if (!row || !canEditApplication(row) || applicationEditDialog.open) return;
     applicationBeingEdited = row;
+    proposedEmailRequest = null;
     applicationEditForm.elements.company.value = row.company_name || "";
     applicationEditForm.elements.job.value = row.job_title || "";
     applicationEditForm.elements.city.value = row.company_city || "";
@@ -2113,7 +2175,7 @@
     const companyName = fields.company.value.trim();
     if (!companyName) { applicationEditStatus.textContent = "Indiquez le nom de l’entreprise."; return; }
 
-    applicationEditSave.disabled = applicationEditClose.disabled = true;
+    toggleApplicationEditActions(true);
     applicationEditStatus.textContent = "";
     try {
       const saved = await supabaseWrite("user_applications?id=eq." + encodeURIComponent(row.id) +
@@ -2140,7 +2202,7 @@
     } catch (error) {
       if (getSession()?.user?.id === userId) applicationEditStatus.textContent = error.message;
     } finally {
-      applicationEditSave.disabled = applicationEditClose.disabled = false;
+      toggleApplicationEditActions(false);
     }
   });
 
