@@ -989,6 +989,49 @@
   };
   let adminRequest = 0;
 
+  const verificationSources = new Map([
+    ["replacement_after_invalid_email", "Remplacement d’un e-mail confirmé invalide"],
+    ["no_contact_found", "Aucun contact trouvé automatiquement"],
+    ["company_search", "Recherche d’entreprise"]
+  ]);
+
+  function appendVerificationDetails(card, row, current) {
+    const source = document.createElement("p");
+    const sourceKey = String(row.source || "").trim().toLowerCase();
+    source.textContent = verificationSources.get(sourceKey) || "Vérification automatique";
+    if (row.created_at) source.textContent += " · " + trackingDateFormat.format(new Date(row.created_at));
+    card.append(source);
+
+    const actions = document.createElement("div");
+    actions.className = "batch-actions";
+    const website = safeExternalUrl(row.website);
+    if (website) {
+      const link = document.createElement("a");
+      link.className = "secondary compact";
+      link.href = website;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.textContent = "Ouvrir le site";
+      actions.append(link);
+    }
+    if (row.address) {
+      const copy = document.createElement("button");
+      copy.type = "button";
+      copy.className = "secondary compact";
+      copy.textContent = "Copier l’adresse";
+      copy.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(row.address);
+          if (current()) adminStatus.textContent = "Adresse copiée.";
+        } catch {
+          if (current()) adminStatus.textContent = "Impossible de copier l’adresse.";
+        }
+      });
+      actions.append(copy);
+    }
+    if (actions.childElementCount) card.append(actions);
+  }
+
   function administrativeActions(mode, row, current) {
     const form = document.createElement("form");
     form.className = "profile-form";
@@ -1002,6 +1045,7 @@
         '<button type="submit" class="secondary" value="not_found">Clôturer sans contact</button> ' +
         '<button type="submit" class="secondary" value="inactive">Ajouter à la liste noire</button></div>';
       form.elements.company.value = row.company_name || "";
+      form.elements.type.value = "hr";
       for (const option of document.querySelector("#company-sector").options) {
         if (option.value) form.elements.sector.append(option.cloneNode(true));
       }
@@ -1158,6 +1202,7 @@
           mode === "reports" ? [row.category, row.description, row.steps, row.status].filter(Boolean).join(" · ") :
           [row.plan, row.is_admin ? "Administrateur" : "", row.last_seen_at].filter(Boolean).join(" · ");
         card.append(title, details);
+        if (mode === "verification") appendVerificationDetails(card, row, current);
         if (mode === "blacklist") {
           const restore = document.createElement("form");
           restore.innerHTML = '<label>Contact vérifié<input required type="email" name="email" maxlength="254"></label>' +
