@@ -979,6 +979,13 @@
     }
   });
 
+  document.querySelector("#dashboard-unread").addEventListener("click", () => {
+    trackingSearch.value = "";
+    trackingHidden.checked = false;
+    trackingFilter.value = "unread";
+    showView("tracking");
+  });
+
   trackingSearch.addEventListener("input", applyTrackingFilters);
   trackingFilter.addEventListener("change", applyTrackingFilters);
   trackingHidden.addEventListener("change", loadTracking);
@@ -1861,29 +1868,16 @@
     return quota.remaining + " envoi(s) restant(s) sur " + quota.limit + " ce mois";
   }
 
+  let trackingCountsRequest = 0;
+
   async function updateTrackingCounts(session) {
-    const queries = {
-      replies: "last_inbound_at=not.is.null",
-      followups: "next_follow_up_at=not.is.null&status=in.(sent,reply_received)",
-      interviews: "status=eq.interview"
-    };
-    await Promise.all(Object.entries(queries).map(async ([key, filter]) => {
-      const node = document.querySelector("#stat-" + key);
-      try {
-        const response = await fetch(config.supabaseUrl + "/rest/v1/user_applications?select=id&limit=1&hidden_at=is.null&" + filter, {
-          method: "HEAD",
-          headers: {
-            apikey: config.supabasePublishableKey,
-            Authorization: "Bearer " + session.access_token,
-            Prefer: "count=exact"
-          }
-        });
-        const count = response.headers.get("content-range")?.split("/").at(-1);
-        if (getSession()?.user?.id === session.user.id) node.textContent = response.ok && /^\d+$/.test(count || "") ? count : "—";
-      } catch {
-        if (getSession()?.user?.id === session.user.id) node.textContent = "—";
-      }
-    }));
+    const request = ++trackingCountsRequest;
+    const counts = await supabaseRpc("get_my_web_tracking_counts", {}).catch(() => null);
+    if (request !== trackingCountsRequest || getSession()?.user?.id !== session.user.id) return;
+    for (const key of ["replies", "followups", "interviews"]) {
+      const amount = counts?.[key];
+      document.querySelector("#stat-" + key).textContent = Number.isSafeInteger(amount) && amount >= 0 ? String(amount) : "—";
+    }
   }
 
   async function loadDashboard() {
