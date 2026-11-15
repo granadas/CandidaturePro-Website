@@ -185,6 +185,7 @@
               <div><small>VOS DOSSIERS</small><h2>Candidatures enregistrées</h2></div>
               <label class="inline-toggle"><input id="show-hidden-applications" type="checkbox"> Voir les masquées</label>
             </div>
+            <label>Rechercher un dossier<input id="applications-search" type="search" placeholder="Entreprise, poste, ville ou e-mail"></label>
             <label>Filtrer les dossiers
               <select id="applications-filter">
                 <option value="">Tous</option><option value="draft">Brouillons</option>
@@ -351,6 +352,8 @@
           <p id="gmail-status" role="status"></p>
           <button id="gmail-connect" class="secondary" hidden>Connecter Gmail</button>
           <button id="gmail-disconnect" class="secondary" hidden>Déconnecter Gmail</button>
+          <button id="settings-check" class="secondary" type="button">Vérifier la connexion</button>
+          <ul id="settings-check-results" aria-live="polite" hidden></ul>
         </article>
       </section>
     </main>
@@ -466,6 +469,7 @@
         <button id="send-edit" class="secondary" type="button">Modifier</button>
       </section>
       <p id="send-status" role="status"></p>
+      <button id="send-save-draft" class="secondary" type="button">Conserver le brouillon dans cet onglet</button>
       <button id="send-submit" class="primary" type="submit">Contrôle final</button>
       <button id="send-cancel" class="secondary" type="button">Fermer</button>
     </form>

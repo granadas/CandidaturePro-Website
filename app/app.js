@@ -490,13 +490,16 @@
   function renderApplications() {
     const list = document.querySelector("#applications-list");
     const filter = document.querySelector("#applications-filter").value;
+    const query = trackingText(document.querySelector("#applications-search").value.trim());
     updateBatchSelection();
-    const visible = applications.filter(row => !filter || (filter === "sent"
+    const visible = applications.filter(row => (!query || trackingText(
+      [row.company_name, row.job_title, row.company_city, row.company_email].filter(Boolean).join(" ")
+    ).includes(query)) && (!filter || (filter === "sent"
       ? Boolean(row.sent_at) || ["sent", "reply_received", "interview", "accepted", "rejected"].includes(row.status)
-      : row.status === filter));
+      : row.status === filter)));
     if (!visible.length) {
-      if (filter) {
-        list.textContent = "Aucun dossier pour ce filtre.";
+      if (filter || query) {
+        list.textContent = "Aucun dossier ne correspond à cette recherche.";
         return;
       }
       list.innerHTML = '<div class="empty-list"><strong>Aucune candidature enregistrée</strong><span>Ajoutez votre premier dossier avec le formulaire.</span></div>';
@@ -1873,6 +1876,7 @@
     }
   });
 
+  document.querySelector("#applications-search").addEventListener("input", renderApplications);
   document.querySelector("#applications-filter").addEventListener("change", renderApplications);
   document.querySelector("#show-hidden-applications").addEventListener("change", loadApplications);
 
@@ -2009,6 +2013,7 @@
     profile = null;
     if (replyDialog.open) replyDialog.close();
     cancelBatch();
+    clearSendDrafts();
     batchSelection.clear();
     ++documentsRequest;
     ++adminRequest;
@@ -2139,6 +2144,7 @@
           if (getSession()?.user?.id !== userId) break;
           await invokeEdgeFunction("gmail-web", { action: "send", applicationId: draft.applicationId,
             recipient: draft.recipient, subject: draft.subject, message: draft.message, attachments });
+          removeSendDraft(userId, draft.applicationId);
           batchSelection.delete(draft.applicationId);
           outcomes.push(draft.recipient + " · Envoyée");
         } catch (error) {
@@ -2269,8 +2275,43 @@
     libraryAdd.disabled = !librarySelect.value;
   });
 
+  const sendSaveDraft = document.querySelector("#send-save-draft");
+  const sendDraftPrefix = "candidature-pro-send-draft:";
+
+  function sendDraftKey(userId, applicationId) {
+    return sendDraftPrefix + userId + ":" + applicationId;
+  }
+
+  function clearSendDrafts() {
+    try {
+      for (let index = sessionStorage.length - 1; index >= 0; index--) {
+        const key = sessionStorage.key(index);
+        if (key?.startsWith(sendDraftPrefix)) sessionStorage.removeItem(key);
+      }
+    } catch { /* Le navigateur peut bloquer le stockage de session. */ }
+  }
+
+  function removeSendDraft(userId, applicationId) {
+    try { sessionStorage.removeItem(sendDraftKey(userId, applicationId)); }
+    catch { /* L’envoi est déjà confirmé. */ }
+  }
+
+  sendSaveDraft.addEventListener("click", () => {
+    const userId = getSession()?.user?.id;
+    if (!userId || !sendApplication || reviewed) return;
+    const [subject, message] = sendInputs;
+    try {
+      sessionStorage.setItem(sendDraftKey(userId, sendApplication.id),
+        JSON.stringify({ subject: subject.value, message: message.value }));
+      sendStatus.textContent = "Brouillon conservé dans cet onglet. Ajoutez à nouveau les PDF à la réouverture.";
+    } catch {
+      sendStatus.textContent = "Le navigateur n’a pas pu conserver le brouillon.";
+    }
+  });
+
   function editSendDraft() {
     reviewed = null;
+    sendSaveDraft.hidden = false;
     sendReview.hidden = true;
     sendAi.hidden = false;
     librarySelect.closest("label").hidden = false;
@@ -2311,6 +2352,14 @@
     document.querySelector("#send-recipient").textContent = "Destinataire · " + dossier.company_email;
     document.querySelector("#send-subject").value =
       (dossier.job_title ? "Candidature – " + dossier.job_title : "Candidature spontanée").slice(0, 120);
+    try {
+      const draft = JSON.parse(sessionStorage.getItem(sendDraftKey(getSession().user.id, dossier.id)) || "null");
+      if (typeof draft?.subject === "string" && typeof draft.message === "string") {
+        sendInputs[0].value = draft.subject.slice(0, 120);
+        sendInputs[1].value = draft.message.slice(0, 12000);
+        sendStatus.textContent = "Brouillon restauré. Ajoutez les PDF avant le contrôle final.";
+      }
+    } catch { /* La préparation reste disponible sans brouillon local. */ }
     sendDialog.showModal();
     loadSendDocuments(dossier).catch(() => {
       if (sendDialog.open && sendApplication === dossier && !reviewed) {
@@ -2350,6 +2399,7 @@
         return;
       }
       reviewed = draft;
+      sendSaveDraft.hidden = true;
       for (const input of sendInputs) {
         input.disabled = true;
         input.closest("label").hidden = true;
@@ -2391,6 +2441,7 @@
         subject: draft.subject, message: draft.message
       });
       if (getSession()?.user?.id !== userId) return;
+      removeSendDraft(userId, application.id);
       batchSelection.delete(application.id);
       sendDialog.close();
       await Promise.all([loadApplications(), loadDashboard().catch(() => {})]);
@@ -2428,6 +2479,37 @@
   function gmailEncode(bytes) {
     return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
   }
+
+  const settingsCheck = document.querySelector("#settings-check");
+  const settingsCheckResults = document.querySelector("#settings-check-results");
+  settingsCheck.addEventListener("click", async () => {
+    const userId = getSession()?.user?.id;
+    if (!userId || settingsCheck.disabled) return;
+    settingsCheck.disabled = true;
+    settingsCheckResults.hidden = false;
+    const showChecks = checks => settingsCheckResults.replaceChildren(...checks.map(text => {
+      const item = document.createElement("li");
+      item.textContent = text;
+      return item;
+    }));
+    showChecks(["Vérification en cours…"]);
+    try {
+      const checks = await Promise.allSettled([
+        supabaseFetch("user_applications?select=id&limit=1"),
+        invokeEdgeFunction("gmail-web", { action: "status" })
+      ]);
+      if (getSession()?.user?.id !== userId) return;
+      const [applicationsCheck, gmailCheck] = checks;
+      showChecks([
+        applicationsCheck.status === "fulfilled" ? "Accès aux candidatures opérationnel." : "Accès aux candidatures indisponible.",
+        gmailCheck.status !== "fulfilled" ? "Service Gmail indisponible." :
+          !gmailCheck.value.configured ? "Service Gmail en attente de configuration." :
+          gmailCheck.value.connected ? "Connexion Gmail enregistrée." : "Aucun compte Gmail lié."
+      ]);
+    } finally {
+      settingsCheck.disabled = false;
+    }
+  });
 
   async function loadGmail() {
     const userId = getSession()?.user?.id;
