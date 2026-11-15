@@ -1475,10 +1475,35 @@
     cvSaveStatus.textContent = "";
   });
 
+  const cvDelete = document.querySelector("#cv-delete");
+  cvDelete.addEventListener("click", async () => {
+    const userId = getSession()?.user?.id;
+    const variant = savedCvVariants.find(row => row.id === cvVariants.value);
+    if (!userId || cvForm.dataset.saving || cvDelete.disabled) return;
+    if (!variant) { cvSaveStatus.textContent = "Sélectionnez la variante à supprimer."; return; }
+    if (!window.confirm("Supprimer définitivement la variante « " + variant.label + " » ?")) return;
+    cvDelete.disabled = true;
+    try {
+      const removed = await supabaseWrite("web_cv_variants?id=eq." + encodeURIComponent(variant.id) + "&select=id", "DELETE");
+      if (getSession()?.user?.id !== userId) return;
+      if (editingCvId === variant.id) editingCvId = null;
+      await loadCvVariants();
+      if (getSession()?.user?.id === userId) {
+        cvSaveStatus.textContent = removed.length
+          ? "Variante supprimée. Le formulaire conserve le texte affiché."
+          : "Cette variante avait déjà été retirée.";
+      }
+    } catch (error) {
+      if (getSession()?.user?.id === userId) cvSaveStatus.textContent = error.message;
+    } finally {
+      cvDelete.disabled = false;
+    }
+  });
+
   for (const [buttonId, copy] of [["cv-save", false], ["cv-save-copy", true]]) {
     document.querySelector("#" + buttonId).addEventListener("click", async () => {
       const userId = getSession()?.user?.id;
-      if (!userId || cvForm.dataset.saving || !cvForm.reportValidity()) return;
+      if (!userId || cvForm.dataset.saving || cvDelete.disabled || !cvForm.reportValidity()) return;
       const fields = Object.fromEntries(cvFieldNames.map(name => [name, cvForm.elements.namedItem(name).value.trim()]));
       const label = cvLabel.value.trim() || fields.title;
       if (!label || !fields.name || !fields.title) {
