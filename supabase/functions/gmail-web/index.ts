@@ -319,13 +319,16 @@ Deno.serve(async (request: Request) => {
     }
 
     if (body?.action === "send") {
-      const { applicationId, recipient, subject, message } = body;
+      const { applicationId, recipient, subject, message, reviewedAt } = body;
       const email = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)+$/;
       if (typeof applicationId !== "string" || !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(applicationId) ||
           typeof recipient !== "string" || recipient.length > 254 || !email.test(recipient) ||
           typeof subject !== "string" || !subject.trim() || subject.length > 120 || /[\r\n]/.test(subject) ||
           typeof message !== "string" || !message.trim() || message.length > 12000) {
         return json({ message: "Vérifiez le destinataire, l’objet et le texte du message." }, 400);
+      }
+      if (reviewedAt !== undefined && (typeof reviewedAt !== "string" || reviewedAt.length > 40 || !Number.isFinite(Date.parse(reviewedAt)))) {
+        return json({ message: "Version du dossier invalide. Relancez le contrôle final." }, 400);
       }
       const read = await fetch(endpoint + filter + "&select=refresh_token", { headers: serviceHeaders });
       if (!read.ok) return json({ message: "Connexion Gmail indisponible." }, 503);
@@ -348,7 +351,9 @@ Deno.serve(async (request: Request) => {
         headers: { ...serviceHeaders, "Content-Type": "application/json" },
         body: JSON.stringify({ p_user: id, p_application: applicationId, ...args })
       });
-      const reservation = await rpc("reserve_web_gmail_delivery", { p_email: recipient });
+      const reservation = reviewedAt === undefined
+        ? await rpc("reserve_web_gmail_delivery", { p_email: recipient })
+        : await rpc("reserve_reviewed_web_gmail_delivery", { p_email: recipient, p_reviewed_at: reviewedAt });
       const reserved = await reservation.json().catch(() => null);
       if (!reservation.ok) return json({ message: "Impossible de vérifier le quota d’envoi." }, 503);
       if (!reserved?.reserved) return json({ message: reserved?.error || "Envoi indisponible." }, 409);

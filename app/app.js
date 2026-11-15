@@ -2403,7 +2403,7 @@
           await verifyReviewedApplication(draft);
           if (getSession()?.user?.id !== userId) break;
           await invokeEdgeFunction("gmail-web", { action: "send", applicationId: draft.applicationId,
-            recipient: draft.recipient, subject: draft.subject, message: draft.message, attachments });
+            recipient: draft.recipient, subject: draft.subject, message: draft.message, reviewedAt: draft.updatedAt, attachments });
           removeSendDraft(userId, draft.applicationId);
           batchSelection.delete(draft.applicationId);
           outcomes.push(draft.companyName + " · " + draft.recipient + " · Envoyée");
@@ -2825,7 +2825,7 @@
       if (!userId || getSession()?.user?.id !== userId) return;
       await invokeEdgeFunction("gmail-web", {
         action: "send", attachments, applicationId: application.id, recipient: application.company_email,
-        subject: draft.subject, message: draft.message
+        subject: draft.subject, message: draft.message, reviewedAt: draft.updatedAt
       });
       if (getSession()?.user?.id !== userId) return;
       removeSendDraft(userId, application.id);
