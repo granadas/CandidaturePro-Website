@@ -2663,6 +2663,7 @@
     if (!dossier?.company_email || !getSession()?.user?.id) return;
     sendApplication = dossier;
     batchProgress.hidden = !batchSize;
+    document.querySelector("#send-skip").hidden = !batchSize;
     batchProgress.textContent = batchSize ? "Dossier " + (batchSize - batchQueue.length) + " sur " + batchSize : "";
     sendForm.reset();
     libraryFiles = [];
@@ -2704,7 +2705,16 @@
     batchSize = 0;
   }
 
+  document.querySelector("#send-skip").addEventListener("click", () => {
+    if (!batchSize || !sendApplication || sendSubmit.disabled) return;
+    batchSelection.delete(sendApplication.id);
+    updateBatchSelection();
+    sendDialog.close();
+    nextBatchApplication();
+  });
+
   document.querySelector("#send-cancel").addEventListener("click", () => {
+    if (sendSubmit.disabled) return;
     cancelBatch();
     sendDialog.close();
   });
@@ -2712,11 +2722,28 @@
     if (sendSubmit.disabled) event.preventDefault();
     else cancelBatch();
   });
+  async function checkSendDraft(application, files) {
+    const [blockedResponse, gmail] = await Promise.all([
+      supabaseRpc("is_company_email_blocked", {
+        p_company_name: application.company_name, p_city: application.company_city || "", p_email: application.company_email
+      }),
+      invokeEdgeFunction("gmail-web", { action: "status" }),
+      Promise.all(files.map(validateSendPdf))
+    ]);
+    const blocked = Array.isArray(blockedResponse) ? blockedResponse[0] : blockedResponse;
+    if (blocked === true) throw new Error("Cette adresse est bloquée dans la base entreprises. Vérifiez le contact dans le dossier.");
+    if (blocked !== false) throw new Error("Impossible de vérifier le destinataire. Réessayez.");
+    if (!gmail.configured) throw new Error("Le service Gmail est indisponible.");
+    if (!gmail.connected) throw new Error("Connectez Gmail dans Paramètres avant de poursuivre.");
+  }
+
   sendForm.addEventListener("submit", async event => {
     event.preventDefault();
     if (sendSubmit.disabled || !sendApplication) return;
     const userId = getSession()?.user?.id;
+    if (!userId) return;
     if (!reviewed) {
+      const dossier = sendApplication;
       const [subject, message, fileInput] = sendInputs;
       const draft = { subject: subject.value.trim(), message: message.value.trim(), files: [...fileInput.files, ...selectedDocuments] };
       if (!draft.subject || !draft.message) {
@@ -2727,6 +2754,23 @@
           draft.files.reduce((total, file) => total + file.size, 0) > 5 * 1024 * 1024) {
         sendStatus.textContent = "Choisissez au maximum deux PDF de 5 Mo au total.";
         return;
+      }
+      sendSubmit.disabled = true;
+      sendStatus.textContent = "Vérification du destinataire, de Gmail et des pièces jointes…";
+      try {
+        await checkSendDraft(dossier, draft.files);
+        if (!sendDialog.open || sendApplication !== dossier || getSession()?.user?.id !== userId) return;
+        const currentFiles = [...fileInput.files, ...selectedDocuments];
+        if (draft.subject !== subject.value.trim() || draft.message !== message.value.trim() ||
+            draft.files.length !== currentFiles.length || draft.files.some((file, index) => file !== currentFiles[index])) {
+          sendStatus.textContent = "Le brouillon a changé. Relancez le contrôle final.";
+          return;
+        }
+      } catch (error) {
+        if (sendDialog.open && sendApplication === dossier && getSession()?.user?.id === userId) sendStatus.textContent = error.message;
+        return;
+      } finally {
+        sendSubmit.disabled = false;
       }
       reviewed = draft;
       sendSaveDraft.hidden = true;
@@ -2787,11 +2831,15 @@
     }
   });
 
+  async function validateSendPdf(file) {
+    if (!/\.pdf$/i.test(file.name) || await file.slice(0, 5).text() !== "%PDF-") {
+      throw new Error("Les pièces jointes doivent être des PDF.");
+    }
+  }
+
   async function encodeSendFiles(files) {
     return Promise.all(files.map(async file => {
-        if (!/\.pdf$/i.test(file.name) || await file.slice(0, 5).text() !== "%PDF-") {
-          throw new Error("Les pièces jointes doivent être des PDF.");
-        }
+        await validateSendPdf(file);
         const bytes = new Uint8Array(await file.arrayBuffer());
         let binary = "";
         for (let offset = 0; offset < bytes.length; offset += 8192) {
