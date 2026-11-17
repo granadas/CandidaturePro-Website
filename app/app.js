@@ -124,7 +124,9 @@
     if (!getSession()) document.querySelector("#account-label").textContent = subtitle;
 
     if (isDashboard) {
-      ensureSession().then(session => session && updateTrackingCounts(session)).catch(() => {});
+      ensureSession().then(session => {
+        if (session) return Promise.all([updateTrackingCounts(session), refreshAccountSetup(session)]);
+      }).catch(() => {});
       if (syncReplies) syncGmailRepliesAutomatically();
     }
     if (isProfile) loadCandidateProfile();
@@ -1923,6 +1925,45 @@
     }
   }
 
+  let accountSetupRequest = 0;
+  let accountSetup = { cv: null, gmail: null };
+
+  function renderAccountSetup() {
+    const steps = [
+      ["profile", profile ? Boolean(profile.candidate_first_name?.trim() && profile.candidate_last_name?.trim()) : null, "Nom et prénom enregistrés", "Renseigner le nom et le prénom"],
+      ["cv", accountSetup.cv, "CV ajouté ou enregistré", "Ajouter un PDF ou créer un CV"],
+      ["gmail", accountSetup.gmail, "Compte Gmail lié", "Connecter Gmail pour l’envoi et le suivi"]
+    ];
+    let completed = getSession()?.user?.id ? 1 : 0;
+    steps.forEach(([key, done, ready, missing], index) => {
+      const row = document.querySelector('[data-setup="' + key + '"]');
+      row.classList.toggle("done", done === true);
+      row.querySelector("i").textContent = done ? "✓" : String(index + 2);
+      row.querySelector("small").textContent = done === null ? "État indisponible" : done ? ready : missing;
+      if (done) completed++;
+    });
+    document.querySelector("#setup-progress").textContent = completed + "/4";
+  }
+
+  async function refreshAccountSetup(session) {
+    const request = ++accountSetupRequest;
+    const [pdf, variant, gmail] = await Promise.allSettled([
+      documentRequest(session, "list/" + documentsBucket, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prefix: session.user.id + "/cv", limit: 1 })
+      }).then(response => response.json()).then(files => files.some(file => Boolean(file.id))),
+      supabaseFetch("web_cv_variants?select=id&limit=1").then(rows => rows.length > 0),
+      invokeEdgeFunction("gmail-web", { action: "status" }).then(result => result.connected === true)
+    ]);
+    if (request !== accountSetupRequest || getSession()?.user?.id !== session.user.id) return;
+    const hasCv = [pdf, variant].some(result => result.status === "fulfilled" && result.value);
+    accountSetup = {
+      cv: hasCv ? true : pdf.status === "fulfilled" && variant.status === "fulfilled" ? false : null,
+      gmail: gmail.status === "fulfilled" ? gmail.value : null
+    };
+    renderAccountSetup();
+  }
+
   async function loadDashboard() {
     const session = await ensureSession();
     if (!session?.user?.id) {
@@ -1943,8 +1984,7 @@
     profile = Array.isArray(profiles) ? profiles[0] || null : null;
     document.querySelector("#stat-sent").textContent = quota ? String(quota.used) : "—";
     document.querySelector("#monthly-quota-detail").textContent = describeSendQuota(quota);
-    const hasProfile = Boolean(profile?.candidate_first_name && profile?.candidate_last_name);
-    document.querySelector("#setup-progress").textContent = hasProfile ? "2/4" : "1/4";
+    renderAccountSetup();
     renderAccount();
     renderProfile();
     await updateTrackingCounts(session);
@@ -1973,8 +2013,7 @@
       profile = updated;
       renderAccount();
       renderProfile();
-      document.querySelector("#setup-progress").textContent =
-        profile?.candidate_first_name && profile?.candidate_last_name ? "2/4" : "1/4";
+      renderAccountSetup();
       message.textContent = "Profil enregistré.";
     } catch (error) {
       message.textContent = error.message;
@@ -2299,6 +2338,8 @@
   });
   signOutButton.addEventListener("click", () => {
     profile = null;
+    ++accountSetupRequest;
+    accountSetup = { cv: null, gmail: null };
     profileDetailsUser = null;
     ++profileDetailsRequest;
     document.querySelector("#profile-form").reset();

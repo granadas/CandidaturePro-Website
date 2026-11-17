@@ -64,7 +64,13 @@
         </div>
         <div class="dashboard-grid">
           <article class="panel"><div class="panel-head"><div><small>PROCHAINE ÉTAPE</small><h2>Commencez votre recherche</h2></div><span class="badge">Nouveau</span></div><p>Choisissez un secteur et une ville. Candidature Pro vous aidera ensuite à préparer les dossiers adaptés.</p><button class="secondary" data-view-link="companies">Trouver des entreprises</button></article>
-          <article class="panel checklist"><div class="panel-head"><h2>Préparation du compte</h2><span id="setup-progress">1/4</span></div><div class="check done"><i>✓</i><span><b>Compte Candidature Pro</b><small>Connexion Supabase existante</small></span></div><div class="check"><i>2</i><span><b>Compléter le profil</b><small>Informations pour les candidatures</small></span></div><div class="check"><i>3</i><span><b>Ajouter un CV</b><small>PDF ou création guidée</small></span></div><div class="check"><i>4</i><span><b>Connecter Gmail</b><small>Envoi et suivi des réponses</small></span></div></article>
+          <article class="panel checklist">
+            <div class="panel-head"><h2>Préparation du compte</h2><span id="setup-progress" role="status">—</span></div>
+            <div class="check done"><i aria-hidden="true">✓</i><span><b>Compte Candidature Pro</b><small>Session ouverte</small></span></div>
+            <div class="check" data-setup="profile"><i aria-hidden="true">2</i><span><b>Profil</b><small></small></span><button type="button" class="secondary compact" data-view-link="profile">Ouvrir</button></div>
+            <div class="check" data-setup="cv"><i aria-hidden="true">3</i><span><b>CV</b><small></small></span><button type="button" class="secondary compact" data-view-link="documents">Ouvrir</button></div>
+            <div class="check" data-setup="gmail"><i aria-hidden="true">4</i><span><b>Gmail</b><small></small></span><button type="button" class="secondary compact" data-view-link="settings">Ouvrir</button></div>
+          </article>
         </div>
       </section>
 
