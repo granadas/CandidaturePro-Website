@@ -572,25 +572,47 @@
     }).join("");
   }
 
+  async function fetchApplicationPages(path, current) {
+    const pageSize = 500;
+    path += "&order=id.asc&limit=" + pageSize;
+    const rows = [];
+    let cursor = "";
+    while (current()) {
+      const page = await supabaseFetch(path + (cursor ? "&id=gt." + encodeURIComponent(cursor) : ""));
+      rows.push(...page);
+      if (page.length < pageSize) break;
+      cursor = page.at(-1).id;
+    }
+    return rows;
+  }
+
+  let applicationsLoadRequest = 0;
+
   async function loadApplications() {
     const message = document.querySelector("#applications-message");
-    if (!getSession()) {
+    const userId = getSession()?.user?.id;
+    const request = ++applicationsLoadRequest;
+    if (!userId) {
       applications = [];
       renderApplications();
       message.textContent = "Connectez-vous pour afficher vos candidatures.";
       return;
     }
+    const includeHidden = document.querySelector("#show-hidden-applications").checked;
+    const current = () => request === applicationsLoadRequest && getSession()?.user?.id === userId;
     message.textContent = "Chargement…";
     try {
-      const includeHidden = document.querySelector("#show-hidden-applications").checked;
       const filter = includeHidden ? "" : "&hidden_at=is.null";
-      applications = await supabaseFetch(
+      const rows = await fetchApplicationPages(
         "user_applications?select=id,company_name,company_city,company_email,job_title,status,source_url,hidden_at,last_activity_at,sent_at,updated_at" +
-        filter + "&order=last_activity_at.desc"
+        filter, current
       );
+      if (!current()) return;
+      applications = rows.sort((a, b) => Date.parse(b.last_activity_at) - Date.parse(a.last_activity_at) || a.id.localeCompare(b.id));
       renderApplications();
       message.textContent = applications.length + " candidature" + (applications.length > 1 ? "s" : "") + ".";
     } catch (error) {
+      if (!current()) return;
       applications = [];
       renderApplications();
       message.textContent = error.message;
@@ -1017,17 +1039,9 @@
   let trackingLoadRequest = 0;
 
   async function fetchTrackingRows(current) {
-    const pageSize = 500;
     const path = "user_applications?select=id,company_name,company_email,job_title,status,sent_at,next_follow_up_at,last_inbound_at,last_follow_up_sent_at,follow_up_delay_days,hidden_at,last_automatic_reply_at,last_human_reply_at,last_reply_read_at,notes,updated_at,last_activity_at" +
-      "&status=in.(sent,reply_received,interview,accepted,rejected)&order=id.asc&limit=" + pageSize;
-    const rows = [];
-    let cursor = "";
-    while (current()) {
-      const page = await supabaseFetch(path + (cursor ? "&id=gt." + encodeURIComponent(cursor) : ""));
-      rows.push(...page);
-      if (page.length < pageSize) break;
-      cursor = page.at(-1).id;
-    }
+      "&status=in.(sent,reply_received,interview,accepted,rejected)";
+    const rows = await fetchApplicationPages(path, current);
     const reminderTime = row => row.next_follow_up_at ? Date.parse(row.next_follow_up_at) : Infinity;
     return rows.sort((a, b) => reminderTime(a) - reminderTime(b) ||
       Date.parse(b.last_activity_at) - Date.parse(a.last_activity_at) || a.id.localeCompare(b.id));
