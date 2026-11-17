@@ -903,6 +903,7 @@
       waiting: row => row.status === "sent" && !row.last_inbound_at,
       reply: row => Boolean(row.last_inbound_at) || row.status === "reply_received",
       interview: row => row.status === "interview",
+      scheduled: row => Boolean(row.next_follow_up_at) && ["sent", "reply_received"].includes(row.status),
       due: followUpDue
     };
     const matchesFilter = filters[trackingFilter.value] || (() => true);
@@ -983,12 +984,14 @@
     }
   });
 
-  document.querySelector("#dashboard-unread").addEventListener("click", () => {
-    trackingSearch.value = "";
-    trackingHidden.checked = false;
-    trackingFilter.value = "unread";
-    showView("tracking");
-  });
+  for (const [buttonId, filter] of [["dashboard-unread", "unread"], ["dashboard-followups", "scheduled"], ["dashboard-interviews", "interview"]]) {
+    document.querySelector("#" + buttonId).addEventListener("click", () => {
+      trackingSearch.value = "";
+      trackingHidden.checked = false;
+      trackingFilter.value = filter;
+      showView("tracking");
+    });
+  }
 
   trackingSearch.addEventListener("input", applyTrackingFilters);
   trackingFilter.addEventListener("change", applyTrackingFilters);
@@ -1011,11 +1014,32 @@
     }
   });
 
+  let trackingLoadRequest = 0;
+
+  async function fetchTrackingRows(current) {
+    const pageSize = 500;
+    const path = "user_applications?select=id,company_name,company_email,job_title,status,sent_at,next_follow_up_at,last_inbound_at,last_follow_up_sent_at,follow_up_delay_days,hidden_at,last_automatic_reply_at,last_human_reply_at,last_reply_read_at,notes,updated_at,last_activity_at" +
+      "&status=in.(sent,reply_received,interview,accepted,rejected)&order=id.asc&limit=" + pageSize;
+    const rows = [];
+    let cursor = "";
+    while (current()) {
+      const page = await supabaseFetch(path + (cursor ? "&id=gt." + encodeURIComponent(cursor) : ""));
+      rows.push(...page);
+      if (page.length < pageSize) break;
+      cursor = page.at(-1).id;
+    }
+    const reminderTime = row => row.next_follow_up_at ? Date.parse(row.next_follow_up_at) : Infinity;
+    return rows.sort((a, b) => reminderTime(a) - reminderTime(b) ||
+      Date.parse(b.last_activity_at) - Date.parse(a.last_activity_at) || a.id.localeCompare(b.id));
+  }
+
   async function loadTracking() {
     const message = document.querySelector("#tracking-message");
     const list = document.querySelector("#tracking-list");
     const showHidden = trackingHidden.checked;
     const userId = getSession()?.user?.id;
+    const request = ++trackingLoadRequest;
+    const current = () => request === trackingLoadRequest && getSession()?.user?.id === userId && trackingHidden.checked === showHidden;
     trackingRows = [];
     list.replaceChildren();
     updateFollowupSelection();
@@ -1025,12 +1049,8 @@
     }
     message.textContent = "Chargement…";
     try {
-      const rows = await supabaseFetch(
-        "user_applications?select=id,company_name,company_email,job_title,status,sent_at,next_follow_up_at,last_inbound_at,last_follow_up_sent_at,follow_up_delay_days,hidden_at,last_automatic_reply_at,last_human_reply_at,last_reply_read_at,notes,updated_at" +
-        "&status=in.(sent,reply_received,interview,accepted,rejected)" +
-        "&order=next_follow_up_at.asc.nullslast,last_activity_at.desc"
-      );
-      if (getSession()?.user?.id !== userId || trackingHidden.checked !== showHidden) return;
+      const rows = await fetchTrackingRows(current);
+      if (!current()) return;
       const activeRows = rows.filter(row => !row.hidden_at);
       document.querySelector("#tracking-sent-count").textContent = activeRows.filter(row => row.sent_at).length;
       document.querySelector("#tracking-reply-count").textContent = activeRows.filter(row => row.last_human_reply_at).length;
@@ -1069,7 +1089,7 @@
       }).join("");
       applyTrackingFilters();
     } catch (error) {
-      if (getSession()?.user?.id === userId) message.textContent = error.message;
+      if (current()) message.textContent = error.message;
     }
   }
 
