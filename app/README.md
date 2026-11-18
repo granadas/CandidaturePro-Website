@@ -14,14 +14,14 @@ L’espace candidat est servi sur https://candidaturepro.ch/app/. Le domaine `ww
 - Suivi des statuts, notes, réponses non lues et dates de relance.
 - Relances sélectionnées avec proposition IA à insérer après relecture ; brouillons et identifiants d’envoi conservés dans l’onglet jusqu’à l’envoi ou la déconnexion.
 - Préparation d’un nouvel envoi depuis le suivi : copie en brouillon, conservation de l’ancien envoi et réutilisation d’un renvoi déjà en attente.
-- Support et administration des contacts, vérifications, adresses invalides, liste noire, utilisateurs, crédits et actualisation des offres.
+- Support et administration des contacts, vérifications, adresses invalides, liste noire, utilisateurs, crédits et actualisation des offres. Statistiques d’usage communes à Windows, crédits filtrés par mois UTC ou tout l’historique, recherche des comptes par e-mail. Présence estimée parmi les 100 comptes les plus récents : activité de moins de deux minutes, affichage actualisé toutes les 30 secondes. Un onglet web visible signale son activité au maximum une fois par minute entre les onglets d’un même navigateur ; aucun signalement lorsque l’onglet est masqué.
 
 - Mot de passe oublié par lien e-mail PKCE dans le même navigateur ; modification depuis Mon compte avec confirmation du nouveau mot de passe. Aucun changement automatique des identifiants.
 - Sauvegarde ZIP des dossiers, variantes de CV et PDF privés (100 Mo maximum), contrôle d’intégrité CRC et appartenance au compte. Restauration des éléments manquants seulement, sans écraser les éléments existants, modifier l’identité ou les droits, ni importer de jetons Gmail. Les liens de fils Gmail des dossiers supprimés ne sont pas recréés.
 
 ## Configuration
 
-Dans la configuration Auth Supabase, autoriser `https://candidaturepro.ch/app/?recuperation=1` (et l’URL équivalente de préversion) pour le retour des liens de récupération. La livraison réelle du lien et le changement du mot de passe nécessitent une validation par le titulaire du compte.
+Configuration Auth vérifiée le 18 novembre 2026 : URL principale `https://candidaturepro.ch/app/` et quatre retours exacts (production et préversion, avec et sans `?recuperation=1`). Pour une nouvelle installation, autoriser `https://candidaturepro.ch/app/?recuperation=1` (et l’URL équivalente de préversion) pour le retour des liens de récupération. La livraison réelle du lien et le changement du mot de passe nécessitent une validation par le titulaire du compte.
 
 `config.js` contient uniquement l’URL Supabase et une clé publique. Les clés privées, la clé de service et les secrets OAuth restent côté serveur.
 

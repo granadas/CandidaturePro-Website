@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#5b21b6">
   <meta name="description" content="Candidature Pro en ligne : recherchez, préparez, envoyez et suivez vos candidatures.">
   <title>Candidature Pro — Espace en ligne</title>
-  <link rel="stylesheet" href="app.css?v=20261118-cv-docx-review">
+  <link rel="stylesheet" href="app.css?v=20261118-admin-statistics">
 </head>
 <body>
   <main id="guest-home" class="guest-home">
@@ -404,8 +404,11 @@
       <section id="admin-view" class="view">
         <article class="panel">
           <h2>Administration</h2>
-          <label>Vue<select id="admin-mode"><option value="blacklist">Liste noire</option><option value="audit">Historique</option><option value="credits">Crédits fournisseurs</option><option value="job-market">Actualisation des offres</option><option value="contacts">Changements de contact</option><option value="invalid">E-mails incorrects</option><option value="verification">Vérifications entreprises</option><option value="reports">Signalements</option><option value="users">Utilisateurs</option><option value="identity">Corrections d’identité</option></select></label>
+          <label>Vue<select id="admin-mode"><option value="blacklist">Liste noire</option><option value="audit">Historique</option><option value="statistics">Statistiques d’usage</option><option value="online">Utilisateurs en ligne</option><option value="credits">Crédits fournisseurs</option><option value="job-market">Actualisation des offres</option><option value="contacts">Changements de contact</option><option value="invalid">E-mails incorrects</option><option value="verification">Vérifications entreprises</option><option value="reports">Signalements</option><option value="users">Utilisateurs</option><option value="identity">Corrections d’identité</option></select></label>
+          <div id="admin-user-controls" class="admin-filters" hidden><label>Rechercher un compte par e-mail<input id="admin-user-search" type="search" maxlength="254" autocomplete="off" placeholder="Adresse e-mail ou partie de l’adresse"></label></div>
+          <div id="admin-credit-controls" class="admin-filters" hidden><label>Période des crédits<input id="admin-credit-month" type="month" min="2000-01"></label><small>Sans mois sélectionné : tout l’historique. Le regroupement mensuel utilise les dates du serveur (UTC).</small><button id="admin-credit-current" type="button" class="secondary compact">Ce mois</button><button id="admin-credit-all" type="button" class="secondary compact">Tout l’historique</button></div>
           <button type="button" class="secondary" id="admin-refresh">Actualiser</button>
+          <p id="admin-updated" class="muted"></p>
           <p id="admin-status" role="status"></p>
           <div id="admin-results" class="applications-list"></div>
         </article>
@@ -605,6 +608,7 @@
   <script src="backup.js?v=20261118"></script>
   <script src="pdf-import.js?v=20261118"></script>
   <script src="cv-import.js?v=20261118"></script>
-  <script src="app.js?v=20261118-cv-docx-review"></script>
+  <script src="admin-tools.js?v=20261118"></script>
+  <script src="app.js?v=20261118-admin-statistics"></script>
 </body>
 </html>

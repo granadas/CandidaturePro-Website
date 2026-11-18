@@ -28,7 +28,7 @@
     documents: ["Documents", "CV et lettres de motivation"],
     premium: ["Premium", "Votre formule et les conditions Premium"],
     support: ["Support", "Assistance Candidature Pro"],
-    admin: ["Administration", "Liste noire, historique et crédits"],
+    admin: ["Administration", "Statistiques, utilisateurs et gestion du service"],
     settings: ["Paramètres", "Compte, e-mail et préférences"]
   };
 
@@ -1582,6 +1582,8 @@
   const adminViews = {
     blacklist: ["admin_list_blacklisted_companies", {}],
     audit: ["admin_list_audit_log", { p_limit: 100 }],
+    statistics: ["admin_get_statistics", {}],
+    online: ["admin_list_users", { p_search: "" }],
     credits: ["admin_get_credit_usage_statistics", { p_month: null }],
     "job-market": ["admin_job_market_refresh_statistics", {}],
     contacts: ["admin_list_company_email_change_requests", {}],
@@ -1592,6 +1594,73 @@
     identity: ["admin_list_web_identity_requests", {}]
   };
   let adminRequest = 0;
+
+  const adminUserControls = document.querySelector("#admin-user-controls"), adminUserSearch = document.querySelector("#admin-user-search");
+  const adminCreditControls = document.querySelector("#admin-credit-controls"), adminCreditMonth = document.querySelector("#admin-credit-month");
+  const adminUpdated = document.querySelector("#admin-updated");
+  const monthParts = new Intl.DateTimeFormat("en", { timeZone: "Europe/Zurich", year: "numeric", month: "2-digit" }).formatToParts(new Date());
+  const adminCurrentMonth = monthParts.find(part => part.type === "year").value + "-" + monthParts.find(part => part.type === "month").value;
+  adminCreditMonth.max = adminCurrentMonth;
+  let adminInFlight = null, adminSearchTimer = null;
+
+  function renderAdminMetrics(rows, credits) {
+    const descriptions = credits ? [
+      ["summary", "Consommation totale"], ["provider", "Par fournisseur"], ["user", "Par utilisateur"], ["operation", "Par opération"]
+    ] : [
+      ["summary_searches", "Recherches d’entreprises"], ["summary_applications", "Candidatures comptabilisées"],
+      ["search_sector", "Secteurs les plus recherchés"], ["top_company", "Entreprises les plus ciblées"], ["top_user", "Utilisateurs les plus actifs"]
+    ];
+    const displayed = new Set();
+    function group(category, label) {
+      const matching = rows.filter(row => row.category === category);
+      if (!matching.length) return;
+      displayed.add(category);
+      const section = document.createElement("section"); section.className = "admin-metric-group";
+      const title = document.createElement("h3"); title.textContent = label; section.append(title);
+      const list = document.createElement("dl"); list.className = "admin-metric-list";
+      for (const row of matching) {
+        const line = document.createElement("div"), term = document.createElement("dt"), amount = document.createElement("dd");
+        term.textContent = row.label || "Mesure";
+        if (row.detail) { const note = document.createElement("small"); note.textContent = row.detail; term.append(note); }
+        amount.textContent = credits ? window.CP_ADMIN_TOOLS.count(row.credits) + " crédits · " + window.CP_ADMIN_TOOLS.money(row.estimated_cost_chf) : window.CP_ADMIN_TOOLS.count(row.total);
+        line.append(term, amount); list.append(line);
+      }
+      section.append(list); adminResults.append(section);
+    }
+    for (const [category, title] of descriptions) group(category, title);
+    for (const row of rows) if (!displayed.has(row.category)) group(row.category, row.category || "Autres mesures");
+    const caption = document.createElement("p"); caption.className = "muted";
+    caption.textContent = credits ? "Coûts estimés selon les tarifs enregistrés lors des appels. La navigation dans les offres n’utilise pas de crédit de recherche."
+      : "Statistiques partagées avec l’application Windows. Les candidatures comptabilisées correspondent aux envois confirmés. Ces totaux ne sont pas limités au mois affiché dans les crédits.";
+    adminResults.append(caption);
+  }
+
+  async function touchWebPresence() {
+    const userId = getSession()?.user?.id;
+    if (!userId || !profile || document.hidden || webPresenceInFlight) return;
+    const now = Date.now(), key = "candidature-pro-web-presence:" + userId;
+    let lastAttempt = webPresenceLast.userId === userId ? webPresenceLast.time : 0;
+    try { lastAttempt = Math.max(lastAttempt, Number(localStorage.getItem(key)) || 0); } catch { /* Memory throttle remains available. */ }
+    if (lastAttempt <= now && now - lastAttempt < 60000) return;
+    webPresenceLast = { userId, time: now };
+    try { localStorage.setItem(key, String(now)); } catch { /* A storage restriction must not block the app. */ }
+    webPresenceInFlight = true;
+    try {
+      const session = await ensureSession();
+      if (session?.user?.id !== userId || document.hidden) return;
+      await fetch(config.supabaseUrl + "/rest/v1/rpc/touch_my_profile", {
+        method: "POST", headers: { apikey: config.supabasePublishableKey, Authorization: "Bearer " + session.access_token, "Content-Type": "application/json" },
+        body: JSON.stringify({ p_app_version: "web-2026.11.18" }), signal: AbortSignal.timeout(10000)
+      });
+    } catch { /* Presence is approximate and must not block candidate actions. */ }
+    finally { webPresenceInFlight = false; }
+  }
+  let webPresenceInFlight = false, webPresenceLast = { userId: null, time: 0 };
+  setInterval(() => {
+    void touchWebPresence();
+    if (!document.hidden && profile?.is_admin === true && adminMode.value === "online" && document.querySelector("#admin-view").classList.contains("active")) void loadAdmin({ quiet: true });
+  }, 30000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) void touchWebPresence(); });
 
   const verificationSources = new Map([
     ["replacement_after_invalid_email", "Remplacement d’un e-mail confirmé invalide"],
@@ -1773,24 +1842,45 @@
 
   let adminJobRefreshRunning = false;
 
-  async function loadAdmin() {
+  async function loadAdmin({ quiet = false } = {}) {
     if (profile?.is_admin !== true) return;
     const userId = getSession()?.user?.id;
-    const request = ++adminRequest;
     const mode = adminMode.value;
-    const [rpc, args] = adminViews[mode];
-    adminResults.replaceChildren();
-    adminStatus.textContent = "Chargement…";
-    const current = () => request === adminRequest && getSession()?.user?.id === userId;
+    if (!userId || !Object.hasOwn(adminViews, mode)) return;
+    if (quiet && adminInFlight?.userId === userId && adminInFlight?.mode === mode) return;
+    const request = ++adminRequest;
+    adminInFlight = { userId, mode, request };
+    adminUserControls.hidden = mode !== "users";
+    adminCreditControls.hidden = mode !== "credits";
+    const [rpc, defaults] = adminViews[mode];
+    const args = { ...defaults };
+    if (mode === "users") args.p_search = adminUserSearch.value.trim();
+    if (mode === "credits") {
+      try { args.p_month = window.CP_ADMIN_TOOLS.monthParameter(adminCreditMonth.value, adminCurrentMonth); }
+      catch (error) { adminStatus.textContent = error.message; adminInFlight = null; return; }
+    }
+    if (!quiet) { adminResults.replaceChildren(); adminUpdated.textContent = ""; adminStatus.textContent = "Chargement…"; }
+    const current = () => request === adminRequest && getSession()?.user?.id === userId && profile?.is_admin === true && adminMode.value === mode;
     try {
-      const rows = await supabaseRpc(rpc, args);
+      let rows = await supabaseRpc(rpc, args);
       if (!current()) return;
+      if (!Array.isArray(rows)) throw new Error("La réponse d’administration est invalide.");
+      adminResults.replaceChildren();
+      adminUpdated.textContent = "Actualisé à " + new Intl.DateTimeFormat("fr-CH", { timeZone: "Europe/Zurich", timeStyle: "short" }).format(new Date());
+      if (["statistics", "credits"].includes(mode)) {
+        adminStatus.textContent = rows.length ? "" : "Aucune donnée pour cette période.";
+        renderAdminMetrics(rows, mode === "credits"); return;
+      }
+      if (mode === "online") {
+        rows = window.CP_ADMIN_TOOLS.onlineUsers(rows);
+        adminStatus.textContent = rows.length + " utilisateur(s) actif(s) au cours des 2 dernières minutes, parmi les 100 comptes les plus récents. Actualisation toutes les 30 secondes lorsque cette vue est visible.";
+      }
       if (mode === "job-market") {
         adminStatus.textContent = "";
         renderAdminJobMarket(rows[0], current);
         return;
       }
-      adminStatus.textContent = rows.length ? "" : "Aucun résultat.";
+      if (mode !== "online") adminStatus.textContent = rows.length ? (mode === "users" ? rows.length + " compte(s) affiché(s), au maximum 100. Affinez la recherche pour retrouver un compte plus ancien." : "") : "Aucun résultat.";
       for (const row of rows) {
         const card = document.createElement("article");
         card.className = "application-row";
@@ -1804,7 +1894,7 @@
           mode === "invalid" ? [row.email, row.reason, row.reply_subject, row.reply_body].filter(Boolean).join(" · ") :
           mode === "verification" ? [row.city, row.address, row.website, row.status].filter(Boolean).join(" · ") :
           mode === "reports" ? [row.category, row.description, row.steps, row.status].filter(Boolean).join(" · ") :
-          [row.plan, row.is_admin ? "Administrateur" : "", row.last_seen_at].filter(Boolean).join(" · ");
+          [row.plan === "premium" ? "Premium" : "Gratuit", row.is_admin ? "Administrateur" : "", mode === "online" ? "Actif récemment" : "", row.last_seen_at ? "Dernière activité : " + new Intl.DateTimeFormat("fr-CH", { timeZone: "Europe/Zurich", dateStyle: "medium", timeStyle: "short" }).format(new Date(row.last_seen_at)) : "Aucune activité enregistrée"].filter(Boolean).join(" · ");
         card.append(title, details);
         if (mode === "verification") appendVerificationDetails(card, row, current);
         if (mode === "blacklist") {
@@ -1868,11 +1958,18 @@
       }
     } catch (error) {
       if (current()) adminStatus.textContent = error.message;
-    }
+    } finally { if (adminInFlight?.request === request) adminInFlight = null; }
   }
 
   adminMode.addEventListener("change", loadAdmin);
   document.querySelector("#admin-refresh").addEventListener("click", loadAdmin);
+  adminUserSearch.addEventListener("input", () => {
+    clearTimeout(adminSearchTimer);
+    adminSearchTimer = setTimeout(() => { if (adminMode.value === "users" && document.querySelector("#admin-view").classList.contains("active")) void loadAdmin(); }, 350);
+  });
+  adminCreditMonth.addEventListener("change", loadAdmin);
+  document.querySelector("#admin-credit-current").addEventListener("click", () => { adminCreditMonth.value = adminCurrentMonth; void loadAdmin(); });
+  document.querySelector("#admin-credit-all").addEventListener("click", () => { adminCreditMonth.value = ""; void loadAdmin(); });
 
   const supportForm = document.querySelector("#support-report");
   supportForm.addEventListener("submit", async event => {
@@ -2883,6 +2980,7 @@
     const firstProfile = !profile;
     profile = Array.isArray(profiles) ? profiles[0] || null : null;
     accountLastRefreshed = Date.now();
+    void touchWebPresence();
     document.querySelector("#stat-sent").textContent = quota ? String(quota.used) : "—";
     document.querySelector("#monthly-quota-detail").textContent = describeSendQuota(quota);
     renderAccountSetup();
@@ -3261,7 +3359,7 @@
     cvAnalysisResults.hidden = true; cvAnalysisStatus.textContent = "";
     cvAnalysisHistoryStatus.textContent = "";
     document.querySelector("#cv-analysis-target").value = "";
-    ++adminRequest;
+    ++adminRequest; adminInFlight = null; clearTimeout(adminSearchTimer); adminUserSearch.value = ""; adminCreditMonth.value = ""; adminUpdated.textContent = "";
     adminResults.replaceChildren();
     ++cvLoadRequest; ++cvPhotoRequest; clearCvPdfImport();
     cvForm.reset(); cvForm.elements.namedItem("photo").value = ""; renderCvPhoto();
