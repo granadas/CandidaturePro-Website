@@ -2456,6 +2456,21 @@
       "Aucune correspondance exacte. Vous pouvez ajuster votre CV avant l’aperçu.";
   });
 
+  document.querySelector("#cv-word-export").addEventListener("click", () => {
+    if (!getSession()?.user?.id || !cvForm.reportValidity()) return;
+    try {
+      const fields = Object.fromEntries(cvFieldNames.map(name => [name, cvForm.elements.namedItem(name).value.trim()]));
+      if (!hasPremiumCv()) fields.template = "classic";
+      const blob = window.CP_CV_WORD.create(fields), url = URL.createObjectURL(blob), link = document.createElement("a");
+      link.href = url;
+      const label = (cvLabel.value.trim() || fields.name).replace(/[\\/:*?"<>|\x00-\x1f\x7f]/g, "_").slice(0, 80);
+      link.download = "CandidaturePro_CV_" + label + ".docx";
+      document.body.append(link); link.click(); link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+      cvSaveStatus.textContent = "CV Word préparé. Vérifiez la mise en page dans votre traitement de texte ; le téléchargement n’enregistre pas la variante sur votre compte.";
+    } catch (error) { cvSaveStatus.textContent = error.message; }
+  });
+
   cvForm.addEventListener("submit", event => {
     event.preventDefault();
     if (!getSession()?.user?.id) return;
