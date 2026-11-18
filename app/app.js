@@ -2131,7 +2131,12 @@
   const cvPhotoThumbnail = document.querySelector("#cv-photo-thumbnail");
   const cvPhotoStatus = document.querySelector("#cv-photo-status");
   const cvPhotoRemove = document.querySelector("#cv-photo-remove");
-  let cvPhotoRequest = 0;
+  let cvPhotoRequest = 0, cvPhotoPreparing = false;
+  function cvPhotoReady() {
+    if (!cvPhotoPreparing) return true;
+    cvSaveStatus.textContent = "Attendez la fin de la préparation de la photo avant d’enregistrer ou d’exporter le CV.";
+    return false;
+  }
 
   function validCvPhoto(value) {
     return typeof value === "string" && value.length <= 100000 &&
@@ -2148,7 +2153,7 @@
   }
 
   cvPhotoRemove.addEventListener("click", () => {
-    ++cvPhotoRequest;
+    ++cvPhotoRequest; cvPhotoPreparing = false;
     cvForm.elements.namedItem("photo").value = ""; cvPhotoFile.value = "";
     renderCvPhoto();
     cvPhotoStatus.textContent = "Photo retirée du formulaire. Enregistrez la variante pour conserver cette modification.";
@@ -2158,11 +2163,11 @@
     const file = cvPhotoFile.files?.[0];
     const userId = getSession()?.user?.id;
     if (!file || !userId) return;
-    const request = ++cvPhotoRequest;
+    const request = ++cvPhotoRequest; cvPhotoPreparing = false;
     if (!["image/jpeg", "image/png"].includes(file.type) || file.size > 5 * 1024 * 1024) {
       cvPhotoStatus.textContent = "Choisissez une image JPG ou PNG de 5 Mo maximum."; cvPhotoFile.value = ""; return;
     }
-    cvPhotoStatus.textContent = "Préparation de la photo…";
+    cvPhotoPreparing = true; cvPhotoStatus.textContent = "Préparation de la photo…";
     let bitmap;
     try {
       bitmap = await createImageBitmap(file);
@@ -2184,7 +2189,7 @@
       if (request === cvPhotoRequest && getSession()?.user?.id === userId) cvPhotoStatus.textContent = error.message || "Impossible de lire cette photo.";
     } finally {
       bitmap?.close();
-      if (request === cvPhotoRequest) cvPhotoFile.value = "";
+      if (request === cvPhotoRequest) { cvPhotoFile.value = ""; cvPhotoPreparing = false; }
     }
   });
 
@@ -2252,7 +2257,7 @@
       if (beforeLabel !== cvLabel.value || beforeVariant !== editingCvId || before !== JSON.stringify(cvFieldNames.map(name => cvForm.elements.namedItem(name).value))) throw new Error("Vos modifications ont été conservées. Rouvrez le CV lorsque vous êtes prêt à remplacer le formulaire.");
       for (const name of cvFieldNames) cvForm.elements.namedItem(name).value = typeof variant.fields[name] === "string" ? variant.fields[name] : "";
       if (!cvForm.elements.template.value) cvForm.elements.template.value = "classic";
-      ++cvPhotoRequest; cvPhotoFile.value = ""; renderCvPhoto();
+      ++cvPhotoRequest; cvPhotoPreparing = false; cvPhotoFile.value = ""; renderCvPhoto();
       cvPhotoStatus.textContent = "La photo affichée appartient à cette variante.";
       cvLabel.value = variant.label;
       editingCvId = variant.id;
@@ -2266,7 +2271,7 @@
   });
 
   document.querySelector("#cv-new").addEventListener("click", () => {
-    ++cvLoadRequest; ++cvPhotoRequest; clearCvPdfImport();
+    ++cvLoadRequest; ++cvPhotoRequest; cvPhotoPreparing = false; clearCvPdfImport();
     cvForm.reset(); cvForm.elements.namedItem("photo").value = ""; renderCvPhoto();
     cvPhotoStatus.textContent = "La photo sera conservée avec la variante lorsque vous l’enregistrez.";
     editingCvId = null;
@@ -2305,7 +2310,7 @@
   for (const [buttonId, copy] of [["cv-save", false], ["cv-save-copy", true]]) {
     document.querySelector("#" + buttonId).addEventListener("click", async () => {
       const userId = getSession()?.user?.id;
-      if (!userId || cvForm.dataset.saving || cvDelete.disabled || !cvForm.reportValidity()) return;
+      if (!userId || cvForm.dataset.saving || cvDelete.disabled || !cvForm.reportValidity() || !cvPhotoReady()) return;
       const fields = Object.fromEntries(cvFieldNames.map(name => [name, cvForm.elements.namedItem(name).value.trim()]));
       const label = cvLabel.value.trim() || fields.title;
       if (new TextEncoder().encode(JSON.stringify(fields)).length > 150000) {
@@ -2479,7 +2484,7 @@
   });
 
   document.querySelector("#cv-word-export").addEventListener("click", () => {
-    if (!getSession()?.user?.id || !cvForm.reportValidity()) return;
+    if (!getSession()?.user?.id || !cvForm.reportValidity() || !cvPhotoReady()) return;
     try {
       const fields = Object.fromEntries(cvFieldNames.map(name => [name, cvForm.elements.namedItem(name).value.trim()]));
       if (!hasPremiumCv()) fields.template = "classic";
@@ -2495,7 +2500,7 @@
 
   cvForm.addEventListener("submit", event => {
     event.preventDefault();
-    if (!getSession()?.user?.id) return;
+    if (!getSession()?.user?.id || !cvPhotoReady()) return;
     const data = new FormData(cvForm);
     const preview = document.querySelector("#cv-preview");
     preview.replaceChildren();
@@ -3398,7 +3403,7 @@
     document.querySelector("#cv-analysis-target").value = "";
     ++adminRequest; adminInFlight = null; clearTimeout(adminSearchTimer); adminUserSearch.value = ""; adminCreditMonth.value = ""; adminUpdated.textContent = "";
     adminResults.replaceChildren();
-    ++cvLoadRequest; ++cvPhotoRequest; clearCvPdfImport();
+    ++cvLoadRequest; ++cvPhotoRequest; cvPhotoPreparing = false; clearCvPdfImport();
     cvForm.reset(); cvForm.elements.namedItem("photo").value = ""; renderCvPhoto();
     cvPhotoStatus.textContent = "";
     savedCvVariants = [];
