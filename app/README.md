@@ -16,7 +16,7 @@ L’espace candidat est servi sur https://candidaturepro.ch/app/. Le domaine `ww
 - Préparation d’un nouvel envoi depuis le suivi : copie en brouillon, conservation de l’ancien envoi et réutilisation d’un renvoi déjà en attente.
 - Support et administration des contacts, vérifications, adresses invalides, liste noire, utilisateurs, crédits et actualisation des offres. Statistiques d’usage communes à Windows, crédits filtrés par mois UTC ou tout l’historique, recherche des comptes par e-mail. Présence estimée parmi les 100 comptes les plus récents : activité de moins de deux minutes, affichage actualisé toutes les 30 secondes. Un onglet web visible signale son activité au maximum une fois par minute entre les onglets d’un même navigateur ; aucun signalement lorsque l’onglet est masqué.
 
-- Mot de passe oublié par lien e-mail PKCE dans le même navigateur ; modification depuis Mon compte avec confirmation du nouveau mot de passe. Aucun changement automatique des identifiants.
+- Mot de passe oublié par lien e-mail PKCE dans le même navigateur, disponible aussi depuis les paramètres sans déconnexion ; modification depuis Mon compte avec confirmation du nouveau mot de passe. Aucun changement automatique des identifiants.
 - Sauvegarde ZIP des dossiers, variantes de CV et PDF privés (100 Mo maximum), contrôle d’intégrité CRC et appartenance au compte. Restauration des éléments manquants seulement, sans écraser les éléments existants, modifier l’identité ou les droits, ni importer de jetons Gmail. Les liens de fils Gmail des dossiers supprimés ne sont pas recréés.
 
 ## Configuration

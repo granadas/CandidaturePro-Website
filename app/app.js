@@ -190,29 +190,51 @@
     passwordDialog.showModal();
   }
 
-  passwordForgot.addEventListener("click", async () => {
-    const emailField = document.querySelector("#email");
-    if (passwordForgot.disabled || !emailField.reportValidity()) return;
-    const email = emailField.value.trim().toLowerCase();
+  const passwordRecoverySend = document.querySelector("#password-recovery-send");
+  const passwordRecoveryStatus = document.querySelector("#password-recovery-status");
+  let passwordRecoveryBusy = false;
+  async function requestPasswordRecovery(email, status) {
     const submit = document.querySelector("#login-submit");
-    if (submit.disabled) return;
-    passwordForgot.disabled = submit.disabled = true;
-    loginMessage.textContent = "Préparation du lien de récupération…";
+    if (passwordRecoveryBusy || submit.disabled || !email) return;
+    passwordRecoveryBusy = true;
+    passwordRecoverySend.disabled = passwordForgot.disabled = submit.disabled = true;
+    status.textContent = "Préparation du lien de récupération…";
+    let storedFlow = null, previousFlow = null;
     try {
       const verifier = gmailEncode(crypto.getRandomValues(new Uint8Array(32)));
       const challenge = gmailEncode(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))));
-      localStorage.setItem(recoveryFlowKey, JSON.stringify({ verifier, email, startedAt: Date.now() }));
+      previousFlow = localStorage.getItem(recoveryFlowKey);
+      storedFlow = JSON.stringify({ verifier, email, startedAt: Date.now() });
+      localStorage.setItem(recoveryFlowKey, storedFlow);
       const redirect = new URL(location.pathname, location.origin); redirect.searchParams.set("recuperation", "1");
       const response = await fetch(config.supabaseUrl + "/auth/v1/recover?redirect_to=" + encodeURIComponent(redirect.href), {
         method: "POST", headers: { apikey: config.supabasePublishableKey, "Content-Type": "application/json" },
         body: JSON.stringify({ email, code_challenge: challenge, code_challenge_method: "s256" }), signal: AbortSignal.timeout(15000)
       });
       const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(authErrorMessage(result, "Impossible d’envoyer le lien de récupération."));
-      loginMessage.textContent = "Si cette adresse correspond à un compte, un lien de récupération a été envoyé. Ouvrez-le dans ce même navigateur. Vérifiez aussi les courriers indésirables.";
+      if (!response.ok) {
+        if (localStorage.getItem(recoveryFlowKey) === storedFlow) {
+          if (previousFlow) localStorage.setItem(recoveryFlowKey, previousFlow); else localStorage.removeItem(recoveryFlowKey);
+        }
+        throw new Error(authErrorMessage(result, "Impossible d’envoyer le lien de récupération."));
+      }
+      status.textContent = "Si cette adresse correspond à un compte, un lien de récupération a été envoyé. Ouvrez-le dans ce même navigateur. Vérifiez aussi les courriers indésirables.";
     } catch (error) {
-      loginMessage.textContent = error.name === "TimeoutError" ? "Le service met trop de temps à répondre. Vérifiez votre boîte e-mail avant une nouvelle demande." : error.message;
-    } finally { passwordForgot.disabled = submit.disabled = false; }
+      status.textContent = ["TimeoutError", "AbortError", "TypeError"].includes(error.name)
+        ? "La demande a peut-être abouti. Vérifiez votre boîte e-mail et ouvrez le lien dans ce navigateur avant une nouvelle demande." : error.message;
+    } finally { passwordRecoveryBusy = false; passwordRecoverySend.disabled = passwordForgot.disabled = submit.disabled = false; }
+  }
+  passwordForgot.addEventListener("click", async () => {
+    const emailField = document.querySelector("#email");
+    if (passwordForgot.disabled || !emailField.reportValidity()) return;
+    await requestPasswordRecovery(emailField.value.trim().toLowerCase(), loginMessage);
+  });
+  passwordRecoverySend.addEventListener("click", async () => {
+    const userId = getSession()?.user?.id;
+    if (!userId || passwordRecoverySend.disabled) return;
+    const session = await ensureSession();
+    if (session?.user?.id !== userId || !session.user.email) return;
+    await requestPasswordRecovery(session.user.email.trim().toLowerCase(), passwordRecoveryStatus);
   });
 
   document.querySelector("#password-change-open").addEventListener("click", async () => {
@@ -3355,7 +3377,7 @@
     else dialog.showModal();
   });
   signOutButton.addEventListener("click", () => {
-    profile = null;
+    profile = null; passwordRecoveryStatus.textContent = "";
     ++backupRequest; backupCandidate = null; backupFile.value = ""; backupPreview.textContent = backupStatus.textContent = "";
     if (passwordDialog.open) passwordDialog.close();
     ++accountSetupRequest;
