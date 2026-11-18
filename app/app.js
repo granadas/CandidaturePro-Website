@@ -297,6 +297,7 @@
     const form = document.querySelector("#profile-form");
     const status = document.querySelector("#profile-message");
     renderProfile();
+    loadIdentityChangeStatus();
     if (!userId || profileDetailsUser === userId) return;
     form.querySelectorAll("input, textarea, button").forEach(element => { element.disabled = true; });
     status.textContent = "Chargement du profil…";
@@ -316,13 +317,84 @@
     const session = getSession();
     const form = document.querySelector("#profile-form");
     const message = document.querySelector("#profile-message");
-    const enabled = Boolean(session?.user?.id);
+    const enabled = Boolean(session?.user?.id && profile);
     form.querySelectorAll("input, textarea, button").forEach(element => { element.disabled = !enabled || profileDetailsUser !== session?.user?.id; });
     document.querySelector("#profile-first-name").value = profile?.candidate_first_name || "";
     document.querySelector("#profile-last-name").value = profile?.candidate_last_name || "";
     document.querySelector("#profile-email").value = profile?.candidate_email || session?.user?.email || "";
-    message.textContent = enabled ? "" : "Connectez-vous pour compléter votre profil.";
+    message.textContent = enabled ? "" : session?.user?.id ? "Chargement du compte…" : "Connectez-vous pour compléter votre profil.";
+    renderIdentityState();
   }
+
+  function candidateIdentityLocked() {
+    return [profile?.candidate_first_name, profile?.candidate_last_name, profile?.candidate_email]
+      .every(value => typeof value === "string" && Boolean(value.trim()));
+  }
+
+  function renderIdentityState() {
+    const locked = candidateIdentityLocked();
+    for (const id of ["profile-first-name", "profile-last-name", "profile-email"]) document.querySelector("#" + id).readOnly = locked;
+    document.querySelector("#profile-identity-status").textContent = !profile ? "Vérification de l’identité…" : locked
+      ? "Identité enregistrée et verrouillée. Les informations complémentaires restent modifiables."
+      : "Le prénom, le nom et l’e-mail seront verrouillés après confirmation, comme dans l’application Windows.";
+    document.querySelector("#profile-submit").textContent = locked ? "Enregistrer les informations complémentaires" : "Enregistrer et verrouiller mon identité";
+    document.querySelector("#identity-change-panel").hidden = !locked;
+  }
+
+  const identityChangePanel = document.querySelector("#identity-change-panel");
+  const identityChangeForm = document.querySelector("#identity-change-form");
+  const identityChangeStatus = document.querySelector("#identity-change-status");
+  const identityChangeSubmit = identityChangeForm.querySelector("button");
+  let identityChangeRequest = 0;
+
+  identityChangePanel.addEventListener("toggle", () => {
+    if (!identityChangePanel.open) return;
+    for (const [name, value] of [["first", profile?.candidate_first_name], ["last", profile?.candidate_last_name], ["email", profile?.candidate_email]]) {
+      if (!identityChangeForm.elements.namedItem(name).value) identityChangeForm.elements.namedItem(name).value = value || "";
+    }
+    loadIdentityChangeStatus();
+  });
+
+  async function loadIdentityChangeStatus() {
+    const userId = getSession()?.user?.id;
+    const request = ++identityChangeRequest;
+    if (!userId || !candidateIdentityLocked()) return;
+    identityChangeSubmit.disabled = true;
+    identityChangeStatus.textContent = "Vérification des demandes…";
+    try {
+      const rows = await supabaseFetch("candidate_identity_change_requests?user_id=eq." + encodeURIComponent(userId) +
+        "&select=id,status,requested_first_name,requested_last_name,requested_email,admin_note&order=created_at.desc,id.desc&limit=50");
+      if (request !== identityChangeRequest || getSession()?.user?.id !== userId) return;
+      const pending = rows.find(row => row.status === "pending");
+      identityChangeSubmit.disabled = Boolean(pending);
+      const latest = rows[0];
+      identityChangeStatus.textContent = pending
+        ? "Demande en attente : " + [pending.requested_first_name, pending.requested_last_name, pending.requested_email].filter(Boolean).join(" · ")
+        : latest ? (latest.status === "approved" ? "Dernière correction approuvée." : "Dernière demande refusée.") + (latest.admin_note ? " " + latest.admin_note : "")
+        : "Aucune demande en attente.";
+    } catch (error) {
+      if (request === identityChangeRequest && getSession()?.user?.id === userId) identityChangeStatus.textContent = error.message;
+    }
+  }
+
+  identityChangeForm.addEventListener("submit", async event => {
+    event.preventDefault();
+    const userId = getSession()?.user?.id;
+    if (!userId || !candidateIdentityLocked() || identityChangeSubmit.disabled || !identityChangeForm.reportValidity()) return;
+    identityChangeSubmit.disabled = true;
+    const data = new FormData(identityChangeForm);
+    try {
+      const result = await supabaseRpc("submit_web_identity_change", {
+        p_first_name: String(data.get("first")).trim(), p_last_name: String(data.get("last")).trim(),
+        p_email: String(data.get("email")).trim(), p_reason: String(data.get("reason")).trim()
+      });
+      if (getSession()?.user?.id !== userId) return;
+      if (!result?.id) throw new Error("La demande n’a pas pu être confirmée.");
+      await loadIdentityChangeStatus();
+    } catch (error) {
+      if (getSession()?.user?.id === userId) { identityChangeStatus.textContent = error.message; identityChangeSubmit.disabled = false; }
+    }
+  });
 
   function escapeHtml(value) {
     return String(value ?? "").replace(/[&<>"']/g, character => ({
@@ -1393,7 +1465,8 @@
     invalid: ["admin_list_invalid_company_email_reports", {}],
     verification: ["admin_list_company_manual_verifications", {}],
     reports: ["admin_list_support_reports", {}],
-    users: ["admin_list_users", { p_search: "" }]
+    users: ["admin_list_users", { p_search: "" }],
+    identity: ["admin_list_web_identity_requests", {}]
   };
   let adminRequest = 0;
 
@@ -1599,9 +1672,9 @@
         const card = document.createElement("article");
         card.className = "application-row";
         const title = document.createElement("strong");
-        title.textContent = row.company_name || row.label || row.title || row.email || row.action || "";
+        title.textContent = mode === "identity" ? [row.current_first_name, row.current_last_name, row.current_email].filter(Boolean).join(" · ") : row.company_name || row.label || row.title || row.email || row.action || "";
         const details = document.createElement("p");
-        details.textContent = mode === "blacklist" ? [row.city, row.sector, row.inactive_reason, row.inactive_at ? trackingDateFormat.format(new Date(row.inactive_at)) : ""].filter(Boolean).join(" · ") :
+        details.textContent = mode === "identity" ? "Identité demandée : " + [row.requested_first_name, row.requested_last_name, row.requested_email].filter(Boolean).join(" · ") + " — Motif : " + row.reason : mode === "blacklist" ? [row.city, row.sector, row.inactive_reason, row.inactive_at ? trackingDateFormat.format(new Date(row.inactive_at)) : ""].filter(Boolean).join(" · ") :
           mode === "audit" ? [row.summary, row.created_at].filter(Boolean).join(" · ") :
           mode === "credits" ? [row.category, row.credits + " crédits", row.estimated_cost_chf + " CHF", row.detail].filter(Boolean).join(" · ") :
           mode === "contacts" ? [row.city, row.current_email, row.proposed_email, row.reply_subject, row.reply_body].filter(Boolean).join(" · ") :
@@ -1637,21 +1710,22 @@
           });
           card.append(restore);
         }
-        if (mode === "contacts" || mode === "invalid") {
+        if (mode === "contacts" || mode === "invalid" || mode === "identity") {
           const review = document.createElement("form");
           review.innerHTML = '<label>Note administrateur<input name="note" maxlength="2000"></label>' +
             '<button type="submit" class="primary" value="approve">' +
-            (mode === "contacts" ? "Approuver le changement" : "Confirmer l’adresse invalide") +
+            (mode === "identity" ? "Approuver la correction d’identité" : mode === "contacts" ? "Approuver le changement" : "Confirmer l’adresse invalide") +
             '</button> <button type="submit" class="secondary" value="reject">Refuser</button>';
           review.addEventListener("submit", async event => {
             event.preventDefault();
             if (!event.submitter || !current() || profile?.is_admin !== true) return;
             const approved = event.submitter.value === "approve";
+            if (mode === "identity" && approved && !window.confirm("Approuver cette correction d’identité pour " + (row.current_email || row.user_id) + " ? Nouvelle identité : " + [row.requested_first_name, row.requested_last_name, row.requested_email].join(" · "))) return;
             const note = new FormData(review).get("note");
             const buttons = review.querySelectorAll("button");
             buttons.forEach(button => button.disabled = true);
             try {
-              const done = mode === "contacts"
+              const done = mode === "identity" ? await supabaseRpc("admin_review_web_identity_request", { p_request_id: row.id, p_approve: approved, p_note: note }) : mode === "contacts"
                 ? await supabaseRpc("admin_review_company_email_change_request", { p_request_id: row.id, p_approve: approved, p_admin_note: note })
                 : await supabaseRpc("admin_review_invalid_company_email_report", { p_report_id: row.id, p_confirm_invalid: approved, p_admin_note: note });
               if (done !== true) throw new Error("La décision n’a pas été enregistrée.");
@@ -2340,7 +2414,7 @@
 
   function renderAccountSetup() {
     const steps = [
-      ["profile", profile ? Boolean(profile.candidate_first_name?.trim() && profile.candidate_last_name?.trim()) : null, "Nom et prénom enregistrés", "Renseigner le nom et le prénom"],
+      ["profile", profile ? candidateIdentityLocked() : null, "Identité enregistrée et verrouillée", "Confirmer le prénom, le nom et l’e-mail"],
       ["cv", accountSetup.cv, "CV ajouté ou enregistré", "Ajouter un PDF ou créer un CV"],
       ["gmail", accountSetup.gmail, "Compte Gmail lié", "Connecter Gmail pour l’envoi et le suivi"]
     ];
@@ -2406,13 +2480,15 @@
     ]);
 
     if (getSession()?.user?.id !== session.user.id) return;
+    const firstProfile = !profile;
     profile = Array.isArray(profiles) ? profiles[0] || null : null;
     accountLastRefreshed = Date.now();
     document.querySelector("#stat-sent").textContent = quota ? String(quota.used) : "—";
     document.querySelector("#monthly-quota-detail").textContent = describeSendQuota(quota);
     renderAccountSetup();
     renderAccount();
-    if (!document.querySelector("#profile-view").classList.contains("active")) renderProfile();
+    if (firstProfile || !document.querySelector("#profile-view").classList.contains("active")) renderProfile();
+    else renderIdentityState();
     await updateTrackingCounts(session);
   }
 
@@ -2423,7 +2499,10 @@
     const details = Object.fromEntries(profileDetailFields.map(field =>
       ["p_" + field, event.currentTarget.elements.namedItem(field).value]));
     const button = document.querySelector("#profile-submit");
-    if (button.disabled) return;
+    if (button.disabled || !event.currentTarget.reportValidity()) return;
+    if (!candidateIdentityLocked() && !window.confirm("Confirmer et verrouiller votre identité candidat : " +
+      document.querySelector("#profile-first-name").value.trim() + " " + document.querySelector("#profile-last-name").value.trim() +
+      " · " + document.querySelector("#profile-email").value.trim() + " ? Une correction ultérieure passera par l’administration.")) return;
     const message = document.querySelector("#profile-message");
     button.disabled = true;
     button.textContent = "Enregistrement…";
@@ -2445,7 +2524,7 @@
       message.textContent = error.message;
     } finally {
       button.disabled = false;
-      button.textContent = "Enregistrer";
+      renderIdentityState();
     }
   });
 
@@ -2767,6 +2846,7 @@
     ++accountSetupRequest;
     accountSetup = { cv: null, gmail: null };
     profileDetailsUser = null;
+    ++identityChangeRequest; identityChangeForm.reset(); identityChangeStatus.textContent = ""; identityChangePanel.open = false;
     ++profileDetailsRequest;
     document.querySelector("#profile-form").reset();
     if (replyDialog.open) replyDialog.close();

@@ -4,7 +4,7 @@ L’espace candidat est servi sur https://candidaturepro.ch/app/. Le domaine `ww
 
 ## Parcours disponibles
 
-- Connexion Supabase, profil candidat et formule avec quota partagé.
+- Connexion Supabase, profil candidat et formule avec quota partagé. L’identité (prénom, nom, e-mail) est verrouillée lors de sa première confirmation ; téléphone, ville, métiers, compétences et langues restent modifiables. Une correction d’identité passe par une demande et une décision administrateur journalisée.
 - Entreprises suisses, offres d’emploi, création et préparation des candidatures.
 - CV avec trois modèles, photo facultative JPG/PNG redimensionnée localement, variantes enregistrées et adaptation des compétences à une offre. Les variantes sont chargées individuellement pour éviter de télécharger toutes les photos à l’ouverture du menu.
 - Analyse indicative des CV du formulaire et historique privé des 30 derniers scores affichés ; Premium requis pour créer une analyse. Le calcul local ne consomme pas de crédit IA.

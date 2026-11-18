@@ -261,10 +261,11 @@
             <span class="badge">Données sécurisées</span>
           </div>
           <p>Ces informations seront utilisées pour préparer vos candidatures. Votre formule et vos droits de compte ne sont pas modifiables depuis ce formulaire.</p>
+          <p id="profile-identity-status" role="status"></p>
           <form id="profile-form" class="profile-form">
-            <label>Prénom<input id="profile-first-name" type="text" maxlength="100" autocomplete="given-name"></label>
-            <label>Nom<input id="profile-last-name" type="text" maxlength="100" autocomplete="family-name"></label>
-            <label class="wide">E-mail de candidature<input id="profile-email" type="email" maxlength="254" autocomplete="email"></label>
+            <label>Prénom<input id="profile-first-name" required type="text" maxlength="100" autocomplete="given-name"></label>
+            <label>Nom<input id="profile-last-name" required type="text" maxlength="100" autocomplete="family-name"></label>
+            <label class="wide">E-mail de candidature<input id="profile-email" required type="email" maxlength="254" autocomplete="email"></label>
             <label>Téléphone<input name="phone" type="tel" maxlength="60" autocomplete="tel"></label>
             <label>Ville<input name="city" maxlength="150" autocomplete="address-level2"></label>
             <label class="wide">Métiers recherchés<textarea name="desired_jobs" rows="2" maxlength="1000"></textarea></label>
@@ -273,6 +274,18 @@
             <div id="profile-message" class="profile-message wide" role="status"></div>
             <div class="wide"><button id="profile-submit" class="primary" type="submit">Enregistrer</button></div>
           </form>
+          <details id="identity-change-panel" hidden>
+            <summary>Demander une correction de l’identité</summary>
+            <p>L’identité actuelle reste utilisée jusqu’à la validation de l’administration.</p>
+            <form id="identity-change-form" class="profile-form">
+              <label>Nouveau prénom<input name="first" required maxlength="100" autocomplete="given-name"></label>
+              <label>Nouveau nom<input name="last" required maxlength="100" autocomplete="family-name"></label>
+              <label class="wide">Nouvel e-mail de candidature<input name="email" type="email" required maxlength="254" autocomplete="email"></label>
+              <label class="wide">Motif de la correction<textarea name="reason" required minlength="10" maxlength="2000" rows="3"></textarea></label>
+              <div class="wide"><button type="submit" class="secondary">Envoyer la demande de correction</button></div>
+            </form>
+            <p id="identity-change-status" role="status"></p>
+          </details>
         </article>
       </section>
 
@@ -369,7 +382,7 @@
       <section id="admin-view" class="view">
         <article class="panel">
           <h2>Administration</h2>
-          <label>Vue<select id="admin-mode"><option value="blacklist">Liste noire</option><option value="audit">Historique</option><option value="credits">Crédits fournisseurs</option><option value="job-market">Actualisation des offres</option><option value="contacts">Changements de contact</option><option value="invalid">E-mails incorrects</option><option value="verification">Vérifications entreprises</option><option value="reports">Signalements</option><option value="users">Utilisateurs</option></select></label>
+          <label>Vue<select id="admin-mode"><option value="blacklist">Liste noire</option><option value="audit">Historique</option><option value="credits">Crédits fournisseurs</option><option value="job-market">Actualisation des offres</option><option value="contacts">Changements de contact</option><option value="invalid">E-mails incorrects</option><option value="verification">Vérifications entreprises</option><option value="reports">Signalements</option><option value="users">Utilisateurs</option><option value="identity">Corrections d’identité</option></select></label>
           <button type="button" class="secondary" id="admin-refresh">Actualiser</button>
           <p id="admin-status" role="status"></p>
           <div id="admin-results" class="applications-list"></div>
@@ -543,6 +556,6 @@
   </dialog>
 
   <script src="config.js"></script>
-  <script src="app.js?v=20261118-cv-replies-reset"></script>
+  <script src="app.js?v=20261118-identity"></script>
 </body>
 </html>
