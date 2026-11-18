@@ -221,7 +221,10 @@ Deno.serve(async (request: Request) => {
       }
       const previewMessages = incoming.slice(-20).map(item => {
         const text = messageText("text/plain", item.payload);
-        return { text: text.slice(0, 30000),
+        const received = Number(item.internalDate);
+        return { id: item.id, from: header(item, "from").slice(0, 500), subject: header(item, "subject").slice(0, 500),
+          receivedAt: Number.isFinite(received) ? new Date(received).toISOString() : null,
+          automatic: isAutomaticAcknowledgment(item.payload?.headers), text: text.slice(0, 30000),
           html: text.trim() ? "" : messageText("text/html", item.payload).slice(0, 120000) };
       });
       const replies = previewMessages.map(item => item.text);

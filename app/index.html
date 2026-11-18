@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#5b21b6">
   <meta name="description" content="Candidature Pro en ligne : recherchez, préparez, envoyez et suivez vos candidatures.">
   <title>Candidature Pro — Espace en ligne</title>
-  <link rel="stylesheet" href="app.css">
+  <link rel="stylesheet" href="app.css?v=20261118-cv-replies">
 </head>
 <body>
   <main id="guest-home" class="guest-home">
@@ -287,6 +287,13 @@
             <label class="wide">Modèle<select name="template"><option value="classic">Classique</option>
               <option value="modern">Contemporain</option><option value="compact">Compact</option></select></label>
             <label class="wide">Nom de la variante<input id="cv-label" maxlength="120"></label>
+            <fieldset class="wide cv-photo-field"><legend>Photo du CV (facultative)</legend>
+              <label>Image JPG ou PNG (5 Mo maximum)<input id="cv-photo-file" type="file" accept="image/jpeg,image/png"></label>
+              <input type="hidden" name="photo" value="">
+              <img id="cv-photo-thumbnail" alt="Photo du CV affiché" hidden>
+              <button id="cv-photo-remove" class="secondary compact" type="button" hidden>Retirer la photo du CV affiché</button>
+              <p id="cv-photo-status" role="status">La photo sera conservée avec la variante lorsque vous l’enregistrez.</p>
+            </fieldset>
             <div class="wide"><button type="button" class="secondary" id="cv-use-profile">Compléter avec mon profil</button></div>
             <label>Nom complet<input name="name" maxlength="120" required></label>
             <label>Titre professionnel<input name="title" maxlength="120" required></label>
@@ -494,6 +501,7 @@
       <label>Ajouter un PDF de mes documents<select id="send-library"><option value="">Sélectionner un document</option></select></label>
       <button id="send-add-document" class="secondary" type="button" disabled>Ajouter le PDF</button>
       <button id="send-selected-documents" class="secondary" type="button" hidden></button>
+      <ul id="send-document-list" class="send-document-list" aria-label="Documents ajoutés depuis la bibliothèque" hidden></ul>
       <details id="send-ai">
         <summary>Préparer une lettre avec l’IA</summary>
         <label>Description de l’offre<textarea id="send-ai-offer" maxlength="6000" rows="3"></textarea></label>
@@ -535,6 +543,6 @@
   </dialog>
 
   <script src="config.js"></script>
-  <script src="app.js?v=20261118-account-rights"></script>
+  <script src="app.js?v=20261118-cv-replies"></script>
 </body>
 </html>

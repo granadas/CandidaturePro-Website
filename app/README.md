@@ -6,11 +6,11 @@ L’espace candidat est servi sur https://candidaturepro.ch/app/. Le domaine `ww
 
 - Connexion Supabase, profil candidat et formule avec quota partagé.
 - Entreprises suisses, offres d’emploi, création et préparation des candidatures.
-- CV avec trois modèles, variantes enregistrées et adaptation des compétences à une offre.
+- CV avec trois modèles, photo facultative JPG/PNG redimensionnée localement, variantes enregistrées et adaptation des compétences à une offre. Les variantes sont chargées individuellement pour éviter de télécharger toutes les photos à l’ouverture du menu.
 - Analyse indicative des CV du formulaire et historique privé des 30 derniers scores affichés ; Premium requis pour créer une analyse. Le calcul local ne consomme pas de crédit IA.
-- Bibliothèque PDF privée : CV, lettres, certificats, attestations, diplômes et autres justificatifs. Aperçu, téléchargement et suppression.
+- Bibliothèque PDF privée : CV, lettres, certificats, attestations, diplômes et autres justificatifs. Aperçu, téléchargement et suppression. Retrait individuel des PDF sélectionnés depuis la bibliothèque avant le contrôle final.
 - Génération de lettres, contrôle final et envoi Gmail individuel ou groupé. Au maximum huit PDF et 10 Mo cumulés par message ; validation identique dans le navigateur et sur le serveur.
-- Synchronisation des réponses, lecture des fils Gmail, rédaction et proposition IA de réponses.
+- Synchronisation des réponses, lecture des fils Gmail avec expéditeur/objet/date, rédaction et proposition IA de réponses. Les brouillons de réponse restent dans le même onglet après fermeture du message ; les demandes d’envoi interrompues gardent leur identifiant et leur texte. La déconnexion efface ces brouillons.
 - Suivi des statuts, notes, réponses non lues et dates de relance.
 - Relances sélectionnées avec proposition IA à insérer après relecture ; brouillons et identifiants d’envoi conservés dans l’onglet jusqu’à l’envoi ou la déconnexion.
 - Préparation d’un nouvel envoi depuis le suivi : copie en brouillon, conservation de l’ancien envoi et réutilisation d’un renvoi déjà en attente.

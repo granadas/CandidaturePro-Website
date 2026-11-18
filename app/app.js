@@ -642,7 +642,41 @@
   let replyContext = null;
   let replyRequest = 0;
 
+  const replyDraftPrefix = "candidature-pro-reply:";
+  function replyDraftKey(context) {
+    return replyDraftPrefix + context.userId + ":" + context.applicationId + ":" + (context.replyTo?.id || "draft");
+  }
+  function saveReplyDraft(context) {
+    if (!context) return false;
+    try {
+      if (!replyDraft.value.trim() && !context.requestId) sessionStorage.removeItem(replyDraftKey(context));
+      else sessionStorage.setItem(replyDraftKey(context), JSON.stringify({
+        message: replyDraft.value, recipient: context.replyTo?.recipient || "", requestId: context.requestId || null
+      }));
+      return true;
+    } catch { return false; }
+  }
+  function restoreReplyDraft(context) {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(replyDraftKey(context)) || "null");
+      if (typeof saved?.message !== "string" || saved.recipient !== (context.replyTo?.recipient || "")) return;
+      replyDraft.value = saved.message.slice(0, 12000);
+      context.requestId = typeof saved.requestId === "string" ? saved.requestId : null;
+      replyDraft.readOnly = replyGenerate.disabled = Boolean(context.requestId);
+      replyEditorStatus.textContent = context.requestId
+        ? "Un envoi a déjà été demandé pour ce texte. Une nouvelle vérification réutilisera le même identifiant. Vérifiez aussi les messages envoyés dans Gmail."
+        : "Brouillon restauré depuis cet onglet.";
+      replyEditor.open = true;
+    } catch { /* Le formulaire reste disponible sans stockage local. */ }
+  }
+  replyDraft.addEventListener("input", () => {
+    if (!replyContext || replyContext.requestId) return;
+    replyEditorStatus.textContent = saveReplyDraft(replyContext)
+      ? "Brouillon conservé dans cet onglet jusqu’à l’envoi ou la déconnexion." : "Le navigateur ne peut pas conserver le brouillon.";
+  });
+
   replyDialog.addEventListener("close", () => {
+    saveReplyDraft(replyContext);
     ++replyRequest;
     replyContext = null;
     replyDraft.value = "";
@@ -654,8 +688,9 @@
   replyGenerate.addEventListener("click", async () => {
     const context = replyContext;
     const before = replyDraft.value;
-    if (!context || replyGenerate.disabled) return;
-    replyGenerate.disabled = true;
+    if (!context || context.requestId || replyGenerate.disabled) return;
+    context.generating = true;
+    replyGenerate.disabled = replySend.disabled = true;
     replyEditorStatus.textContent = "Génération en cours…";
     try {
       const result = await invokeEdgeFunction("smart-reply", {
@@ -673,31 +708,51 @@
         throw new Error("La proposition est vide ou dépasse la taille autorisée.");
       }
       replyDraft.value = result.reply.trim();
-      replyEditorStatus.textContent = "Proposition prête à modifier.";
+      replyEditorStatus.textContent = saveReplyDraft(context)
+        ? "Proposition prête à modifier. Brouillon conservé dans cet onglet." : "Proposition prête à modifier. Le navigateur ne peut pas conserver le brouillon.";
     } catch (error) {
       if (replyContext === context) replyEditorStatus.textContent = error.message;
     } finally {
-      replyGenerate.disabled = false;
+      context.generating = false;
+      if (replyContext === context) {
+        replyGenerate.disabled = Boolean(context.requestId);
+        replySend.disabled = false;
+      }
     }
   });
 
   replySend.addEventListener("click", async () => {
     const context = replyContext;
     const message = replyDraft.value.trim();
-    if (!context?.replyTo || replySend.disabled) return;
+    if (!context?.replyTo || context.generating || replySend.disabled) return;
     if (!message) { replyEditorStatus.textContent = "Rédigez votre réponse."; return; }
     if (!window.confirm("Envoyer cette réponse à " + context.replyTo.recipient + " ?")) return;
     replySend.disabled = true;
     context.requestId ||= crypto.randomUUID();
+    if (!saveReplyDraft(context)) {
+      context.requestId = null; replySend.disabled = false;
+      replyEditorStatus.textContent = "Le navigateur ne peut pas mémoriser cet envoi. Aucun message envoyé."; return;
+    }
+    replyDraft.readOnly = replyGenerate.disabled = true;
     try {
       const result = await invokeEdgeFunction("gmail-web", { action: "send_reply",
         applicationId: context.applicationId, replyId: context.replyTo.id, recipient: context.replyTo.recipient, requestId: context.requestId, message });
-      if (replyContext !== context) return;
       if (result.sent !== true) throw new Error("Gmail n’a pas confirmé l’envoi.");
-      replyDraft.value = "";
+      try { sessionStorage.removeItem(replyDraftKey(context)); } catch { /* Gmail a confirmé l’envoi. */ }
       context.requestId = null;
-      replyEditorStatus.textContent = "Réponse envoyée dans le fil Gmail.";
+      if (replyContext !== context) return;
+      replyDraft.value = ""; replyDraft.readOnly = replyGenerate.disabled = false;
+      replyEditorStatus.textContent = result.tracked === false
+        ? "Réponse envoyée dans Gmail. L’enregistrement du suivi est indisponible ; ne renvoyez pas le message."
+        : "Réponse envoyée dans le fil Gmail.";
     } catch (error) {
+      if (error.status && error.status < 500 && error.uncertain !== true) {
+        context.requestId = null;
+        if (replyContext === context) {
+          replyDraft.readOnly = replyGenerate.disabled = false;
+          saveReplyDraft(context);
+        }
+      }
       if (replyContext === context) replyEditorStatus.textContent = error.message;
     } finally {
       replySend.disabled = false;
@@ -743,6 +798,7 @@
     replySend.hidden = true;
     replyEditor.open = false;
     replyDraft.value = "";
+    replyDraft.readOnly = replyGenerate.disabled = replySend.disabled = false;
     replyEditorStatus.textContent = "";
     replyGmail.hidden = true;
     replyConsent.hidden = true;
@@ -758,8 +814,9 @@
       replyConsent.hidden = !result.needsConsent;
       const previews = Array.isArray(result.previewMessages) ? result.previewMessages :
         (result.replies || []).map(text => ({ text }));
-      const replies = previews.map(item => (item.text.trim() || gmailHtmlToText(item.html)).slice(0, 30000))
-        .filter(Boolean);
+      const messages = previews.map(item => ({ ...item, text: ((typeof item.text === "string" ? item.text.trim() : "") || gmailHtmlToText(item.html)).slice(0, 30000) }))
+        .filter(item => item.text);
+      const replies = messages.map(item => item.text);
       if (replies.length) {
         const application = button.closest(".application-row");
         replyContext = { userId, applicationId: button.dataset.openReply, replyTo: result.replyTo, body: replies.at(-1).slice(0, 8000),
@@ -767,15 +824,26 @@
           jobTitle: application.querySelector(".application-main span").textContent };
         replyEditor.hidden = false;
         replySend.hidden = !result.replyTo;
+        restoreReplyDraft(replyContext);
       }
       replyContent.textContent = result.needsConsent ? "Autorisez la lecture pour afficher le message ici." :
         replies.length ? "" : "Le contenu de ce message est disponible dans Gmail.";
-      for (const reply of replies) {
-        const content = reply.replace(/\r\n?/g, "\n").trim();
+      for (const item of messages) {
+        const content = item.text.replace(/\r\n?/g, "\n").trim();
         const quoted = /\n(?:_{8,}|-{3,}\s*(?:Original Message|Message d’origine)\s*-{3,}|On .+ wrote:|Le .+ a écrit\s*:|From:.*\nSent:|De :.*\nEnvoyé :)/i.exec(content);
         const split = quoted && quoted.index > 0 ? quoted.index : content.length;
         const message = document.createElement("article");
         message.className = "reply-message";
+        const header = document.createElement("header"); header.className = "reply-message-header";
+        if (item.subject) { const subject = document.createElement("strong"); subject.textContent = item.subject; header.append(subject); }
+        if (item.from) { const from = document.createElement("span"); from.textContent = "De : " + item.from; header.append(from); }
+        if (item.receivedAt && Number.isFinite(Date.parse(item.receivedAt))) {
+          const date = document.createElement("time"); date.dateTime = item.receivedAt;
+          date.textContent = new Intl.DateTimeFormat("fr-CH", { dateStyle: "medium", timeStyle: "short" }).format(new Date(item.receivedAt));
+          header.append(date);
+        }
+        if (item.automatic) { const badge = document.createElement("span"); badge.textContent = "Réponse automatique"; badge.className = "badge"; header.append(badge); }
+        if (header.childNodes.length) message.append(header);
         const body = document.createElement("p");
         body.textContent = content.slice(0, split).trim();
         message.append(body);
@@ -1646,9 +1714,70 @@
   const cvVariants = document.querySelector("#cv-variants");
   const cvLabel = document.querySelector("#cv-label");
   const cvSaveStatus = document.querySelector("#cv-save-status");
-  const cvFieldNames = ["name", "title", "contact", "summary", "experience", "education", "skills", "target", "offer", "template"];
+  const cvFieldNames = ["name", "title", "contact", "summary", "experience", "education", "skills", "target", "offer", "template", "photo"];
   let savedCvVariants = [];
   let editingCvId = null;
+
+  const cvPhotoFile = document.querySelector("#cv-photo-file");
+  const cvPhotoThumbnail = document.querySelector("#cv-photo-thumbnail");
+  const cvPhotoStatus = document.querySelector("#cv-photo-status");
+  const cvPhotoRemove = document.querySelector("#cv-photo-remove");
+  let cvPhotoRequest = 0;
+
+  function validCvPhoto(value) {
+    return typeof value === "string" && value.length <= 100000 &&
+      /^data:image\/(?:jpeg|png);base64,(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value) &&
+      (value.startsWith("data:image/jpeg;base64,/9j/") || value.startsWith("data:image/png;base64,iVBORw0KGgo"));
+  }
+
+  function renderCvPhoto() {
+    const photo = cvForm.elements.namedItem("photo");
+    const visible = validCvPhoto(photo.value);
+    if (visible) cvPhotoThumbnail.src = photo.value;
+    else { photo.value = ""; cvPhotoThumbnail.removeAttribute("src"); }
+    cvPhotoThumbnail.hidden = cvPhotoRemove.hidden = !visible;
+  }
+
+  cvPhotoRemove.addEventListener("click", () => {
+    ++cvPhotoRequest;
+    cvForm.elements.namedItem("photo").value = ""; cvPhotoFile.value = "";
+    renderCvPhoto();
+    cvPhotoStatus.textContent = "Photo retirée du formulaire. Enregistrez la variante pour conserver cette modification.";
+  });
+
+  cvPhotoFile.addEventListener("change", async () => {
+    const file = cvPhotoFile.files?.[0];
+    const userId = getSession()?.user?.id;
+    if (!file || !userId) return;
+    const request = ++cvPhotoRequest;
+    if (!["image/jpeg", "image/png"].includes(file.type) || file.size > 5 * 1024 * 1024) {
+      cvPhotoStatus.textContent = "Choisissez une image JPG ou PNG de 5 Mo maximum."; cvPhotoFile.value = ""; return;
+    }
+    cvPhotoStatus.textContent = "Préparation de la photo…";
+    let bitmap;
+    try {
+      bitmap = await createImageBitmap(file);
+      if (!bitmap.width || !bitmap.height || bitmap.width * bitmap.height > 25000000) throw new Error("Choisissez une photo de 25 mégapixels maximum.");
+      const ratio = Math.min(256 / bitmap.width, 320 / bitmap.height, 1);
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(bitmap.width * ratio));
+      canvas.height = Math.max(1, Math.round(bitmap.height * ratio));
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("Le navigateur ne peut pas préparer cette photo.");
+      context.fillStyle = "#ffffff"; context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      const photo = canvas.toDataURL("image/jpeg", .82);
+      if (!validCvPhoto(photo)) throw new Error("La photo reste trop volumineuse. Choisissez une image plus simple.");
+      if (request !== cvPhotoRequest || getSession()?.user?.id !== userId) return;
+      cvForm.elements.namedItem("photo").value = photo; renderCvPhoto();
+      cvPhotoStatus.textContent = "Photo prête. Elle sera conservée lorsque vous enregistrerez la variante.";
+    } catch (error) {
+      if (request === cvPhotoRequest && getSession()?.user?.id === userId) cvPhotoStatus.textContent = error.message || "Impossible de lire cette photo.";
+    } finally {
+      bitmap?.close();
+      if (request === cvPhotoRequest) cvPhotoFile.value = "";
+    }
+  });
 
   document.querySelector("#cv-use-profile").addEventListener("click", async event => {
     const button = event.currentTarget;
@@ -1685,7 +1814,7 @@
     const userId = getSession()?.user?.id;
     if (!userId) return;
     try {
-      const rows = await supabaseFetch("web_cv_variants?select=id,label,fields&order=updated_at.desc&limit=200");
+      const rows = await supabaseFetch("web_cv_variants?select=id,label&order=updated_at.desc&limit=200");
       if (getSession()?.user?.id !== userId) return;
       savedCvVariants = rows;
       cvVariants.length = 1;
@@ -1696,21 +1825,41 @@
     }
   }
 
-  document.querySelector("#cv-load").addEventListener("click", () => {
-    const variant = savedCvVariants.find(row => row.id === cvVariants.value);
-    if (!variant) return;
-    for (const name of cvFieldNames) cvForm.elements.namedItem(name).value = typeof variant.fields[name] === "string" ? variant.fields[name] : "";
-    if (!cvForm.elements.template.value) cvForm.elements.template.value = "classic";
-    cvLabel.value = variant.label;
-    editingCvId = variant.id;
-    document.querySelector("#cv-target-context").textContent = "";
-    cvSaveStatus.textContent = "Variante ouverte.";
-    document.querySelector("#cv-analysis-target").value = variant.fields.target || "";
-    cvAnalysisResults.hidden = true; cvAnalysisStatus.textContent = "";
+  let cvLoadRequest = 0;
+  document.querySelector("#cv-load").addEventListener("click", async event => {
+    const selected = savedCvVariants.find(row => row.id === cvVariants.value);
+    const userId = getSession()?.user?.id;
+    const button = event.currentTarget;
+    if (!selected || !userId || button.disabled || cvForm.dataset.saving) return;
+    const request = ++cvLoadRequest;
+    const before = JSON.stringify(cvFieldNames.map(name => cvForm.elements.namedItem(name).value));
+    const beforeLabel = cvLabel.value;
+    const beforeVariant = editingCvId;
+    button.disabled = true;
+    try {
+      const [variant] = await supabaseFetch("web_cv_variants?id=eq." + encodeURIComponent(selected.id) + "&select=id,label,fields");
+      if (request !== cvLoadRequest || getSession()?.user?.id !== userId || cvVariants.value !== selected.id) return;
+      if (!variant) throw new Error("Cette variante n’est plus disponible.");
+      if (beforeLabel !== cvLabel.value || beforeVariant !== editingCvId || before !== JSON.stringify(cvFieldNames.map(name => cvForm.elements.namedItem(name).value))) throw new Error("Vos modifications ont été conservées. Rouvrez le CV lorsque vous êtes prêt à remplacer le formulaire.");
+      for (const name of cvFieldNames) cvForm.elements.namedItem(name).value = typeof variant.fields[name] === "string" ? variant.fields[name] : "";
+      if (!cvForm.elements.template.value) cvForm.elements.template.value = "classic";
+      ++cvPhotoRequest; cvPhotoFile.value = ""; renderCvPhoto();
+      cvPhotoStatus.textContent = "La photo affichée appartient à cette variante.";
+      cvLabel.value = variant.label;
+      editingCvId = variant.id;
+      document.querySelector("#cv-target-context").textContent = "";
+      cvSaveStatus.textContent = "Variante ouverte.";
+      document.querySelector("#cv-analysis-target").value = variant.fields.target || "";
+      cvAnalysisResults.hidden = true; cvAnalysisStatus.textContent = "";
+    } catch (error) {
+      if (request === cvLoadRequest && getSession()?.user?.id === userId) cvSaveStatus.textContent = error.message;
+    } finally { button.disabled = false; }
   });
 
   document.querySelector("#cv-new").addEventListener("click", () => {
-    cvForm.reset();
+    ++cvLoadRequest; ++cvPhotoRequest;
+    cvForm.reset(); renderCvPhoto();
+    cvPhotoStatus.textContent = "La photo sera conservée avec la variante lorsque vous l’enregistrez.";
     editingCvId = null;
     document.querySelector("#cv-target-context").textContent = "";
     document.querySelector("#cv-adapt-status").textContent = "";
@@ -1750,6 +1899,9 @@
       if (!userId || cvForm.dataset.saving || cvDelete.disabled || !cvForm.reportValidity()) return;
       const fields = Object.fromEntries(cvFieldNames.map(name => [name, cvForm.elements.namedItem(name).value.trim()]));
       const label = cvLabel.value.trim() || fields.title;
+      if (new TextEncoder().encode(JSON.stringify(fields)).length > 150000) {
+        cvSaveStatus.textContent = "Le CV est trop volumineux. Réduisez le texte ou retirez la photo avant d’enregistrer."; return;
+      }
       if (!label || !fields.name || !fields.title) {
         cvSaveStatus.textContent = "Renseignez le nom et le titre du CV.";
         return;
@@ -1924,6 +2076,11 @@
     const preview = document.querySelector("#cv-preview");
     preview.replaceChildren();
     preview.dataset.template = hasPremiumCv() ? String(data.get("template")) : "classic";
+    const photo = data.get("photo");
+    if (validCvPhoto(photo)) {
+      const image = document.createElement("img"); image.className = "cv-portrait";
+      image.alt = "Photo du candidat"; image.src = photo; preview.append(image);
+    }
     const name = document.createElement("h1");
     name.textContent = String(data.get("name")).trim();
     const title = document.createElement("p");
@@ -2624,7 +2781,9 @@
     document.querySelector("#cv-analysis-target").value = "";
     ++adminRequest;
     adminResults.replaceChildren();
-    cvForm.reset();
+    ++cvLoadRequest; ++cvPhotoRequest;
+    cvForm.reset(); renderCvPhoto();
+    cvPhotoStatus.textContent = "";
     savedCvVariants = [];
     editingCvId = null;
     cvVariants.length = 1;
@@ -2932,6 +3091,33 @@
   const librarySummary = document.querySelector("#send-selected-documents");
   let libraryFiles = [];
   let selectedDocuments = [];
+  const selectedDocumentSources = new Map();
+  const selectedDocumentList = document.querySelector("#send-document-list");
+
+  function renderSelectedDocuments() {
+    selectedDocumentList.replaceChildren();
+    selectedDocumentList.hidden = Boolean(reviewed) || selectedDocuments.length === 0;
+    librarySummary.hidden = Boolean(reviewed) || selectedDocuments.length === 0;
+    librarySummary.textContent = "Retirer tous les documents ajoutés";
+    for (const file of selectedDocuments) {
+      const row = document.createElement("li");
+      const name = document.createElement("span");
+      name.textContent = file.name + " · " + new Intl.NumberFormat("fr-CH", { maximumFractionDigits: 1 }).format(file.size / 1024) + " Ko";
+      const remove = document.createElement("button");
+      remove.type = "button"; remove.className = "secondary compact"; remove.textContent = "Retirer";
+      remove.setAttribute("aria-label", "Retirer " + file.name);
+      remove.addEventListener("click", () => {
+        if (reviewed || sendSubmit.disabled) return;
+        const source = selectedDocumentSources.get(file);
+        selectedDocuments = selectedDocuments.filter(item => item !== file);
+        selectedDocumentSources.delete(file);
+        for (const option of librarySelect.options) if (option.value === source) option.disabled = false;
+        libraryAdd.disabled = !librarySelect.value || selectedDocuments.length >= 8;
+        renderSelectedDocuments();
+      });
+      row.append(name, remove); selectedDocumentList.append(row);
+    }
+  }
 
   async function loadSendDocuments(dossier) {
     const session = await ensureSession();
@@ -2960,9 +3146,15 @@
       const blob = await response.blob();
       if (!sendDialog.open || sendApplication !== dossier || reviewed || getSession()?.user?.id !== session.user.id) return;
       const name = documentFile.name.replace(/^[a-f0-9-]{36}_/, "");
-      selectedDocuments.push(new File([blob], name, { type: "application/pdf" }));
-      librarySummary.textContent = "Retirer les PDF ajoutés (" + selectedDocuments.map(file => file.name).join(", ") + ")";
-      librarySummary.hidden = false;
+      if (await blob.slice(0, 5).text() !== "%PDF-") throw new Error("Ce document n’est pas un PDF valide.");
+      if (!sendDialog.open || sendApplication !== dossier || reviewed || getSession()?.user?.id !== session.user.id) return;
+      const existing = [...sendInputs[2].files, ...selectedDocuments];
+      if (existing.length >= 8 || existing.reduce((total, file) => total + file.size, blob.size) > 10 * 1024 * 1024) {
+        throw new Error("Le dossier accepte au maximum huit PDF de 10 Mo au total. Retirez une pièce jointe avant d’ajouter ce document.");
+      }
+      const attached = new File([blob], name, { type: "application/pdf" });
+      selectedDocuments.push(attached); selectedDocumentSources.set(attached, option.value);
+      renderSelectedDocuments();
       option.disabled = true;
       librarySelect.value = "";
     } catch (error) {
@@ -2976,9 +3168,9 @@
   });
 
   librarySummary.addEventListener("click", () => {
-    selectedDocuments = [];
-    librarySummary.textContent = "";
-    librarySummary.hidden = true;
+    if (reviewed || sendSubmit.disabled) return;
+    selectedDocuments = []; selectedDocumentSources.clear();
+    renderSelectedDocuments();
     for (const option of librarySelect.options) option.disabled = false;
     libraryAdd.disabled = !librarySelect.value;
   });
@@ -2994,7 +3186,7 @@
     try {
       for (let index = sessionStorage.length - 1; index >= 0; index--) {
         const key = sessionStorage.key(index);
-        if (key?.startsWith(sendDraftPrefix) || key?.startsWith(followupDraftPrefix)) sessionStorage.removeItem(key);
+        if (key?.startsWith(sendDraftPrefix) || key?.startsWith(followupDraftPrefix) || key?.startsWith(replyDraftPrefix)) sessionStorage.removeItem(key);
       }
     } catch { /* Le navigateur peut bloquer le stockage de session. */ }
   }
@@ -3024,7 +3216,7 @@
     sendAi.hidden = false;
     librarySelect.closest("label").hidden = false;
     libraryAdd.hidden = false;
-    librarySummary.hidden = selectedDocuments.length === 0;
+    renderSelectedDocuments();
     for (const input of sendInputs) {
       input.disabled = false;
       input.closest("label").hidden = false;
@@ -3048,7 +3240,7 @@
     batchProgress.textContent = batchSize ? "Dossier " + (batchSize - batchQueue.length) + " sur " + batchSize : "";
     sendForm.reset();
     libraryFiles = [];
-    selectedDocuments = [];
+    selectedDocuments = []; selectedDocumentSources.clear(); renderSelectedDocuments();
     librarySelect.length = 1;
     librarySelect.disabled = false;
     libraryAdd.disabled = true;
@@ -3171,6 +3363,7 @@
       librarySelect.closest("label").hidden = true;
       libraryAdd.hidden = true;
       librarySummary.hidden = true;
+      selectedDocumentList.hidden = true;
       sendReview.hidden = false;
       sendReview.focus();
       return;

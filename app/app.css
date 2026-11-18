@@ -167,3 +167,21 @@
 .cv-analysis-metric progress{width:100%;height:14px;accent-color:#6d28d9}
 #cv-analysis-results li{margin:8px 0;line-height:1.5}
 @media(max-width:600px){.cv-analysis-metric{grid-template-columns:1fr;gap:5px}}
+
+.cv-photo-field{border:1px solid #dce3ee;border-radius:12px;padding:16px;min-width:0}
+.cv-photo-field legend{font-weight:700;padding:0 6px}
+#cv-photo-thumbnail{width:90px;max-height:115px;object-fit:contain;margin:12px 12px 0 0;border-radius:8px;vertical-align:middle}
+#cv-photo-status{font-size:13px;color:#52617a}
+#cv-preview .cv-portrait{float:right;width:100px;max-height:130px;object-fit:contain;margin:0 0 18px 20px;break-inside:avoid}
+#cv-preview[data-template="modern"] .cv-portrait{border-radius:12px}
+#cv-preview[data-template="compact"] .cv-portrait{width:80px;max-height:100px}
+#cv-preview::after{content:"";display:block;clear:both}
+
+.reply-message-header{display:grid;gap:5px;padding:0 0 12px;margin-bottom:14px;border-bottom:1px solid #e7ebf3;font-size:13px;color:#52617a;overflow-wrap:anywhere}
+.reply-message-header strong{font-size:15px;color:#182236}
+.reply-message-header .badge{justify-self:start}
+
+.send-document-list{list-style:none;padding:0;margin:10px 0}
+.send-document-list li{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid #dce3ee;border-radius:10px;padding:10px 12px;margin:6px 0}
+.send-document-list span{overflow-wrap:anywhere;font-size:13px}
+.send-document-list button{flex-shrink:0}
