@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#5b21b6">
   <meta name="description" content="Candidature Pro en ligne : recherchez, préparez, envoyez et suivez vos candidatures.">
   <title>Candidature Pro — Espace en ligne</title>
-  <link rel="stylesheet" href="app.css?v=20261118-admin-statistics">
+  <link rel="stylesheet" href="app.css?v=20261118-signup">
 </head>
 <body>
   <main id="guest-home" class="guest-home">
@@ -16,7 +16,8 @@
       <p class="guest-kicker">Espace candidat</p>
       <h1>Retrouvez vos candidatures.</h1>
       <p>Connectez-vous pour retrouver vos recherches, vos documents et le suivi de vos candidatures.</p>
-      <button id="guest-login" class="primary">Se connecter</button>
+      <button id="guest-signup" class="primary" type="button">Créer un compte gratuit</button>
+      <button id="guest-login" class="secondary" type="button">Se connecter</button>
       <a href="../">Découvrir Candidature Pro</a>
     </div>
   </main>
@@ -585,11 +586,15 @@
     <form id="login-form">
       <button type="button" id="close-login" class="close" aria-label="Fermer">×</button>
       <span class="dialog-logo">CP</span>
-      <h2>Connexion</h2>
-      <p>Utilisez le même compte que dans l'application Windows.</p>
+      <h2 id="auth-title">Connexion</h2>
+      <p id="auth-description">Retrouvez votre compte Candidature Pro, sur le site comme dans Windows.</p>
+      <div class="auth-modes" aria-label="Connexion ou inscription"><button id="auth-mode-signin" type="button" class="secondary compact" aria-pressed="true">Se connecter</button><button id="auth-mode-signup" type="button" class="secondary compact" aria-pressed="false">Créer un compte</button></div>
       <label>Adresse e-mail<input id="email" type="email" autocomplete="email" required></label>
       <label>Mot de passe<input id="password" type="password" autocomplete="current-password" required></label>
+      <label id="signup-confirm-wrapper" hidden>Confirmer le mot de passe<input id="signup-confirm" type="password" autocomplete="new-password" minlength="8" maxlength="128" disabled></label>
+      <p id="signup-notice" class="auth-notice" hidden>Votre compte commence avec la formule gratuite : 5 candidatures par mois. La confirmation de votre e-mail est nécessaire. Consultez la <a href="../privacy.html" target="_blank" rel="noopener noreferrer">politique de confidentialité</a>.</p>
       <button id="password-forgot" type="button" class="secondary">Mot de passe oublié ?</button>
+      <button id="signup-resend" type="button" class="secondary" hidden>Renvoyer le message de confirmation</button>
       <div id="login-message" class="message" role="status"></div>
       <button id="login-submit" class="primary full" type="submit">Se connecter</button>
       <small>Vos identifiants sont transmis directement au service d'authentification sécurisé de Candidature Pro.</small>
@@ -614,6 +619,7 @@
   <script src="cv-import.js?v=20261118"></script>
   <script src="admin-tools.js?v=20261118"></script>
   <script src="cv-word.js?v=20261118"></script>
-  <script src="app.js?v=20261118-photo-export"></script>
+  <script src="account-signup.js?v=20261118"></script>
+  <script src="app.js?v=20261118-signup"></script>
 </body>
 </html>

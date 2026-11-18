@@ -4,6 +4,7 @@ L’espace candidat est servi sur https://candidaturepro.ch/app/. Le domaine `ww
 
 ## Parcours disponibles
 
+- Inscription web gratuite par e-mail et mot de passe, confirmation PKCE et renvoi du message. Aucun compte n’est considéré connecté avant confirmation lorsque celle-ci est requise. Un lien ouvert dans un autre navigateur invite à se connecter avec ses identifiants. Aucun mot de passe n’est enregistré dans le stockage local.
 - Connexion Supabase, profil candidat et formule avec quota partagé. L’identité (prénom, nom, e-mail) est verrouillée lors de sa première confirmation ; téléphone, ville, métiers, compétences et langues restent modifiables. Une correction d’identité passe par une demande et une décision administrateur journalisée.
 - Entreprises suisses, offres d’emploi, création et préparation des candidatures.
 - CV avec trois modèles, photo facultative JPG/PNG redimensionnée localement, variantes enregistrées et adaptation des compétences à une offre. Les variantes sont chargées individuellement pour éviter de télécharger toutes les photos à l’ouverture du menu. Export Word DOCX modifiable local, avec photo intégrée et styles correspondant au modèle choisi ; le modèle classique reste accessible sans Premium. L’export n’enregistre pas automatiquement la variante.

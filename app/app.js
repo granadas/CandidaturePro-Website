@@ -53,6 +53,31 @@
   const guestHome = document.querySelector("#guest-home");
   const guestLogin = document.querySelector("#guest-login");
 
+  const authModeSignin = document.querySelector("#auth-mode-signin"), authModeSignup = document.querySelector("#auth-mode-signup");
+  const signupConfirm = document.querySelector("#signup-confirm"), signupResend = document.querySelector("#signup-resend");
+  let authMode = "signin", authBusy = false, pendingConfirmationEmail = null, signupResendAfter = 0;
+  function setAuthMode(mode) {
+    if (authBusy || document.querySelector("#login-submit").disabled) return;
+    authMode = mode === "signup" ? "signup" : "signin";
+    const signup = authMode === "signup", password = document.querySelector("#password");
+    document.querySelector("#auth-title").textContent = signup ? "Créer un compte gratuit" : "Connexion";
+    document.querySelector("#auth-description").textContent = signup ? "Commencez dans votre navigateur. L’application Windows est facultative." : "Retrouvez votre compte Candidature Pro, sur le site comme dans Windows.";
+    document.querySelector("#signup-confirm-wrapper").hidden = document.querySelector("#signup-notice").hidden = !signup;
+    signupConfirm.disabled = !signup; signupConfirm.required = signup;
+    password.value = signupConfirm.value = "";
+    password.minLength = signup ? 8 : 0; password.maxLength = signup ? 128 : 4096;
+    password.autocomplete = signup ? "new-password" : "current-password";
+    document.querySelector("#password-forgot").hidden = signup;
+    signupResend.hidden = true; pendingConfirmationEmail = null;
+    authModeSignin.setAttribute("aria-pressed", String(!signup)); authModeSignup.setAttribute("aria-pressed", String(signup));
+    document.querySelector("#login-submit").textContent = signup ? "Créer mon compte gratuit" : "Se connecter";
+    loginMessage.textContent = "";
+  }
+  authModeSignin.addEventListener("click", () => setAuthMode("signin"));
+  authModeSignup.addEventListener("click", () => setAuthMode("signup"));
+  dialog.addEventListener("cancel", event => { if (authBusy || document.querySelector("#login-submit").disabled) event.preventDefault(); });
+  dialog.addEventListener("close", () => { document.querySelector("#password").value = signupConfirm.value = ""; });
+
   function getSession() {
     try { return JSON.parse(localStorage.getItem(storageKey) || "null"); }
     catch { return null; }
@@ -156,7 +181,7 @@
       body: JSON.stringify(body)
     });
     const result = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(authErrorMessage(result, "Connexion impossible."));
+    if (!response.ok) { const error = new Error(authErrorMessage(result, "Connexion impossible.")); error.code = result.error_code || result.code; throw error; }
     return normalizeSession(result);
   }
 
@@ -3375,11 +3400,12 @@
     el.addEventListener("click", () => showView(el.dataset.view || el.dataset.viewLink));
   });
   document.querySelector("#menu-toggle").addEventListener("click", () => sidebar.classList.toggle("open"));
-  guestLogin.addEventListener("click", () => dialog.showModal());
-  document.querySelector("#close-login").addEventListener("click", () => dialog.close());
+  guestLogin.addEventListener("click", () => { setAuthMode("signin"); dialog.showModal(); });
+  document.querySelector("#guest-signup").addEventListener("click", () => { setAuthMode("signup"); dialog.showModal(); });
+  document.querySelector("#close-login").addEventListener("click", () => { if (!authBusy && !document.querySelector("#login-submit").disabled) dialog.close(); });
   loginButton.addEventListener("click", () => {
     if (getSession()) showView("settings");
-    else dialog.showModal();
+    else { setAuthMode("signin"); dialog.showModal(); }
   });
   signOutButton.addEventListener("click", () => {
     profile = null; passwordRecoveryStatus.textContent = "";
@@ -3428,28 +3454,53 @@
     location.replace("../");
   });
 
+  function setAuthBusy(busy) {
+    authBusy = busy;
+    for (const node of [document.querySelector("#login-submit"), passwordForgot, signupResend, authModeSignin, authModeSignup, document.querySelector("#close-login")]) node.disabled = busy;
+  }
+  const signupConfirmationMessage = "Si cette adresse peut être utilisée, un message de confirmation a été envoyé. Ouvrez-le dans ce même navigateur, puis connectez-vous. Si vous avez déjà un compte, utilisez la connexion ou « Mot de passe oublié ». Vérifiez aussi les courriers indésirables.";
   loginForm.addEventListener("submit", async event => {
     event.preventDefault();
     const submit = document.querySelector("#login-submit");
-    if (submit.disabled || passwordForgot.disabled) return;
-    loginMessage.textContent = "";
-    submit.disabled = passwordForgot.disabled = true;
-    submit.textContent = "Connexion…";
+    if (authBusy || submit.disabled || passwordForgot.disabled || !loginForm.reportValidity()) return;
+    const email = document.querySelector("#email").value.trim().toLowerCase(), password = document.querySelector("#password").value;
+    const mode = authMode;
+    if (mode === "signup" && password !== signupConfirm.value) { loginMessage.textContent = "Les deux mots de passe sont différents."; return; }
+    loginMessage.textContent = ""; setAuthBusy(true);
+    submit.textContent = mode === "signup" ? "Création en cours…" : "Connexion…";
     try {
-      const session = await signIn(document.querySelector("#email").value.trim(), document.querySelector("#password").value);
-      setSession(session);
-      showView("dashboard");
-      dialog.close();
-      loginForm.reset();
-      await loadDashboard().catch(error => {
-        document.querySelector("#account-label").textContent = error.message;
-      });
+      let session;
+      if (mode === "signup") {
+        const result = await window.CP_SIGNUP.create(email, password);
+        document.querySelector("#password").value = signupConfirm.value = "";
+        if (result.type === "confirmation") {
+          pendingConfirmationEmail = email; signupResendAfter = Date.now() + 60000;
+          signupResend.hidden = false; loginMessage.textContent = signupConfirmationMessage; return;
+        }
+        session = normalizeSession(result.session);
+      } else session = await signIn(email, password);
+      profile = null; setSession(session);
+      showView("dashboard"); dialog.close(); loginForm.reset(); pendingConfirmationEmail = null;
+      await loadDashboard().catch(error => { document.querySelector("#account-label").textContent = error.message; });
     } catch (error) {
       loginMessage.textContent = error.message;
+      if (error.code === "email_not_confirmed") { pendingConfirmationEmail = email; signupResend.hidden = false; }
     } finally {
-      submit.disabled = passwordForgot.disabled = false;
-      submit.textContent = "Se connecter";
+      setAuthBusy(false);
+      submit.textContent = authMode === "signup" ? "Créer mon compte gratuit" : "Se connecter";
     }
+  });
+  signupResend.addEventListener("click", async () => {
+    if (authBusy || signupResend.disabled || !pendingConfirmationEmail) return;
+    const email = document.querySelector("#email").value.trim().toLowerCase();
+    if (email !== pendingConfirmationEmail) { loginMessage.textContent = "L’adresse a changé. Relancez la connexion ou l’inscription pour cette adresse."; return; }
+    if (Date.now() < signupResendAfter) { loginMessage.textContent = "Patientez encore " + Math.ceil((signupResendAfter - Date.now()) / 1000) + " seconde(s) avant de renvoyer le message."; return; }
+    setAuthBusy(true); loginMessage.textContent = "Demande du message de confirmation…";
+    try {
+      await window.CP_SIGNUP.resend(email); signupResendAfter = Date.now() + 60000;
+      loginMessage.textContent = signupConfirmationMessage;
+    } catch (error) { loginMessage.textContent = error.message; }
+    finally { setAuthBusy(false); }
   });
 
   const batchSelection = new Set();
@@ -4244,15 +4295,22 @@
   async function bootstrap() {
     if (await finishPasswordRecovery()) return;
     await ensureSession();
+    const signupConfirmation = await window.CP_SIGNUP.complete(getSession()?.user?.email || null);
+    if (signupConfirmation?.session) { profile = null; setSession(normalizeSession(signupConfirmation.session)); }
+    await ensureSession();
     renderAccount();
     showView("dashboard", false);
     await finishGmailConnection();
     syncGmailRepliesAutomatically();
     const url = new URL(location.href);
-    if (url.searchParams.has("connexion")) {
-      url.searchParams.delete("connexion");
-      history.replaceState(null, "", url);
-      if (appShell.hidden) dialog.showModal();
+    const signupRequested = url.searchParams.has("inscription"), signinRequested = url.searchParams.has("connexion");
+    if (signupRequested || signinRequested) {
+      url.searchParams.delete("connexion"); url.searchParams.delete("inscription"); history.replaceState(null, "", url);
+      if (appShell.hidden) { setAuthMode(signupRequested ? "signup" : "signin"); dialog.showModal(); }
+    }
+    if (signupConfirmation?.error) {
+      if (appShell.hidden) { setAuthMode("signin"); loginMessage.textContent = signupConfirmation.error; if (!dialog.open) dialog.showModal(); }
+      else { showView("settings"); passwordRecoveryStatus.textContent = signupConfirmation.error; }
     }
     try { await loadDashboard(); }
     catch (error) {

@@ -207,3 +207,9 @@
 .admin-metric-list dt small { display: block; color: #64748b; margin-top: 4px; }
 .admin-metric-list dd { flex-shrink: 0; font-weight: 700; margin-left: 0; }
 @media(max-width: 640px) { .admin-metric-list > div { flex-direction: column; gap: 8px; } .admin-metric-list dd { align-self: flex-start; } }
+
+.auth-modes { display: flex; gap: 8px; margin: 16px 0; flex-wrap: wrap; }
+.auth-modes [aria-pressed="true"] { background: #eee8fd; border-color: #8857df; color: #4b1f92; }
+#login-dialog [hidden] { display: none; }
+.auth-notice { padding: 12px; border-radius: 10px; background: #f5f2fc; font-size: 13px; line-height: 1.6; }
+.auth-notice a { color: #5424a2; }

@@ -31,3 +31,5 @@
 .hero-electric .preview-header{border-radius:23px 23px 0 0;background:#182d4b}
 .hero-electric .preview-row{margin:8px 0;padding:12px;border:1px solid #345175;border-radius:12px;background:#1b3456}
 @media(max-width:850px){.hero-electric .product-preview{transform:none;margin-bottom:14px}.hero-electric .product-preview::after{right:-5px}}
+
+@media(max-width:720px){.nav-actions a[href*="inscription"]{display:none}.nav{justify-content:space-between;gap:12px}.nav .brand{font-size:15px}.nav-actions .btn{padding:10px 12px;font-size:13px}}
