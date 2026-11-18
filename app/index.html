@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#5b21b6">
   <meta name="description" content="Candidature Pro en ligne : recherchez, préparez, envoyez et suivez vos candidatures.">
   <title>Candidature Pro — Espace en ligne</title>
-  <link rel="stylesheet" href="app.css?v=20261118-pdf-import">
+  <link rel="stylesheet" href="app.css?v=20261118-cv-docx">
 </head>
 <body>
   <main id="guest-home" class="guest-home">
@@ -292,14 +292,24 @@
       <section id="documents-view" class="view">
         <article class="panel">
           <h2>Créer un CV</h2>
-          <fieldset class="cv-pdf-import"><legend>Importer le texte d’un CV PDF</legend>
-            <p>La lecture s’effectue dans votre navigateur. Le PDF reste sur votre appareil tant que vous ne l’ajoutez pas à la bibliothèque. Les scans sans texte sélectionnable nécessitent une saisie manuelle.</p>
-            <label>CV PDF (10 Mo et 20 pages maximum)<input id="cv-pdf-file" type="file" accept=".pdf,application/pdf"></label>
+          <fieldset class="cv-pdf-import"><legend>Importer un CV PDF, Word ou TXT</legend>
+            <p>La lecture s’effectue dans votre navigateur. Le fichier reste sur votre appareil pendant cette lecture. La bibliothèque de pièces jointes accepte les PDF. Les scans sans texte sélectionnable nécessitent une saisie manuelle.</p>
+            <label>CV PDF, DOCX ou TXT (10 Mo maximum ; 20 pages pour un PDF)<input id="cv-pdf-file" type="file" accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"></label>
             <button id="cv-pdf-cancel" type="button" class="secondary" hidden>Annuler la lecture</button>
             <p id="cv-pdf-status" role="status"></p>
             <div id="cv-pdf-review" hidden>
               <label>Texte extrait à relire et à sélectionner<textarea id="cv-pdf-text" rows="8" maxlength="30000"></textarea></label>
-              <label>Rubrique à compléter<select id="cv-pdf-target"><option value="experience">Expériences</option><option value="summary">Profil</option><option value="education">Formation</option><option value="skills">Compétences et langues</option><option value="contact">Coordonnées</option></select></label>
+              <button id="cv-import-detect" type="button" class="secondary">Détecter les rubriques du CV</button>
+              <fieldset id="cv-import-sections" hidden><legend>Rubriques proposées à relire</legend>
+                <p>Seules les rubriques cochées seront ajoutées à la suite du contenu actuel. Le nom, le titre, les coordonnées et la photo du formulaire restent inchangés.</p>
+                <label><span><input type="checkbox" id="cv-import-summary-check"> Profil</span><textarea id="cv-import-summary" rows="3" maxlength="2000"></textarea></label>
+                <label><span><input type="checkbox" id="cv-import-experience-check"> Expériences</span><textarea id="cv-import-experience" rows="5" maxlength="6000"></textarea></label>
+                <label><span><input type="checkbox" id="cv-import-education-check"> Formation</span><textarea id="cv-import-education" rows="3" maxlength="3000"></textarea></label>
+                <label><span><input type="checkbox" id="cv-import-skills-check"> Compétences et langues</span><textarea id="cv-import-skills" rows="3" maxlength="3000"></textarea></label>
+                <p id="cv-import-detect-status" role="status"></p>
+                <button id="cv-import-apply" type="button" class="secondary">Ajouter les rubriques cochées au formulaire</button>
+              </fieldset>
+              <label>Ajouter manuellement à une rubrique<select id="cv-pdf-target"><option value="experience">Expériences</option><option value="summary">Profil</option><option value="education">Formation</option><option value="skills">Compétences et langues</option><option value="contact">Coordonnées</option></select></label>
               <p>Gardez dans le texte ci-dessus la partie destinée à cette rubrique. Vous pouvez répéter l’opération pour les autres rubriques. Le texte est ajouté à la suite du contenu actuel.</p>
               <button id="cv-pdf-insert" type="button" class="secondary">Ajouter le texte à cette rubrique</button>
             </div>
@@ -594,6 +604,7 @@
   <script src="config.js"></script>
   <script src="backup.js?v=20261118"></script>
   <script src="pdf-import.js?v=20261118"></script>
-  <script src="app.js?v=20261118-pdf-import"></script>
+  <script src="cv-import.js?v=20261118"></script>
+  <script src="app.js?v=20261118-cv-docx"></script>
 </body>
 </html>

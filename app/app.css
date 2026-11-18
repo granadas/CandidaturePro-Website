@@ -190,3 +190,7 @@
 .cv-pdf-import legend { font-weight: 700; padding: 0 8px; }
 .cv-pdf-import label { display: grid; gap: 8px; margin: 14px 0; }
 .cv-pdf-import textarea { width: 100%; box-sizing: border-box; resize: vertical; }
+
+#cv-import-sections { margin-top: 20px; border: 1px solid #dce3f1; border-radius: 12px; padding: 16px; min-width: 0; }
+#cv-import-sections input[type="checkbox"] { width: auto; margin-right: 8px; }
+#cv-import-sections label > span { display: flex; align-items: center; }

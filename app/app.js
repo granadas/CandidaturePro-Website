@@ -1918,9 +1918,19 @@
   const cvPdfFile = document.querySelector("#cv-pdf-file"), cvPdfStatus = document.querySelector("#cv-pdf-status");
   const cvPdfText = document.querySelector("#cv-pdf-text"), cvPdfReview = document.querySelector("#cv-pdf-review");
   const cvPdfCancel = document.querySelector("#cv-pdf-cancel");
+  const cvImportSections = document.querySelector("#cv-import-sections"), cvImportDetectStatus = document.querySelector("#cv-import-detect-status");
+  const cvImportKeys = ["summary", "experience", "education", "skills"];
+  let cvImportContext = null;
+  function resetCvImportSections() {
+    cvImportContext = null; cvImportSections.hidden = true; cvImportDetectStatus.textContent = "";
+    for (const key of cvImportKeys) {
+      document.querySelector("#cv-import-" + key).value = "";
+      document.querySelector("#cv-import-" + key + "-check").checked = false;
+    }
+  }
   let cvPdfRequest = 0, cvPdfAbort = null;
   function clearCvPdfImport() {
-    ++cvPdfRequest; cvPdfAbort?.abort(); cvPdfAbort = null;
+    ++cvPdfRequest; cvPdfAbort?.abort(); cvPdfAbort = null; resetCvImportSections();
     cvPdfFile.value = cvPdfText.value = cvPdfStatus.textContent = "";
     cvPdfReview.hidden = cvPdfCancel.hidden = true; cvPdfFile.disabled = false;
   }
@@ -1928,18 +1938,19 @@
   cvPdfFile.addEventListener("change", async () => {
     const file = cvPdfFile.files?.[0], userId = getSession()?.user?.id;
     if (!file || !userId) return;
+    resetCvImportSections();
     cvPdfAbort?.abort(); const controller = new AbortController(); cvPdfAbort = controller;
     const request = ++cvPdfRequest;
     const current = () => request === cvPdfRequest && getSession()?.user?.id === userId;
     cvPdfFile.disabled = true; cvPdfCancel.hidden = false; cvPdfReview.hidden = true;
-    cvPdfText.value = ""; cvPdfStatus.textContent = "Lecture du PDF sur cet appareil…";
+    cvPdfText.value = ""; cvPdfStatus.textContent = "Lecture du CV sur cet appareil…";
     try {
-      const result = await window.CP_PDF.extract(file, (page, total) => {
+      const result = await window.CP_CV_IMPORT.extract(file, (page, total) => {
         if (current()) cvPdfStatus.textContent = "Lecture de la page " + page + " sur " + total + "…";
       }, controller.signal);
       if (!current()) return;
       cvPdfText.value = result.text; cvPdfReview.hidden = false;
-      cvPdfStatus.textContent = result.pages + " page(s) lue(s). Relisez le texte avant de l’ajouter au formulaire. Aucun CV enregistré n’a été modifié.";
+      cvPdfStatus.textContent = (result.pages ? result.pages + " page(s) lue(s). " : "CV " + result.format + " lu. ") + "Relisez le texte avant de l’ajouter au formulaire. Aucun CV enregistré n’a été modifié.";
     } catch (error) { if (current()) cvPdfStatus.textContent = error.name === "AbortError" ? "Lecture annulée." : error.message; }
     finally { if (current()) { cvPdfFile.disabled = false; cvPdfCancel.hidden = true; cvPdfAbort = null; } }
   });
@@ -1953,6 +1964,48 @@
     if (value.length > field.maxLength) { cvPdfStatus.textContent = "Cette rubrique accepte " + field.maxLength + " caractères. Réduisez le texte à insérer ; votre formulaire a été conservé."; return; }
     field.value = value;
     cvPdfStatus.textContent = "Texte ajouté au formulaire. Vérifiez la mise en page, puis enregistrez la variante pour conserver la modification.";
+  });
+
+  document.querySelector("#cv-import-detect").addEventListener("click", () => {
+    const userId = getSession()?.user?.id;
+    if (!userId || cvPdfReview.hidden) return;
+    const result = window.CP_CV_IMPORT.partition(cvPdfText.value);
+    resetCvImportSections();
+    cvImportContext = { userId, variant: editingCvId, loadRequest: cvLoadRequest,
+      fields: Object.fromEntries(cvImportKeys.map(key => [key, cvForm.elements.namedItem(key).value])) };
+    const available = [];
+    for (const key of cvImportKeys) {
+      const text = result.fields[key], proposal = document.querySelector("#cv-import-" + key);
+      proposal.value = text;
+      const fits = text.length <= cvForm.elements.namedItem(key).maxLength;
+      document.querySelector("#cv-import-" + key + "-check").checked = Boolean(text) && fits;
+      if (text) available.push(key);
+    }
+    cvImportSections.hidden = false;
+    cvImportDetectStatus.textContent = available.length
+      ? available.length + " rubrique(s) reconnue(s). Relisez les propositions ; réduisez les textes trop longs avant de les cocher." + (result.unassigned ? " Certaines lignes restent à répartir manuellement depuis le texte source." : "")
+      : "Aucune rubrique reconnue. Utilisez l’ajout manuel ci-dessous, ou ajoutez des titres tels que Expériences, Formation et Compétences dans le texte source.";
+  });
+  document.querySelector("#cv-import-apply").addEventListener("click", () => {
+    const context = cvImportContext;
+    if (!context || cvImportSections.hidden || cvForm.dataset.saving) return;
+    if (context.userId !== getSession()?.user?.id || context.variant !== editingCvId || context.loadRequest !== cvLoadRequest) {
+      cvImportDetectStatus.textContent = "Le CV affiché a changé. Détectez à nouveau les rubriques avant de les ajouter."; return;
+    }
+    const selected = cvImportKeys.filter(key => document.querySelector("#cv-import-" + key + "-check").checked);
+    if (!selected.length) { cvImportDetectStatus.textContent = "Cochez au moins une rubrique à ajouter."; return; }
+    const updates = [];
+    for (const key of selected) {
+      const field = cvForm.elements.namedItem(key), proposal = document.querySelector("#cv-import-" + key).value.trim();
+      if (field.value !== context.fields[key]) { cvImportDetectStatus.textContent = "Le formulaire a été modifié. Vos changements sont conservés ; détectez à nouveau les rubriques."; return; }
+      if (!proposal) { cvImportDetectStatus.textContent = "Une rubrique cochée est vide. Complétez-la ou décochez-la."; return; }
+      const value = [field.value.trim(), proposal].filter(Boolean).join("\n\n");
+      if (value.length > field.maxLength) { cvImportDetectStatus.textContent = "Une rubrique dépasse sa limite de " + field.maxLength + " caractères avec le contenu actuel. Réduisez la proposition ; aucun champ n’a été modifié."; return; }
+      updates.push([field, value]);
+    }
+    for (const [field, value] of updates) field.value = value;
+    resetCvImportSections();
+    cvPdfStatus.textContent = updates.length + " rubrique(s) ajoutée(s) au formulaire. Relisez le CV puis enregistrez la variante pour conserver ces modifications.";
   });
 
   const cvPhotoFile = document.querySelector("#cv-photo-file");
