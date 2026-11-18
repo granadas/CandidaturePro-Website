@@ -154,3 +154,16 @@
   font-size: 12px;
 }
 #tracking-unread-badge[hidden] { display: none; }
+
+.followup-draft{padding:18px;border:1px solid #dce3ee;border-radius:14px;margin:16px 0;background:#fff}
+#followup-drafts .followup-include{display:flex;align-items:center;gap:10px;font-weight:750}
+#followup-drafts .followup-include input{width:auto;margin:0;accent-color:#6d28d9}
+.followup-draft>p{font-size:13px;overflow-wrap:anywhere;color:#52617a}
+.followup-draft textarea{font:inherit;line-height:1.55;padding:12px;box-sizing:border-box}
+.followup-draft [aria-label^="Proposition"]{background:#f7f4ff;margin-top:12px}
+
+.cv-analysis-score{font-size:36px;font-weight:800;color:#5b21b6;margin:18px 0}
+.cv-analysis-metric{display:grid;grid-template-columns:minmax(150px,1fr) 2fr;align-items:center;gap:16px;margin:10px 0}
+.cv-analysis-metric progress{width:100%;height:14px;accent-color:#6d28d9}
+#cv-analysis-results li{margin:8px 0;line-height:1.5}
+@media(max-width:600px){.cv-analysis-metric{grid-template-columns:1fr;gap:5px}}

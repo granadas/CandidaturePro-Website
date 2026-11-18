@@ -137,7 +137,7 @@
       loadTracking();
       if (syncReplies) syncGmailRepliesAutomatically();
     }
-    if (isDocuments) { loadDocuments(); loadCvVariants(); }
+    if (isDocuments) { loadDocuments(); loadCvVariants(); loadCvAnalysisHistory(); }
     if (name === "settings") loadGmail();
     sidebar.classList.remove("open");
   }
@@ -269,7 +269,12 @@
       return invokeEdgeFunction(name, body, false);
     }
     const result = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(result.message || result.error || "Le service est indisponible.");
+    if (!response.ok) {
+      const error = new Error(result.message || result.error || "Le service est indisponible.");
+      error.uncertain = result.uncertain === true;
+      error.status = response.status;
+      throw error;
+    }
     return result;
   }
 
@@ -813,66 +818,160 @@
   const followupConfirm = document.querySelector("#followup-confirm");
   const followupDrafts = document.querySelector("#followup-drafts");
   let followupRows = [];
+  let followupGeneration = 0;
+  let followupAiBusy = 0;
+  const followupDraftPrefix = "candidature-pro-followup:";
+
+  function followupDraftKey(userId, id) { return followupDraftPrefix + userId + ":" + id; }
+  function readFollowupDraft(userId, id) {
+    try { return JSON.parse(sessionStorage.getItem(followupDraftKey(userId, id)) || "null"); }
+    catch { return null; }
+  }
+  function saveFollowupDraft(userId, row) {
+    try {
+      sessionStorage.setItem(followupDraftKey(userId, row.id), JSON.stringify({
+        message: row.editor.value, requestId: row.requestId || null, recipient: row.company_email
+      }));
+      return true;
+    } catch { return false; }
+  }
 
   document.querySelector("#followup-batch").addEventListener("click", () => {
-    followupRows = selectedFollowUps();
+    const userId = getSession()?.user?.id;
+    if (!userId) return;
+    followupRows = selectedFollowUps().map(row => ({ ...row }));
     if (!followupRows.length) {
       document.querySelector("#tracking-message").textContent = "Sélectionnez les dossiers à relancer.";
       return;
     }
+    const generation = ++followupGeneration;
+    followupAiBusy = 0;
+    followupConfirm.disabled = false;
     followupDrafts.replaceChildren();
     for (const row of followupRows) {
+      const saved = readFollowupDraft(userId, row.id);
+      const restored = saved?.recipient === row.company_email && typeof saved.message === "string";
+      row.requestId = restored && typeof saved.requestId === "string" ? saved.requestId : null;
+      const card = document.createElement("article");
+      card.className = "followup-draft";
+      const choiceLabel = document.createElement("label");
+      choiceLabel.className = "followup-include";
+      const choice = document.createElement("input");
+      choice.type = "checkbox"; choice.checked = true;
+      choiceLabel.append(choice, document.createTextNode(row.company_name));
+      const recipient = document.createElement("p");
+      recipient.textContent = "À : " + row.company_email + (row.job_title ? " · " + row.job_title : "");
       const label = document.createElement("label");
-      label.textContent = row.company_name + " · " + row.company_email;
-      const message = document.createElement("textarea");
-      message.value = "Bonjour,\n\nJe me permets de revenir vers vous au sujet de ma candidature" +
+      label.textContent = "Texte de la relance";
+      const editor = document.createElement("textarea");
+      const name = [profile?.candidate_first_name, profile?.candidate_last_name].filter(Boolean).join(" ");
+      editor.value = restored ? saved.message : "Bonjour,\n\nJe me permets de revenir vers vous au sujet de ma candidature" +
         (row.job_title ? " pour le poste de " + row.job_title : "") +
-        ". Je reste à votre disposition pour tout complément.\n\nCordialement,";
-      message.required = true;
-      message.maxLength = 12000;
-      message.rows = 5;
-      label.append(message);
-      followupDrafts.append(label);
+        ". Je reste à votre disposition pour tout complément.\n\nCordialement," + (name ? "\n" + name : "");
+      editor.maxLength = 12000; editor.rows = 7;
+      editor.readOnly = Boolean(row.requestId);
+      const status = document.createElement("p");
+      status.setAttribute("role", "status");
+      if (row.requestId) status.textContent = "Un envoi a déjà été demandé pour ce texte. Une nouvelle vérification utilisera le même identifiant pour éviter un doublon. Vérifiez aussi les messages envoyés dans Gmail.";
+      const ai = document.createElement("button");
+      ai.type = "button"; ai.className = "secondary";
+      ai.textContent = "Proposer une relance avec IA";
+      ai.disabled = Boolean(row.requestId);
+      const suggestion = document.createElement("textarea");
+      suggestion.readOnly = true; suggestion.hidden = true; suggestion.rows = 7;
+      suggestion.setAttribute("aria-label", "Proposition de relance pour " + row.company_name);
+      const use = document.createElement("button");
+      use.type = "button"; use.className = "secondary";
+      use.textContent = "Utiliser la proposition"; use.hidden = true;
+      row.editor = editor; row.choice = choice; row.ai = ai; row.use = use; row.result = status;
+      editor.addEventListener("input", () => {
+        status.textContent = saveFollowupDraft(userId, row)
+          ? "Brouillon conservé dans cet onglet." : "Le navigateur ne peut pas conserver ce brouillon.";
+      });
+      use.addEventListener("click", () => {
+        if (row.requestId || followupConfirm.disabled) return;
+        editor.value = suggestion.value;
+        use.hidden = true;
+        status.textContent = saveFollowupDraft(userId, row)
+          ? "Proposition insérée. Relisez le texte avant l’envoi." : "Proposition insérée. Le navigateur ne peut pas conserver le brouillon.";
+      });
+      ai.addEventListener("click", async () => {
+        if (ai.disabled || row.requestId || !followupDialog.open) return;
+        ai.disabled = true; ++followupAiBusy; followupConfirm.disabled = true;
+        use.hidden = true; suggestion.hidden = true;
+        status.textContent = "Préparation de la proposition… Votre texte reste conservé.";
+        const before = editor.value;
+        try {
+          const result = await invokeEdgeFunction("smart-reply", {
+            mode: "followup", classification: "Relance sans réponse", companyName: row.company_name,
+            jobTitle: row.job_title || "", candidateName: name || "le candidat",
+            replyBody: "Aucune réponse humaine reçue. Rédiger une courte relance professionnelle de ma candidature. Ne pas inventer de réponse du recruteur ni de qualification. Texte à améliorer : " + before
+          });
+          if (generation !== followupGeneration || !followupDialog.open || getSession()?.user?.id !== userId) return;
+          if (typeof result.reply !== "string" || !result.reply.trim() || result.reply.length > 12000) throw new Error("La proposition est vide ou trop longue.");
+          suggestion.value = result.reply.trim(); suggestion.hidden = false; use.hidden = false;
+          status.textContent = "Relisez la proposition avant de l’utiliser. Votre texte est conservé.";
+        } catch (error) {
+          if (generation === followupGeneration && getSession()?.user?.id === userId) status.textContent = error.message;
+        } finally {
+          if (generation === followupGeneration) {
+            ai.disabled = Boolean(row.requestId); --followupAiBusy;
+            followupConfirm.disabled = followupAiBusy > 0;
+          }
+        }
+      });
+      label.append(editor);
+      card.append(choiceLabel, recipient, label, ai, status, suggestion, use);
+      followupDrafts.append(card);
     }
-    followupStatus.textContent = "";
+    followupStatus.textContent = "Les textes modifiés sont conservés dans cet onglet jusqu’à l’envoi ou la déconnexion.";
     followupConfirm.hidden = false;
     followupDialog.showModal();
   });
 
   followupClose.addEventListener("click", () => followupDialog.close());
+  followupDialog.addEventListener("close", () => { ++followupGeneration; });
   followupDialog.addEventListener("cancel", event => {
-    if (followupConfirm.disabled) event.preventDefault();
+    if (followupConfirm.disabled && !followupAiBusy) event.preventDefault();
   });
   followupForm.addEventListener("submit", async event => {
     event.preventDefault();
-    if (followupConfirm.disabled || followupConfirm.hidden) return;
+    if (followupConfirm.disabled || followupConfirm.hidden || followupAiBusy) return;
     const userId = getSession()?.user?.id;
     if (!userId) return;
-    const messages = [...followupDrafts.querySelectorAll("textarea")].map(input => input.value.trim());
-    if (messages.some(message => !message)) {
-      followupStatus.textContent = "Renseignez le texte de chaque relance.";
+    const rows = followupRows.filter(row => row.choice.checked);
+    if (!rows.length) { followupStatus.textContent = "Sélectionnez au moins une relance."; return; }
+    if (rows.some(row => !row.editor.value.trim())) {
+      followupStatus.textContent = "Renseignez le texte de chaque relance sélectionnée.";
       return;
     }
-    const rows = [...followupRows];
     followupConfirm.disabled = followupClose.disabled = true;
-    followupDrafts.querySelectorAll("textarea").forEach(input => { input.readOnly = true; });
+    for (const row of followupRows) {
+      row.editor.readOnly = true; row.choice.disabled = true; row.ai.disabled = true; row.use.disabled = true;
+    }
     const results = [];
     try {
       for (const [index, row] of rows.entries()) {
         if (getSession()?.user?.id !== userId) break;
         followupStatus.textContent = "Relance " + (index + 1) + " sur " + rows.length + "…";
         try {
+          row.requestId ||= crypto.randomUUID();
+          if (!saveFollowupDraft(userId, row)) throw new Error("Le navigateur ne peut pas mémoriser cet envoi. Aucun message envoyé pour ce dossier.");
           const response = await invokeEdgeFunction("gmail-web", { action: "send_followup",
-            applicationId: row.id, recipient: row.company_email, requestId: crypto.randomUUID(), message: messages[index] });
+            applicationId: row.id, recipient: row.company_email, requestId: row.requestId, message: row.editor.value.trim() });
           if (response.sent !== true) throw new Error("Gmail n’a pas confirmé l’envoi.");
+          sessionStorage.removeItem(followupDraftKey(userId, row.id));
+          row.requestId = null;
           results.push(row.company_name + (response.tracked === false
             ? " · Relance envoyée, mise à jour du suivi indisponible" : " · Relance envoyée"));
         } catch (error) {
           results.push(row.company_name + " · " + error.message);
         }
       }
-      followupStatus.textContent = results.join("\n");
-      await loadTracking();
+      if (getSession()?.user?.id === userId) {
+        followupStatus.textContent = results.join("\n");
+        await loadTracking();
+      }
     } finally {
       followupConfirm.hidden = true;
       followupConfirm.disabled = followupClose.disabled = false;
@@ -1038,6 +1137,31 @@
     }
   });
 
+  trackingList.addEventListener("click", async event => {
+    const button = event.target.closest("[data-tracking-resend]");
+    const userId = getSession()?.user?.id;
+    if (!button || button.disabled || !userId) return;
+    const row = trackingRows.find(item => item.id === button.dataset.trackingResend);
+    if (!row?.sent_at) return;
+    if (!window.confirm("Créer un nouveau brouillon pour « " + row.company_name + " » ? L’ancien envoi et son suivi seront conservés. Vérifiez le destinataire, le texte et les PDF avant tout nouvel envoi.")) return;
+    button.disabled = true;
+    try {
+      const result = await supabaseRpc("create_web_resend_draft", { p_application_id: row.id });
+      if (getSession()?.user?.id !== userId) return;
+      if (!result?.id) throw new Error("Le nouveau brouillon n’a pas pu être confirmé.");
+      document.querySelector("#applications-search").value = row.company_name;
+      document.querySelector("#applications-filter").value = "";
+      document.querySelector("#show-hidden-applications").checked = Boolean(result.hidden);
+      showView("applications");
+      document.querySelector("#application-message").textContent = result.created
+        ? "Renvoi préparé. Contrôlez le destinataire et ajoutez le texte et les documents avant l’envoi."
+        : result.hidden ? "Un renvoi existe déjà dans les dossiers masqués. Réaffichez-le pour le préparer."
+          : "Un renvoi est déjà en attente. Aucun doublon créé.";
+    } catch (error) {
+      if (getSession()?.user?.id === userId) trackingMessage.textContent = error.message;
+    } finally { button.disabled = false; }
+  });
+
   let trackingLoadRequest = 0;
 
   async function fetchTrackingRows(current) {
@@ -1095,6 +1219,7 @@
             ? '<label><input type="checkbox" data-followup-choice value="' + escapeHtml(row.id) + '"> Sélectionner pour relance</label>' : '') +
           (row.last_inbound_at ? '<button type="button" class="secondary compact" data-open-reply="' +
             escapeHtml(row.id) + '">Lire la réponse</button>' : '') +
+          (row.sent_at ? '<button type="button" class="secondary compact" data-tracking-resend="' + escapeHtml(row.id) + '">Préparer un nouvel envoi</button>' : '') +
           '<button type="button" class="secondary compact" data-tracking-edit="' + escapeHtml(row.id) + '">Modifier le statut ou la note</button>' +
           '<button type="button" class="secondary compact" data-tracking-visibility="'  + escapeHtml(row.id) + '">' +
           (row.hidden_at ? "Réafficher" : "Masquer du suivi") + '</button></div>' +
@@ -1576,6 +1701,8 @@
     editingCvId = variant.id;
     document.querySelector("#cv-target-context").textContent = "";
     cvSaveStatus.textContent = "Variante ouverte.";
+    document.querySelector("#cv-analysis-target").value = variant.fields.target || "";
+    cvAnalysisResults.hidden = true; cvAnalysisStatus.textContent = "";
   });
 
   document.querySelector("#cv-new").addEventListener("click", () => {
@@ -1584,6 +1711,8 @@
     document.querySelector("#cv-target-context").textContent = "";
     document.querySelector("#cv-adapt-status").textContent = "";
     cvSaveStatus.textContent = "";
+    document.querySelector("#cv-analysis-target").value = "";
+    cvAnalysisResults.hidden = true; cvAnalysisStatus.textContent = "";
   });
 
   const cvDelete = document.querySelector("#cv-delete");
@@ -1644,6 +1773,126 @@
       (!profile.premium_until || Date.parse(profile.premium_until) > Date.now());
   }
 
+  const cvAnalyze = document.querySelector("#cv-analyze");
+  const cvAnalysisStatus = document.querySelector("#cv-analysis-status");
+  const cvAnalysisResults = document.querySelector("#cv-analysis-results");
+  const cvAnalysisHistory = document.querySelector("#cv-analysis-history");
+  const cvAnalysisHistoryStatus = document.querySelector("#cv-analysis-history-status");
+  const cvAnalysisClear = document.querySelector("#cv-analysis-clear");
+  let cvAnalysisRequest = 0;
+
+  function analyzeCvFields(fields, target) {
+    const skills = fields.skills.split(/[;\n]+/).map(value => value.trim()).filter(Boolean);
+    const text = [fields.title, fields.summary, fields.experience, fields.education, fields.skills].join("\n");
+    const normalize = value => value.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+    const corpus = normalize(text);
+    const tokens = [...new Set(normalize(target).split(/[^\p{L}\p{N}+#]+/u).filter(value => value.length >= 3))];
+    const structure = 80 + (fields.title.trim() ? 10 : 0) + (skills.length >= 5 ? 10 : 0);
+    const content = text.trim() ? Math.min(100, 70 + (text.length >= 800 ? 20 : 10)) : 55;
+    const keywords = tokens.length ? Math.round(tokens.filter(word => corpus.includes(word)).length * 100 / tokens.length) : 50;
+    const readability = fields.template === "modern" ? 90 : fields.template === "classic" ? 95 : 85;
+    const ats = fields.template === "modern" ? 88 : fields.template === "classic" ? 95 : 84;
+    const overall = Math.round(structure * .25 + content * .25 + keywords * .20 + readability * .15 + ats * .15);
+    const findings = [];
+    if (!fields.title.trim()) findings.push("Ajoutez un titre professionnel clair.");
+    if (!fields.summary.trim()) findings.push("Ajoutez un court profil professionnel.");
+    if (skills.length < 5) findings.push("Complétez les compétences avec vos savoir-faire réels, une compétence par ligne.");
+    if (!fields.experience.trim()) findings.push("Renseignez les expériences et les réalisations pertinentes.");
+    if (!/(?:19[89]\d|20\d\d)/.test(fields.experience + fields.education)) findings.push("Précisez les dates des expériences et des formations.");
+    if (!target.trim()) findings.push("Indiquez un métier cible pour préciser l’analyse des mots-clés.");
+    else if (keywords < 70) findings.push("Le métier cible apparaît peu dans le CV. Ajoutez uniquement les termes correspondant à votre expérience.");
+    if (fields.experience.split("\n").some(line => line.length > 180)) findings.push("Raccourcissez les paragraphes les plus longs pour faciliter la lecture.");
+    if (!findings.length) findings.push("Les rubriques essentielles sont présentes. Vérifiez les faits, les coordonnées et la présentation du PDF avant l’envoi.");
+    return { overall, structure, content, keywords, readability, ats, findings };
+  }
+
+  function renderCvAnalysis(report) {
+    cvAnalysisResults.replaceChildren();
+    const score = document.createElement("p");
+    score.className = "cv-analysis-score";
+    score.textContent = report.overall + "/100";
+    cvAnalysisResults.append(score);
+    for (const [key, label] of [["structure", "Structure"], ["content", "Contenu"], ["keywords", "Mots-clés"], ["readability", "Lisibilité"], ["ats", "Compatibilité ATS"]]) {
+      const line = document.createElement("label");
+      line.className = "cv-analysis-metric";
+      const caption = document.createElement("span"); caption.textContent = label + " · " + report[key] + "/100";
+      const bar = document.createElement("progress"); bar.max = 100; bar.value = report[key];
+      line.append(caption, bar); cvAnalysisResults.append(line);
+    }
+    const list = document.createElement("ul");
+    for (const finding of report.findings) { const item = document.createElement("li"); item.textContent = finding; list.append(item); }
+    cvAnalysisResults.append(list); cvAnalysisResults.hidden = false;
+  }
+
+  async function loadCvAnalysisHistory() {
+    const request = ++cvAnalysisRequest;
+    const userId = getSession()?.user?.id;
+    if (!userId) return;
+    cvAnalysisHistory.replaceChildren();
+    cvAnalysisHistoryStatus.textContent = "Chargement…";
+    try {
+      const reports = await supabaseFetch("web_cv_analysis_reports?select=id,created_at,cv_name,target_role,overall&order=created_at.desc,id.desc&limit=30");
+      if (request !== cvAnalysisRequest || getSession()?.user?.id !== userId) return;
+      cvAnalysisHistoryStatus.textContent = reports.length ? "Les 30 dernières analyses au maximum." : "Aucune analyse enregistrée.";
+      for (const [index, report] of reports.entries()) {
+        const card = document.createElement("article"); card.className = "application-row";
+        const body = document.createElement("div"); body.className = "application-main";
+        const title = document.createElement("strong"); title.textContent = report.cv_name + " · " + report.overall + "/100";
+        const caption = document.createElement("span");
+        caption.textContent = new Intl.DateTimeFormat("fr-CH", { dateStyle: "medium", timeStyle: "short" }).format(new Date(report.created_at)) + (report.target_role ? " · " + report.target_role : "");
+        body.append(title, caption);
+        const previous = reports.slice(index + 1).find(item => item.cv_name === report.cv_name && item.target_role === report.target_role);
+        if (previous) {
+          const delta = report.overall - previous.overall;
+          const change = document.createElement("small"); change.textContent = (delta > 0 ? "+" : "") + delta + " point(s) depuis l’analyse précédente du même CV et du même métier.";
+          body.append(change);
+        }
+        card.append(body); cvAnalysisHistory.append(card);
+      }
+    } catch (error) {
+      if (request === cvAnalysisRequest && getSession()?.user?.id === userId) cvAnalysisHistoryStatus.textContent = error.message;
+    }
+  }
+
+  cvAnalyze.addEventListener("click", async () => {
+    const userId = getSession()?.user?.id;
+    if (!userId || cvAnalyze.disabled || cvAnalysisClear.disabled) return;
+    if (!hasPremiumCv()) { cvAnalysisStatus.textContent = "L’analyse CV / ATS est disponible avec Premium."; return; }
+    const fields = Object.fromEntries(cvFieldNames.map(name => [name, cvForm.elements.namedItem(name).value.trim()]));
+    if (!fields.name || !fields.title || ![fields.summary, fields.experience, fields.education, fields.skills].some(Boolean)) {
+      cvAnalysisStatus.textContent = "Complétez le nom, le titre et le contenu du CV dans le formulaire."; return;
+    }
+    const target = document.querySelector("#cv-analysis-target").value.trim() || fields.target;
+    const report = analyzeCvFields(fields, target);
+    renderCvAnalysis(report);
+    cvAnalyze.disabled = true;
+    cvAnalysisStatus.textContent = "Analyse terminée. Enregistrement du score…";
+    try {
+      await supabaseWrite("web_cv_analysis_reports", "POST", {
+        cv_name: cvLabel.value.trim() || fields.title, target_role: target,
+        ...Object.fromEntries(["overall", "structure", "content", "keywords", "readability", "ats"].map(key => [key, report[key]]))
+      });
+      if (getSession()?.user?.id !== userId) return;
+      cvAnalysisStatus.textContent = "Analyse enregistrée. Le calcul est effectué dans votre navigateur, sans crédit IA.";
+      await loadCvAnalysisHistory();
+    } catch (error) {
+      if (getSession()?.user?.id === userId) cvAnalysisStatus.textContent = "Analyse affichée, historique non enregistré. " + error.message;
+    } finally { cvAnalyze.disabled = false; }
+  });
+
+  cvAnalysisClear.addEventListener("click", async () => {
+    const userId = getSession()?.user?.id;
+    if (!userId || cvAnalysisClear.disabled || cvAnalyze.disabled) return;
+    if (!window.confirm("Effacer tout l’historique des analyses ? Vos CV et vos documents seront conservés.")) return;
+    cvAnalysisClear.disabled = true;
+    try {
+      await supabaseWrite("web_cv_analysis_reports?user_id=eq." + encodeURIComponent(userId), "DELETE");
+      if (getSession()?.user?.id === userId) await loadCvAnalysisHistory();
+    } catch (error) {
+      if (getSession()?.user?.id === userId) cvAnalysisHistoryStatus.textContent = error.message;
+    } finally { cvAnalysisClear.disabled = false; }
+  });
+
   document.querySelector("#cv-adapt").addEventListener("click", () => {
     if (!hasPremiumCv() || !getSession()?.user?.id) return;
     const status = document.querySelector("#cv-adapt-status");
@@ -1690,7 +1939,7 @@
   document.querySelector("#cv-print").addEventListener("click", () => window.print());
 
   const documentsBucket = "candidature-documents";
-  const documentKinds = { cv: "CV", lettre: "Lettre de motivation" };
+  const documentKinds = { cv: "CV", lettre: "Lettre de motivation", certificat: "Certificat / attestation", diplome: "Diplôme", autre: "Autre document" };
   const documentForm = document.querySelector("#document-form");
   const documentsList = document.querySelector("#documents-list");
   const documentsMessage = document.querySelector("#documents-message");
@@ -2348,6 +2597,11 @@
     clearSendDrafts();
     batchSelection.clear();
     ++documentsRequest;
+    ++cvAnalysisRequest;
+    cvAnalysisHistory.replaceChildren(); cvAnalysisResults.replaceChildren();
+    cvAnalysisResults.hidden = true; cvAnalysisStatus.textContent = "";
+    cvAnalysisHistoryStatus.textContent = "";
+    document.querySelector("#cv-analysis-target").value = "";
     ++adminRequest;
     adminResults.replaceChildren();
     cvForm.reset();
@@ -2675,7 +2929,7 @@
     const option = librarySelect.selectedOptions[0];
     const documentFile = libraryFiles[option?.value];
     const dossier = sendApplication;
-    if (!documentFile || selectedDocuments.length >= 2) return;
+    if (!documentFile || selectedDocuments.length >= 8) return;
     libraryAdd.disabled = true;
     librarySelect.disabled = true;
     try {
@@ -2696,7 +2950,7 @@
     } finally {
       if (sendApplication === dossier) {
         librarySelect.disabled = false;
-        libraryAdd.disabled = !librarySelect.value || selectedDocuments.length >= 2;
+        libraryAdd.disabled = !librarySelect.value || selectedDocuments.length >= 8;
       }
     }
   });
@@ -2720,7 +2974,7 @@
     try {
       for (let index = sessionStorage.length - 1; index >= 0; index--) {
         const key = sessionStorage.key(index);
-        if (key?.startsWith(sendDraftPrefix)) sessionStorage.removeItem(key);
+        if (key?.startsWith(sendDraftPrefix) || key?.startsWith(followupDraftPrefix)) sessionStorage.removeItem(key);
       }
     } catch { /* Le navigateur peut bloquer le stockage de session. */ }
   }
@@ -2857,9 +3111,9 @@
         sendStatus.textContent = "Renseignez l’objet et le message.";
         return;
       }
-      if (draft.files.length > 2 || draft.files.some(file => !/\.pdf$/i.test(file.name)) ||
-          draft.files.reduce((total, file) => total + file.size, 0) > 5 * 1024 * 1024) {
-        sendStatus.textContent = "Choisissez au maximum deux PDF de 5 Mo au total.";
+      if (draft.files.length > 8 || draft.files.some(file => !/\.pdf$/i.test(file.name)) ||
+          draft.files.reduce((total, file) => total + file.size, 0) > 10 * 1024 * 1024) {
+        sendStatus.textContent = "Choisissez au maximum huit PDF de 10 Mo au total.";
         return;
       }
       sendSubmit.disabled = true;

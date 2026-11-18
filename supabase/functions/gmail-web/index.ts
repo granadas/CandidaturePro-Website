@@ -344,7 +344,7 @@ Deno.serve(async (request: Request) => {
         return json({ message: "Impossible d’autoriser l’envoi. Vérifiez la connexion Gmail dans les paramètres." }, 502);
       }
       const attachments = parseAttachments(body.attachments ?? []);
-      if (!attachments) return json({ message: "Ajoutez au maximum deux PDF de 5 Mo au total." }, 400);
+      if (!attachments) return json({ message: "Ajoutez au maximum huit PDF de 10 Mo au total." }, 400);
       const raw = encodeMessage(recipient, subject, message, attachments);
       const rpc = (name: string, args: object) => fetch(root + "/rest/v1/rpc/" + name, {
         method: "POST",
@@ -433,16 +433,16 @@ function mimeBase64(text: string) {
 type Attachment = { name: string; data: string };
 
 function parseAttachments(input: unknown): Attachment[] | null {
-  if (!Array.isArray(input) || input.length > 2) return null;
+  if (!Array.isArray(input) || input.length > 8) return null;
   let size = 0;
   for (const item of input) {
     if (typeof item?.name !== "string" || !/\.pdf$/i.test(item.name) || item.name.length > 255 ||
-        typeof item.data !== "string" || item.data.length > Math.ceil(5 * 1024 * 1024 / 3) * 4 ||
+        typeof item.data !== "string" || item.data.length > Math.ceil(10 * 1024 * 1024 / 3) * 4 ||
         item.data.length % 4 || !/^[A-Za-z0-9+/]+={0,2}$/.test(item.data) ||
         !atob(item.data.slice(0, 8)).startsWith("%PDF-")) return null;
     size += item.data.length / 4 * 3 - (item.data.match(/=+$/)?.[0].length ?? 0);
   }
-  return size <= 5 * 1024 * 1024 ? input : null;
+  return size <= 10 * 1024 * 1024 ? input : null;
 }
 
 function encodeMessage(recipient: string, subject: string, message: string, attachments: Attachment[], reference = "") {

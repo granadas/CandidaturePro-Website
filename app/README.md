@@ -1,33 +1,29 @@
-# Candidature Pro Web — fondation
+# Candidature Pro Web
 
-Première étape de la version web, isolée de la page commerciale.
+L’espace candidat est servi sur https://candidaturepro.ch/app/. Le domaine `www` est redirigé vers cette adresse. La page publique présente le service ; les outils et le téléchargement Windows apparaissent après connexion.
 
-## Contenu
+## Parcours disponibles
 
-- interface responsive desktop/mobile ;
-- navigation principale alignée avec l'application Windows ;
-- tableau de bord initial ;
-- formulaire de connexion compatible avec Supabase Auth par e-mail/mot de passe ;
-- configuration publique séparée dans `config.js`.
+- Connexion Supabase, profil candidat et formule avec quota partagé.
+- Entreprises suisses, offres d’emploi, création et préparation des candidatures.
+- CV avec trois modèles, variantes enregistrées et adaptation des compétences à une offre.
+- Analyse indicative des CV du formulaire et historique privé des 30 derniers scores affichés ; Premium requis pour créer une analyse. Le calcul local ne consomme pas de crédit IA.
+- Bibliothèque PDF privée : CV, lettres, certificats, attestations, diplômes et autres justificatifs. Aperçu, téléchargement et suppression.
+- Génération de lettres, contrôle final et envoi Gmail individuel ou groupé. Au maximum huit PDF et 10 Mo cumulés par message ; validation identique dans le navigateur et sur le serveur.
+- Synchronisation des réponses, lecture des fils Gmail, rédaction et proposition IA de réponses.
+- Suivi des statuts, notes, réponses non lues et dates de relance.
+- Relances sélectionnées avec proposition IA à insérer après relecture ; brouillons et identifiants d’envoi conservés dans l’onglet jusqu’à l’envoi ou la déconnexion.
+- Préparation d’un nouvel envoi depuis le suivi : copie en brouillon, conservation de l’ancien envoi et réutilisation d’un renvoi déjà en attente.
+- Support et administration des contacts, vérifications, adresses invalides, liste noire, utilisateurs, crédits et actualisation des offres.
 
-## Activation de la connexion
+## Configuration
 
-Le projet Supabase doit être actif. Renseigner uniquement une clé **publishable** dans `config.js`.
+`config.js` contient uniquement l’URL Supabase et une clé publique. Les clés privées, la clé de service et les secrets OAuth restent côté serveur.
 
-Ne jamais placer une clé `service_role`, un secret OAuth Gmail ou une clé privée dans ce dépôt public.
+Le client OAuth Google est de type Application Web avec Gmail API activée. Autoriser exactement `https://candidaturepro.ch/app/` et l’URI de préversion configurée. Les secrets serveur sont `GMAIL_WEB_CLIENT_ID`, `GMAIL_WEB_CLIENT_SECRET` et `GMAIL_WEB_REDIRECT_URI`.
 
-## Étapes suivantes
+La fonction `gmail-web` vérifie l’utilisateur, l’origine et l’appartenance des dossiers avant les opérations Gmail. Les envois initiaux et les réponses/relances disposent de réservations pour éviter de renvoyer automatiquement un message dont le résultat est incertain. Vérifier Gmail lorsqu’un envoi reste incertain.
 
-1. connecter les données du profil ;
-2. inventorier les tables/RPC existantes et leurs politiques RLS ;
-3. connecter Entreprises et Candidatures en lecture ;
-4. ajouter les opérations d'écriture après contrôle RLS ;
-5. intégrer Gmail via une fonction serveur dédiée.
+## Limites de validation
 
-## Connexion Gmail web
-
-Créer un client OAuth Google de type **Application Web**, activer Gmail API et autoriser exactement l’URL de retour de l’application web, par exemple `https://candidaturepro.ch/app/` si le site est servi à cette adresse. Renseigner `GMAIL_WEB_CLIENT_ID`, `GMAIL_WEB_CLIENT_SECRET` et `GMAIL_WEB_REDIRECT_URI` dans les secrets de la fonction Supabase, puis tester le consentement avec un compte de test autorisé dans Google Cloud.
-
-La fonction `gmail-web` gère la connexion et la révocation pour le périmètre `gmail.send`. Un dossier au statut **Prête à envoyer** peut être envoyé depuis le navigateur avec jusqu’à deux PDF, pour 5 Mo au total. L’envoi confirmé passe le dossier au statut **Envoyée**. Si Gmail ne confirme pas le résultat, le dossier reste protégé contre un second envoi et l’utilisateur peut vérifier le dossier Envoyés dans Gmail. La synchronisation et la lecture des réponses utilisent aussi `gmail.readonly`.
-
-Pour activer Gmail sur le domaine public tout en conservant la préversion, ajouter `https://candidaturepro.ch/app/` aux URI de redirection autorisés du même client OAuth Google. Garder la valeur de `GMAIL_WEB_REDIRECT_URI` pour la préversion. La fonction associe le domaine public à son URI de retour fixe. Le démarrage OAuth et l’échange de code utilisent l’URI associée à l’origine de la requête.
+Les vérifications automatisées locales couvrent les calculs, validations, sélections et interruptions simulées. Elles ne remplacent pas une validation finale dans un navigateur connecté, avec de vrais PDF et le compte Gmail du candidat. L’analyse CV porte sur les champs du formulaire, sans extraction automatique du contenu des PDF importés.
