@@ -11,6 +11,8 @@
   const config = window.CANDIDATURE_PRO_CONFIG || {};
   const storageKey = "candidature-pro-web-session";
   let profile = null;
+  let accountLastRefreshed = 0;
+  let accountRefreshPromise = null;
   let applications = [];
   let companyResults = [];
   let jobResults = [];
@@ -85,18 +87,20 @@
     signOutButton.hidden = !email;
 
     const isPremium = hasPremiumCv();
+    const planLabel = profile ? (isPremium ? "Premium" : "Free") : "Vérification…";
     document.querySelector("#cv-targeting").hidden = !hasPremiumCv();
     document.querySelectorAll("#cv-form [name=template] option:not([value=classic])").forEach(option => { option.disabled = !hasPremiumCv(); });
-    document.querySelector("#current-plan").textContent = isPremium ? "Premium" : "Free";
+    document.querySelector("#current-plan").textContent = planLabel;
     document.querySelector("#settings-account").textContent = email
       ? email + (profile ? " · " + (isPremium ? "Premium" : "Free") : "")
       : "Connectez-vous pour accéder à votre compte.";
-    document.querySelector("#premium-plan").textContent = "Formule actuelle · " + (isPremium ? "Premium" : "Free");
-    document.querySelector("#plan-detail").textContent = isPremium ? "Candidatures illimitées" : "5 candidatures par mois";
+    document.querySelector("#premium-plan").textContent = "Formule actuelle · " + planLabel;
+    document.querySelector("#plan-detail").textContent = !profile ? "Vérification des droits du compte" : isPremium ? "Candidatures illimitées" : "5 candidatures par mois";
   }
 
   function showView(name, syncReplies = true) {
     if (appShell.hidden || (name === "admin" && profile?.is_admin !== true)) return;
+    if (profile) refreshAccountRights();
     const isDashboard = name === "dashboard";
     const isProfile = name === "profile";
     const isApplications = name === "applications";
@@ -2213,6 +2217,21 @@
     renderAccountSetup();
   }
 
+  function refreshAccountRights() {
+    if (!getSession()?.user?.id || !profile || Date.now() - accountLastRefreshed < 30000) return Promise.resolve();
+    if (accountRefreshPromise) return accountRefreshPromise;
+    accountRefreshPromise = loadDashboard().catch(() => {
+      // Preserve the last verified rights while the network is unavailable.
+      document.querySelector("#premium-plan").textContent += " · Actualisation indisponible";
+    }).finally(() => { accountRefreshPromise = null; });
+    return accountRefreshPromise;
+  }
+
+  window.addEventListener("focus", refreshAccountRights);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) refreshAccountRights();
+  });
+
   async function loadDashboard() {
     const session = await ensureSession();
     if (!session?.user?.id) {
@@ -2231,11 +2250,12 @@
 
     if (getSession()?.user?.id !== session.user.id) return;
     profile = Array.isArray(profiles) ? profiles[0] || null : null;
+    accountLastRefreshed = Date.now();
     document.querySelector("#stat-sent").textContent = quota ? String(quota.used) : "—";
     document.querySelector("#monthly-quota-detail").textContent = describeSendQuota(quota);
     renderAccountSetup();
     renderAccount();
-    renderProfile();
+    if (!document.querySelector("#profile-view").classList.contains("active")) renderProfile();
     await updateTrackingCounts(session);
   }
 
