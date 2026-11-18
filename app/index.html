@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#5b21b6">
   <meta name="description" content="Candidature Pro en ligne : recherchez, préparez, envoyez et suivez vos candidatures.">
   <title>Candidature Pro — Espace en ligne</title>
-  <link rel="stylesheet" href="app.css?v=20261118-cv-replies">
+  <link rel="stylesheet" href="app.css?v=20261118-pdf-import">
 </head>
 <body>
   <main id="guest-home" class="guest-home">
@@ -292,6 +292,18 @@
       <section id="documents-view" class="view">
         <article class="panel">
           <h2>Créer un CV</h2>
+          <fieldset class="cv-pdf-import"><legend>Importer le texte d’un CV PDF</legend>
+            <p>La lecture s’effectue dans votre navigateur. Le PDF reste sur votre appareil tant que vous ne l’ajoutez pas à la bibliothèque. Les scans sans texte sélectionnable nécessitent une saisie manuelle.</p>
+            <label>CV PDF (10 Mo et 20 pages maximum)<input id="cv-pdf-file" type="file" accept=".pdf,application/pdf"></label>
+            <button id="cv-pdf-cancel" type="button" class="secondary" hidden>Annuler la lecture</button>
+            <p id="cv-pdf-status" role="status"></p>
+            <div id="cv-pdf-review" hidden>
+              <label>Texte extrait à relire et à sélectionner<textarea id="cv-pdf-text" rows="8" maxlength="30000"></textarea></label>
+              <label>Rubrique à compléter<select id="cv-pdf-target"><option value="experience">Expériences</option><option value="summary">Profil</option><option value="education">Formation</option><option value="skills">Compétences et langues</option><option value="contact">Coordonnées</option></select></label>
+              <p>Gardez dans le texte ci-dessus la partie destinée à cette rubrique. Vous pouvez répéter l’opération pour les autres rubriques. Le texte est ajouté à la suite du contenu actuel.</p>
+              <button id="cv-pdf-insert" type="button" class="secondary">Ajouter le texte à cette rubrique</button>
+            </div>
+          </fieldset>
           <form id="cv-form" class="profile-form">
             <label>CV enregistrés<select id="cv-variants"><option value="">Choisir un CV</option></select></label>
             <div><button type="button" class="secondary" id="cv-load">Ouvrir</button>
@@ -581,6 +593,7 @@
 
   <script src="config.js"></script>
   <script src="backup.js?v=20261118"></script>
-  <script src="app.js?v=20261118-account-backup"></script>
+  <script src="pdf-import.js?v=20261118"></script>
+  <script src="app.js?v=20261118-pdf-import"></script>
 </body>
 </html>

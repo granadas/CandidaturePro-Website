@@ -31,4 +31,4 @@ La fonction `gmail-web` vérifie l’utilisateur, l’origine et l’appartenanc
 
 ## Limites de validation
 
-Les vérifications automatisées locales couvrent les calculs, validations, sélections et interruptions simulées. Elles ne remplacent pas une validation finale dans un navigateur connecté, avec de vrais PDF et le compte Gmail du candidat. L’analyse CV porte sur les champs du formulaire, sans extraction automatique du contenu des PDF importés.
+Les vérifications automatisées locales couvrent les calculs, validations, sélections et interruptions simulées. Elles ne remplacent pas une validation finale dans un navigateur connecté, avec de vrais PDF et le compte Gmail du candidat. L’analyse CV porte sur les champs du formulaire. L’import PDF extrait le texte localement avec PDF.js 6.5.438 (licence Apache 2.0 incluse), puis permet de relire et ajouter les passages aux rubriques. Aucun OCR des scans ; limites de 10 Mo, 20 pages, 30 000 caractères et 30 secondes. Les mises en page à colonnes peuvent nécessiter des corrections. Aucun PDF importé pour lecture n’est automatiquement téléversé ou enregistré.

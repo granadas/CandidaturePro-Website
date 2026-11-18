@@ -1915,6 +1915,46 @@
   let savedCvVariants = [];
   let editingCvId = null;
 
+  const cvPdfFile = document.querySelector("#cv-pdf-file"), cvPdfStatus = document.querySelector("#cv-pdf-status");
+  const cvPdfText = document.querySelector("#cv-pdf-text"), cvPdfReview = document.querySelector("#cv-pdf-review");
+  const cvPdfCancel = document.querySelector("#cv-pdf-cancel");
+  let cvPdfRequest = 0, cvPdfAbort = null;
+  function clearCvPdfImport() {
+    ++cvPdfRequest; cvPdfAbort?.abort(); cvPdfAbort = null;
+    cvPdfFile.value = cvPdfText.value = cvPdfStatus.textContent = "";
+    cvPdfReview.hidden = cvPdfCancel.hidden = true; cvPdfFile.disabled = false;
+  }
+  cvPdfCancel.addEventListener("click", () => { clearCvPdfImport(); cvPdfStatus.textContent = "Lecture annulée."; });
+  cvPdfFile.addEventListener("change", async () => {
+    const file = cvPdfFile.files?.[0], userId = getSession()?.user?.id;
+    if (!file || !userId) return;
+    cvPdfAbort?.abort(); const controller = new AbortController(); cvPdfAbort = controller;
+    const request = ++cvPdfRequest;
+    const current = () => request === cvPdfRequest && getSession()?.user?.id === userId;
+    cvPdfFile.disabled = true; cvPdfCancel.hidden = false; cvPdfReview.hidden = true;
+    cvPdfText.value = ""; cvPdfStatus.textContent = "Lecture du PDF sur cet appareil…";
+    try {
+      const result = await window.CP_PDF.extract(file, (page, total) => {
+        if (current()) cvPdfStatus.textContent = "Lecture de la page " + page + " sur " + total + "…";
+      }, controller.signal);
+      if (!current()) return;
+      cvPdfText.value = result.text; cvPdfReview.hidden = false;
+      cvPdfStatus.textContent = result.pages + " page(s) lue(s). Relisez le texte avant de l’ajouter au formulaire. Aucun CV enregistré n’a été modifié.";
+    } catch (error) { if (current()) cvPdfStatus.textContent = error.name === "AbortError" ? "Lecture annulée." : error.message; }
+    finally { if (current()) { cvPdfFile.disabled = false; cvPdfCancel.hidden = true; cvPdfAbort = null; } }
+  });
+  document.querySelector("#cv-pdf-insert").addEventListener("click", () => {
+    if (!getSession()?.user?.id || cvPdfReview.hidden || cvForm.dataset.saving) return;
+    const name = document.querySelector("#cv-pdf-target").value;
+    if (!["summary", "experience", "education", "skills", "contact"].includes(name)) return;
+    const field = cvForm.elements.namedItem(name), text = cvPdfText.value.trim();
+    if (!text) { cvPdfStatus.textContent = "Gardez le texte à ajouter dans la zone de relecture."; return; }
+    const value = [field.value.trim(), text].filter(Boolean).join("\n\n");
+    if (value.length > field.maxLength) { cvPdfStatus.textContent = "Cette rubrique accepte " + field.maxLength + " caractères. Réduisez le texte à insérer ; votre formulaire a été conservé."; return; }
+    field.value = value;
+    cvPdfStatus.textContent = "Texte ajouté au formulaire. Vérifiez la mise en page, puis enregistrez la variante pour conserver la modification.";
+  });
+
   const cvPhotoFile = document.querySelector("#cv-photo-file");
   const cvPhotoThumbnail = document.querySelector("#cv-photo-thumbnail");
   const cvPhotoStatus = document.querySelector("#cv-photo-status");
@@ -2054,7 +2094,7 @@
   });
 
   document.querySelector("#cv-new").addEventListener("click", () => {
-    ++cvLoadRequest; ++cvPhotoRequest;
+    ++cvLoadRequest; ++cvPhotoRequest; clearCvPdfImport();
     cvForm.reset(); cvForm.elements.namedItem("photo").value = ""; renderCvPhoto();
     cvPhotoStatus.textContent = "La photo sera conservée avec la variante lorsque vous l’enregistrez.";
     editingCvId = null;
@@ -3170,7 +3210,7 @@
     document.querySelector("#cv-analysis-target").value = "";
     ++adminRequest;
     adminResults.replaceChildren();
-    ++cvLoadRequest; ++cvPhotoRequest;
+    ++cvLoadRequest; ++cvPhotoRequest; clearCvPdfImport();
     cvForm.reset(); cvForm.elements.namedItem("photo").value = ""; renderCvPhoto();
     cvPhotoStatus.textContent = "";
     savedCvVariants = [];
