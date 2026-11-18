@@ -193,4 +193,5 @@
 
 #cv-import-sections { margin-top: 20px; border: 1px solid #dce3f1; border-radius: 12px; padding: 16px; min-width: 0; }
 #cv-import-sections input[type="checkbox"] { width: auto; margin-right: 8px; }
-#cv-import-sections label > span { display: flex; align-items: center; }
+#cv-import-sections .cv-import-proposal { padding: 12px 0; border-top: 1px solid #e5e9f2; }
+#cv-import-sections .cv-import-proposal > label:first-child { display: flex; align-items: center; font-weight: 700; }

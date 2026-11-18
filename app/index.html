@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#5b21b6">
   <meta name="description" content="Candidature Pro en ligne : recherchez, préparez, envoyez et suivez vos candidatures.">
   <title>Candidature Pro — Espace en ligne</title>
-  <link rel="stylesheet" href="app.css?v=20261118-cv-docx">
+  <link rel="stylesheet" href="app.css?v=20261118-cv-docx-review">
 </head>
 <body>
   <main id="guest-home" class="guest-home">
@@ -302,10 +302,10 @@
               <button id="cv-import-detect" type="button" class="secondary">Détecter les rubriques du CV</button>
               <fieldset id="cv-import-sections" hidden><legend>Rubriques proposées à relire</legend>
                 <p>Seules les rubriques cochées seront ajoutées à la suite du contenu actuel. Le nom, le titre, les coordonnées et la photo du formulaire restent inchangés.</p>
-                <label><span><input type="checkbox" id="cv-import-summary-check"> Profil</span><textarea id="cv-import-summary" rows="3" maxlength="2000"></textarea></label>
-                <label><span><input type="checkbox" id="cv-import-experience-check"> Expériences</span><textarea id="cv-import-experience" rows="5" maxlength="6000"></textarea></label>
-                <label><span><input type="checkbox" id="cv-import-education-check"> Formation</span><textarea id="cv-import-education" rows="3" maxlength="3000"></textarea></label>
-                <label><span><input type="checkbox" id="cv-import-skills-check"> Compétences et langues</span><textarea id="cv-import-skills" rows="3" maxlength="3000"></textarea></label>
+                <div class="cv-import-proposal"><label><input type="checkbox" id="cv-import-summary-check"> Profil</label><label>Texte proposé — profil<textarea id="cv-import-summary" rows="3" maxlength="2000"></textarea></label></div>
+                <div class="cv-import-proposal"><label><input type="checkbox" id="cv-import-experience-check"> Expériences</label><label>Texte proposé — expériences<textarea id="cv-import-experience" rows="5" maxlength="6000"></textarea></label></div>
+                <div class="cv-import-proposal"><label><input type="checkbox" id="cv-import-education-check"> Formation</label><label>Texte proposé — formation<textarea id="cv-import-education" rows="3" maxlength="3000"></textarea></label></div>
+                <div class="cv-import-proposal"><label><input type="checkbox" id="cv-import-skills-check"> Compétences et langues</label><label>Texte proposé — compétences et langues<textarea id="cv-import-skills" rows="3" maxlength="3000"></textarea></label></div>
                 <p id="cv-import-detect-status" role="status"></p>
                 <button id="cv-import-apply" type="button" class="secondary">Ajouter les rubriques cochées au formulaire</button>
               </fieldset>
@@ -605,6 +605,6 @@
   <script src="backup.js?v=20261118"></script>
   <script src="pdf-import.js?v=20261118"></script>
   <script src="cv-import.js?v=20261118"></script>
-  <script src="app.js?v=20261118-cv-docx"></script>
+  <script src="app.js?v=20261118-cv-docx-review"></script>
 </body>
 </html>
