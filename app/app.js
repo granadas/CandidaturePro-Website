@@ -1858,7 +1858,7 @@
 
   document.querySelector("#cv-new").addEventListener("click", () => {
     ++cvLoadRequest; ++cvPhotoRequest;
-    cvForm.reset(); renderCvPhoto();
+    cvForm.reset(); cvForm.elements.namedItem("photo").value = ""; renderCvPhoto();
     cvPhotoStatus.textContent = "La photo sera conservée avec la variante lorsque vous l’enregistrez.";
     editingCvId = null;
     document.querySelector("#cv-target-context").textContent = "";
@@ -2782,7 +2782,7 @@
     ++adminRequest;
     adminResults.replaceChildren();
     ++cvLoadRequest; ++cvPhotoRequest;
-    cvForm.reset(); renderCvPhoto();
+    cvForm.reset(); cvForm.elements.namedItem("photo").value = ""; renderCvPhoto();
     cvPhotoStatus.textContent = "";
     savedCvVariants = [];
     editingCvId = null;
