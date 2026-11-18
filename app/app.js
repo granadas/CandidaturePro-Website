@@ -156,8 +156,131 @@
       body: JSON.stringify(body)
     });
     const result = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(result.error_description || result.msg || "Connexion impossible.");
+    if (!response.ok) throw new Error(authErrorMessage(result, "Connexion impossible."));
     return normalizeSession(result);
+  }
+
+  function authErrorMessage(result, fallback) {
+    const code = result.error_code || result.code || "";
+    const raw = result.error_description || result.msg || result.message || "";
+    if (code === "invalid_credentials" || /invalid login credentials/i.test(raw)) return "L’e-mail ou le mot de passe n’est pas reconnu.";
+    if (code === "email_not_confirmed") return "Confirmez votre adresse e-mail avec le message reçu avant de vous connecter.";
+    if (["over_email_send_rate_limit", "over_request_rate_limit"].includes(code)) return "Trop de demandes rapprochées. Patientez avant de réessayer.";
+    if (["otp_expired", "flow_state_expired", "flow_state_not_found"].includes(code)) return "Le lien a expiré. Demandez un nouveau lien de récupération.";
+    if (code === "same_password") return "Choisissez un mot de passe différent du précédent.";
+    if (["reauthentication_needed", "reauthentication_not_valid"].includes(code)) return "Reconnectez-vous à votre compte avant de modifier le mot de passe.";
+    return raw || fallback;
+  }
+
+  const passwordDialog = document.querySelector("#password-dialog");
+  const passwordForm = document.querySelector("#password-form");
+  const passwordStatus = document.querySelector("#password-status");
+  const passwordSave = document.querySelector("#password-save");
+  const passwordClose = document.querySelector("#password-close");
+  const passwordForgot = document.querySelector("#password-forgot");
+  const recoveryFlowKey = "candidature-pro-password-recovery";
+  let passwordContext = null;
+
+  function openPasswordDialog(session, recovery) {
+    passwordContext = { session, recovery };
+    passwordForm.reset(); passwordStatus.textContent = "";
+    document.querySelector("#password-dialog-title").textContent = recovery ? "Choisir un nouveau mot de passe" : "Modifier mon mot de passe";
+    document.querySelector("#password-account").textContent = "Compte Candidature Pro · " + session.user.email;
+    passwordSave.hidden = false;
+    passwordDialog.showModal();
+  }
+
+  passwordForgot.addEventListener("click", async () => {
+    const emailField = document.querySelector("#email");
+    if (passwordForgot.disabled || !emailField.reportValidity()) return;
+    const email = emailField.value.trim().toLowerCase();
+    const submit = document.querySelector("#login-submit");
+    if (submit.disabled) return;
+    passwordForgot.disabled = submit.disabled = true;
+    loginMessage.textContent = "Préparation du lien de récupération…";
+    try {
+      const verifier = gmailEncode(crypto.getRandomValues(new Uint8Array(32)));
+      const challenge = gmailEncode(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))));
+      localStorage.setItem(recoveryFlowKey, JSON.stringify({ verifier, email, startedAt: Date.now() }));
+      const redirect = new URL(location.pathname, location.origin); redirect.searchParams.set("recuperation", "1");
+      const response = await fetch(config.supabaseUrl + "/auth/v1/recover?redirect_to=" + encodeURIComponent(redirect.href), {
+        method: "POST", headers: { apikey: config.supabasePublishableKey, "Content-Type": "application/json" },
+        body: JSON.stringify({ email, code_challenge: challenge, code_challenge_method: "s256" }), signal: AbortSignal.timeout(15000)
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(authErrorMessage(result, "Impossible d’envoyer le lien de récupération."));
+      loginMessage.textContent = "Si cette adresse correspond à un compte, un lien de récupération a été envoyé. Ouvrez-le dans ce même navigateur. Vérifiez aussi les courriers indésirables.";
+    } catch (error) {
+      loginMessage.textContent = error.name === "TimeoutError" ? "Le service met trop de temps à répondre. Vérifiez votre boîte e-mail avant une nouvelle demande." : error.message;
+    } finally { passwordForgot.disabled = submit.disabled = false; }
+  });
+
+  document.querySelector("#password-change-open").addEventListener("click", async () => {
+    const session = await ensureSession();
+    if (session?.user?.id && !passwordDialog.open) openPasswordDialog(session, false);
+  });
+  passwordClose.addEventListener("click", () => passwordDialog.close());
+  passwordDialog.addEventListener("cancel", event => { if (passwordSave.disabled) event.preventDefault(); });
+  passwordDialog.addEventListener("close", () => {
+    const recovery = passwordContext?.recovery;
+    passwordContext = null; passwordForm.reset();
+    if (recovery) location.replace(location.pathname);
+  });
+  passwordForm.addEventListener("submit", async event => {
+    event.preventDefault();
+    const context = passwordContext;
+    if (!context || passwordSave.disabled || passwordSave.hidden || !passwordForm.reportValidity()) return;
+    const password = document.querySelector("#password-new").value;
+    if (password !== document.querySelector("#password-confirm").value) { passwordStatus.textContent = "Les deux mots de passe sont différents."; return; }
+    if (password.length < 8) { passwordStatus.textContent = "Choisissez un mot de passe d’au moins 8 caractères."; return; }
+    if (!context.recovery && getSession()?.user?.id !== context.session.user.id) { passwordStatus.textContent = "Le compte connecté a changé. Rouvrez ce formulaire."; return; }
+    passwordSave.disabled = passwordClose.disabled = true;
+    passwordStatus.textContent = "Modification en cours…";
+    try {
+      const session = context.recovery ? context.session : await ensureSession();
+      if (!session?.access_token || session.user.id !== context.session.user.id || session.expires_at <= Date.now() / 1000) throw new Error("Votre session a expiré. Reconnectez-vous ou demandez un nouveau lien.");
+      const response = await fetch(config.supabaseUrl + "/auth/v1/user", {
+        method: "PUT", headers: { apikey: config.supabasePublishableKey, Authorization: "Bearer " + session.access_token, "Content-Type": "application/json" },
+        body: JSON.stringify({ password }), signal: AbortSignal.timeout(15000)
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(authErrorMessage(result, "Le mot de passe n’a pas pu être modifié."));
+      if (passwordContext !== context) return;
+      if (context.recovery) setSession(session);
+      passwordForm.reset(); passwordSave.hidden = true;
+      passwordStatus.textContent = "Votre mot de passe a été modifié. Vous pouvez fermer cette fenêtre.";
+    } catch (error) {
+      if (passwordContext === context) passwordStatus.textContent = ["TimeoutError", "AbortError", "TypeError"].includes(error.name)
+        ? "Connexion interrompue. La modification a peut-être abouti. Vérifiez la connexion avec le nouveau mot de passe avant de réessayer." : error.message;
+    } finally { passwordSave.disabled = passwordClose.disabled = false; }
+  });
+
+  async function finishPasswordRecovery() {
+    const url = new URL(location.href);
+    if (url.searchParams.get("recuperation") !== "1") return false;
+    const code = url.searchParams.get("code");
+    const failed = url.searchParams.has("error");
+    url.searchParams.delete("code"); url.searchParams.delete("recuperation");
+    url.searchParams.delete("error"); url.searchParams.delete("error_description");
+    history.replaceState(null, "", url.pathname + url.search);
+    let flow;
+    try { flow = JSON.parse(localStorage.getItem(recoveryFlowKey) || "null"); } catch { flow = null; }
+    try {
+      if (failed || !code || code.length > 4096 || !flow || !/^[A-Za-z0-9_-]{43}$/.test(flow.verifier || "") || !Number.isFinite(flow.startedAt) || flow.startedAt > Date.now() || Date.now() - flow.startedAt > 60 * 60 * 1000) throw new Error("Le lien a expiré ou a été ouvert dans un autre navigateur. Demandez un nouveau lien et ouvrez-le dans le navigateur utilisé pour la demande.");
+      const response = await fetch(config.supabaseUrl + "/auth/v1/token?grant_type=pkce", {
+        method: "POST", headers: { apikey: config.supabasePublishableKey, "Content-Type": "application/json" },
+        body: JSON.stringify({ auth_code: code, code_verifier: flow.verifier }), signal: AbortSignal.timeout(15000)
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(authErrorMessage(result, "Le lien de récupération n’est plus valide."));
+      if (!result.access_token || !result.refresh_token || !result.user?.id || result.user.email?.toLowerCase() !== flow.email) throw new Error("Le lien ne correspond pas au compte demandé. Recommencez la récupération.");
+      localStorage.removeItem(recoveryFlowKey);
+      openPasswordDialog(normalizeSession(result), true);
+    } catch (error) {
+      loginMessage.textContent = error.message;
+      dialog.showModal();
+    }
+    return true;
   }
 
   async function signIn(email, password) {
@@ -2378,6 +2501,190 @@
     }
   });
 
+  const backupExport = document.querySelector("#backup-export");
+  const backupFile = document.querySelector("#backup-file");
+  const backupRestore = document.querySelector("#backup-restore");
+  const backupPreview = document.querySelector("#backup-preview");
+  const backupStatus = document.querySelector("#backup-status");
+  let backupRequest = 0;
+  let backupCandidate = null;
+  let backupBusy = false;
+  const backupApplicationFields = ["id", "company_name", "company_city", "company_email", "job_title", "status", "source", "notes", "sent_at", "last_activity_at", "next_follow_up_at", "last_inbound_at", "hidden_at", "created_at", "updated_at", "source_url", "last_follow_up_sent_at", "follow_up_delay_days", "last_automatic_reply_at", "last_human_reply_at", "last_reply_read_at", "source_job_id", "resend_of"];
+  const backupUuid = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+
+  function setBackupBusy(busy) {
+    backupBusy = busy; backupExport.disabled = backupFile.disabled = busy;
+    backupRestore.disabled = busy || !backupCandidate;
+  }
+  function downloadBackup(blob) {
+    const url = URL.createObjectURL(blob), link = document.createElement("a");
+    link.href = url; link.download = "CandidaturePro_Sauvegarde_" + new Date().toISOString().slice(0, 10) + ".zip";
+    document.body.append(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  }
+  function safeBackupFilename(name) {
+    return name.replace(/[\\/:\x00-\x1f\x7f]/g, "_").slice(0, 255);
+  }
+  function backupString(value, max, required = false) {
+    if (value === null || value === undefined) { if (required) throw new Error("Un champ requis manque dans la sauvegarde."); return null; }
+    if (typeof value !== "string" || [...value].length > max || (required && !value.trim())) throw new Error("Un champ de la sauvegarde est invalide ou trop long.");
+    return value;
+  }
+  function validateBackupManifest(manifest, entries, userId) {
+    if (!manifest || manifest.format !== "candidature-pro-web" || manifest.version !== 1 || manifest.accountId !== userId ||
+        !Array.isArray(manifest.applications) || manifest.applications.length > 20000 ||
+        !Array.isArray(manifest.cvVariants) || manifest.cvVariants.length > 1000 ||
+        !Array.isArray(manifest.documents) || manifest.documents.length > 1999) throw new Error("Cette sauvegarde n’est pas compatible avec le compte connecté.");
+    const seenApplications = new Set(), seenVariants = new Set(), seenDocuments = new Set();
+    const applications = manifest.applications.map(row => {
+      if (!row || !backupUuid.test(row.id) || seenApplications.has(row.id)) throw new Error("Identifiant de dossier invalide ou en double.");
+      seenApplications.add(row.id);
+      if (!Object.hasOwn(statusLabels, row.status) || !["web", "desktop", "import"].includes(row.source)) throw new Error("Statut de dossier invalide.");
+      const clean = { id: row.id, status: row.status, source: row.source };
+      for (const [key, max] of [["company_name", 200], ["company_city", 150], ["company_email", 254], ["job_title", 200], ["notes", 5000], ["source_url", 2000]]) clean[key] = backupString(row[key], max, key === "company_name");
+      for (const key of ["sent_at", "last_activity_at", "next_follow_up_at", "last_inbound_at", "hidden_at", "created_at", "updated_at", "last_follow_up_sent_at", "last_automatic_reply_at", "last_human_reply_at", "last_reply_read_at"]) {
+        const value = row[key];
+        if (value !== null && value !== undefined && (typeof value !== "string" || value.length > 40 || !Number.isFinite(Date.parse(value)))) throw new Error("Une date de dossier est invalide.");
+        if (value != null) clean[key] = value;
+      }
+      const delay = row.follow_up_delay_days ?? 10;
+      if (!Number.isInteger(delay) || delay < 1 || delay > 365) throw new Error("Délai de relance invalide.");
+      clean.follow_up_delay_days = delay;
+      for (const key of ["source_job_id", "resend_of"]) { if (row[key] != null && !backupUuid.test(row[key])) throw new Error("Référence de dossier invalide."); clean[key] = row[key] || null; }
+      return clean;
+    });
+    const cvVariants = manifest.cvVariants.map(row => {
+      if (!row || !backupUuid.test(row.id) || seenVariants.has(row.id) || !row.fields || typeof row.fields !== "object" || Array.isArray(row.fields)) throw new Error("Variante de CV invalide.");
+      seenVariants.add(row.id);
+      const fields = {};
+      for (const key of cvFieldNames) fields[key] = backupString(row.fields[key] ?? "", key === "photo" ? 100000 : 16000) || "";
+      if (!fields.name || !fields.title || !["classic", "modern", "compact"].includes(fields.template) || (fields.photo && !validCvPhoto(fields.photo)) ||
+          new TextEncoder().encode(JSON.stringify(fields)).length > 150000) throw new Error("Le contenu d’un CV est invalide.");
+      const clean = { id: row.id, label: backupString(row.label, 120, true), fields };
+      if (typeof row.updated_at === "string" && row.updated_at.length <= 40 && Number.isFinite(Date.parse(row.updated_at))) clean.updated_at = row.updated_at;
+      return clean;
+    });
+    const documents = manifest.documents.map(row => {
+      if (!row || !Object.hasOwn(documentKinds, row.kind) || typeof row.name !== "string" || row.name !== safeBackupFilename(row.name) || !/\.pdf$/i.test(row.name)) throw new Error("Document invalide dans la sauvegarde.");
+      const path = "documents/" + row.kind + "/" + row.name;
+      if (row.path !== path || seenDocuments.has(path)) throw new Error("Chemin de document invalide ou en double.");
+      seenDocuments.add(path);
+      const bytes = entries.get(path);
+      if (!bytes || bytes.length > 10 * 1024 * 1024 || new TextDecoder().decode(bytes.subarray(0, 5)) !== "%PDF-") throw new Error("Un PDF est absent, invalide ou trop volumineux.");
+      return { kind: row.kind, name: row.name, path, bytes };
+    });
+    if (entries.size !== documents.length + 1) throw new Error("La sauvegarde contient des fichiers inattendus.");
+    return { applications, cvVariants, documents };
+  }
+
+  backupExport.addEventListener("click", async () => {
+    const session = await ensureSession();
+    if (!session?.user?.id || backupBusy) return;
+    const request = ++backupRequest, userId = session.user.id;
+    const current = () => request === backupRequest && getSession()?.user?.id === userId;
+    setBackupBusy(true); backupStatus.textContent = "Préparation de la sauvegarde…";
+    try {
+      const [applicationRows, cvVariants, files] = await Promise.all([
+        fetchApplicationPages("user_applications?select=" + backupApplicationFields.join(","), current),
+        fetchApplicationPages("web_cv_variants?select=id,label,fields,updated_at", current), listDocuments(session)
+      ]);
+      if (!current()) return;
+      const manifest = { format: "candidature-pro-web", version: 1, accountId: userId, exportedAt: new Date().toISOString(),
+        applications: applicationRows.map(row => Object.fromEntries(backupApplicationFields.filter(key => row[key] !== undefined).map(key => [key, row[key]]))), cvVariants, documents: [] };
+      const entries = [];
+      let total = 0;
+      for (const [index, file] of files.entries()) {
+        if (!current()) return;
+        backupStatus.textContent = "Ajout du PDF " + (index + 1) + " sur " + files.length + "…";
+        const blob = await getDocumentBlob(userId, file);
+        if (!current()) return;
+        const bytes = new Uint8Array(await blob.arrayBuffer()); total += bytes.length;
+        if (total > 100 * 1024 * 1024 || bytes.length > 10 * 1024 * 1024) throw new Error("La sauvegarde dépasse 100 Mo ou un document dépasse 10 Mo.");
+        const kind = file.prefix.split("/").at(-1), name = safeBackupFilename(file.name), path = "documents/" + kind + "/" + name;
+        entries.push({ name: path, bytes }); manifest.documents.push({ kind, name, path });
+      }
+      const manifestBytes = new TextEncoder().encode(JSON.stringify(manifest, null, 2));
+      validateBackupManifest(manifest, new Map([["candidature-pro.json", manifestBytes], ...entries.map(entry => [entry.name, entry.bytes])]), userId);
+      if (manifestBytes.length > 30 * 1024 * 1024) throw new Error("Les dossiers et variantes dépassent 30 Mo. Réduisez le nombre de variantes ou la taille des photos.");
+      const archive = window.CP_BACKUP.buildArchive([{ name: "candidature-pro.json", bytes: manifestBytes }, ...entries]);
+      if (!current()) return;
+      downloadBackup(archive);
+      backupStatus.textContent = "Sauvegarde préparée : " + applicationRows.length + " dossier(s), " + cvVariants.length + " CV et " + files.length + " PDF. Vérifiez que le téléchargement est terminé.";
+    } catch (error) { if (current()) backupStatus.textContent = error.message; }
+    finally { setBackupBusy(false); }
+  });
+
+  backupFile.addEventListener("change", async () => {
+    const file = backupFile.files?.[0], userId = getSession()?.user?.id;
+    const request = ++backupRequest;
+    backupCandidate = null; backupRestore.hidden = true; backupRestore.disabled = true; backupPreview.textContent = "";
+    if (!file || !userId || backupBusy) return;
+    backupStatus.textContent = "Lecture de la sauvegarde…";
+    try {
+      if (file.size > 103 * 1024 * 1024) throw new Error("Choisissez une sauvegarde ZIP de 100 Mo maximum.");
+      const entries = window.CP_BACKUP.readArchive(new Uint8Array(await file.arrayBuffer()));
+      const manifestBytes = entries.get("candidature-pro.json");
+      if (!manifestBytes || manifestBytes.length > 30 * 1024 * 1024) throw new Error("Le fichier de données est absent ou trop volumineux.");
+      const parsed = validateBackupManifest(JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(manifestBytes)), entries, userId);
+      if (request !== backupRequest || getSession()?.user?.id !== userId) return;
+      backupCandidate = { ...parsed, userId };
+      backupPreview.textContent = parsed.applications.length + " dossier(s), " + parsed.cvVariants.length + " CV et " + parsed.documents.length + " PDF à comparer aux données actuelles.";
+      backupStatus.textContent = "Archive reconnue. Les éléments déjà présents seront conservés.";
+      backupRestore.hidden = false; backupRestore.disabled = false;
+    } catch (error) {
+      if (request === backupRequest && getSession()?.user?.id === userId) backupStatus.textContent = error instanceof SyntaxError ? "Le fichier de données de la sauvegarde est invalide." : error.message;
+    }
+  });
+
+  backupRestore.addEventListener("click", async () => {
+    const candidate = backupCandidate, session = await ensureSession();
+    if (!candidate || backupBusy || candidate.userId !== session?.user?.id) return;
+    if (!window.confirm("Ajouter les dossiers, CV et PDF manquants de cette sauvegarde à votre compte ? Les éléments déjà présents seront conservés.")) return;
+    const request = ++backupRequest, userId = candidate.userId;
+    const current = () => request === backupRequest && getSession()?.user?.id === userId;
+    const counts = { added: 0, skipped: 0 };
+    setBackupBusy(true); backupStatus.textContent = "Comparaison avec les données actuelles…";
+    try {
+      const [applicationRows, variants, files] = await Promise.all([
+        fetchApplicationPages("user_applications?select=id", current), fetchApplicationPages("web_cv_variants?select=id", current), listDocuments(session)
+      ]);
+      if (!current()) return;
+      const applicationIds = new Set(applicationRows.map(row => row.id)), variantIds = new Set(variants.map(row => row.id));
+      const filePaths = new Set(files.map(file => file.prefix.split("/").at(-1) + "/" + file.name));
+      const pending = [...candidate.applications.map(row => ({ table: "user_applications", row, exists: applicationIds.has(row.id) })),
+        ...candidate.cvVariants.map(row => ({ table: "web_cv_variants", row, exists: variantIds.has(row.id) }))];
+      for (const [index, item] of pending.entries()) {
+        if (!current()) return;
+        backupStatus.textContent = "Restauration des données " + (index + 1) + " sur " + pending.length + "…";
+        if (item.exists) { counts.skipped++; continue; }
+        try { await supabaseWrite(item.table, "POST", { ...item.row, user_id: userId }); counts.added++; }
+        catch (error) {
+          // A concurrent creation must never cause an overwrite.
+          const existing = await supabaseFetch(item.table + "?id=eq." + encodeURIComponent(item.row.id) + "&select=id");
+          if (existing.length) counts.skipped++; else throw error;
+        }
+      }
+      for (const [index, file] of candidate.documents.entries()) {
+        if (!current()) return;
+        backupStatus.textContent = "Restauration du PDF " + (index + 1) + " sur " + candidate.documents.length + "…";
+        if (filePaths.has(file.kind + "/" + file.name)) { counts.skipped++; continue; }
+        const freshSession = await ensureSession();
+        if (freshSession?.user?.id !== userId || !current()) return;
+        await documentRequest(freshSession, documentsBucket + "/" + userId + "/" + file.kind + "/" + encodeURIComponent(file.name), {
+          method: "POST", headers: { "Content-Type": "application/pdf", "x-upsert": "false" }, body: file.bytes
+        });
+        counts.added++;
+      }
+      if (current()) {
+        backupStatus.textContent = "Restauration terminée : " + counts.added + " élément(s) ajouté(s), " + counts.skipped + " déjà présent(s).";
+        backupCandidate = null; backupRestore.hidden = true; backupFile.value = "";
+        await loadDashboard();
+      }
+    } catch (error) {
+      if (current()) backupStatus.textContent = counts.added + " élément(s) ajouté(s) avant l’arrêt. " + error.message + " Une nouvelle tentative conservera les éléments déjà restaurés.";
+    } finally { setBackupBusy(false); }
+  });
+
   async function loadSendQuota() {
     const response = await supabaseRpc("get_my_candidature_quota", {});
     const quota = Array.isArray(response) ? response[0] : response;
@@ -2843,6 +3150,8 @@
   });
   signOutButton.addEventListener("click", () => {
     profile = null;
+    ++backupRequest; backupCandidate = null; backupFile.value = ""; backupPreview.textContent = backupStatus.textContent = "";
+    if (passwordDialog.open) passwordDialog.close();
     ++accountSetupRequest;
     accountSetup = { cv: null, gmail: null };
     profileDetailsUser = null;
@@ -2889,8 +3198,9 @@
   loginForm.addEventListener("submit", async event => {
     event.preventDefault();
     const submit = document.querySelector("#login-submit");
+    if (submit.disabled || passwordForgot.disabled) return;
     loginMessage.textContent = "";
-    submit.disabled = true;
+    submit.disabled = passwordForgot.disabled = true;
     submit.textContent = "Connexion…";
     try {
       const session = await signIn(document.querySelector("#email").value.trim(), document.querySelector("#password").value);
@@ -2904,7 +3214,7 @@
     } catch (error) {
       loginMessage.textContent = error.message;
     } finally {
-      submit.disabled = false;
+      submit.disabled = passwordForgot.disabled = false;
       submit.textContent = "Se connecter";
     }
   });
@@ -3699,6 +4009,7 @@
   }
 
   async function bootstrap() {
+    if (await finishPasswordRecovery()) return;
     await ensureSession();
     renderAccount();
     showView("dashboard", false);

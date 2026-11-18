@@ -393,6 +393,17 @@
           <div class="panel-head"><h2>Mon compte</h2></div>
           <p id="settings-account"></p>
           <button class="secondary" data-view-link="profile">Modifier mon profil</button>
+          <button id="password-change-open" class="secondary" type="button">Modifier mon mot de passe</button>
+        </article>
+        <article class="panel" aria-labelledby="backup-title">
+          <h2 id="backup-title">Sauvegarde de mes données</h2>
+          <p>L’archive ZIP contient vos dossiers, vos variantes de CV et vos PDF réutilisables. Conservez-la dans un emplacement privé.</p>
+          <button id="backup-export" type="button" class="secondary">Télécharger ma sauvegarde</button>
+          <label>Restaurer une sauvegarde créée avec ce compte<input id="backup-file" type="file" accept=".zip,application/zip"></label>
+          <p>La restauration ajoute les éléments manquants et conserve les éléments déjà présents. L’identité, l’abonnement et la connexion Gmail sont gérés par votre compte. Un ancien fil Gmail peut ne plus être disponible après la restauration d’un dossier supprimé.</p>
+          <p id="backup-preview" role="status"></p>
+          <button id="backup-restore" type="button" class="secondary" hidden disabled>Ajouter les éléments manquants</button>
+          <p id="backup-status" role="status"></p>
         </article>
         <article class="panel">
           <div class="panel-head"><h2>Gmail</h2></div>
@@ -549,13 +560,27 @@
       <p>Utilisez le même compte que dans l'application Windows.</p>
       <label>Adresse e-mail<input id="email" type="email" autocomplete="email" required></label>
       <label>Mot de passe<input id="password" type="password" autocomplete="current-password" required></label>
+      <button id="password-forgot" type="button" class="secondary">Mot de passe oublié ?</button>
       <div id="login-message" class="message" role="status"></div>
       <button id="login-submit" class="primary full" type="submit">Se connecter</button>
       <small>Vos identifiants sont transmis directement au service d'authentification sécurisé de Candidature Pro.</small>
     </form>
   </dialog>
 
+  <dialog id="password-dialog" aria-labelledby="password-dialog-title">
+    <form id="password-form" class="profile-form">
+      <h2 id="password-dialog-title" class="wide">Modifier mon mot de passe</h2>
+      <p id="password-account" class="wide"></p>
+      <label class="wide">Nouveau mot de passe<input id="password-new" type="password" required minlength="8" maxlength="128" autocomplete="new-password"></label>
+      <label class="wide">Confirmer le nouveau mot de passe<input id="password-confirm" type="password" required minlength="8" maxlength="128" autocomplete="new-password"></label>
+      <p id="password-status" role="status" class="wide"></p>
+      <div class="wide batch-actions"><button id="password-save" type="submit" class="primary">Enregistrer le nouveau mot de passe</button>
+        <button id="password-close" type="button" class="secondary">Fermer</button></div>
+    </form>
+  </dialog>
+
   <script src="config.js"></script>
-  <script src="app.js?v=20261118-identity"></script>
+  <script src="backup.js?v=20261118"></script>
+  <script src="app.js?v=20261118-account-backup"></script>
 </body>
 </html>

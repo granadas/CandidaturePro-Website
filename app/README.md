@@ -16,7 +16,12 @@ L’espace candidat est servi sur https://candidaturepro.ch/app/. Le domaine `ww
 - Préparation d’un nouvel envoi depuis le suivi : copie en brouillon, conservation de l’ancien envoi et réutilisation d’un renvoi déjà en attente.
 - Support et administration des contacts, vérifications, adresses invalides, liste noire, utilisateurs, crédits et actualisation des offres.
 
+- Mot de passe oublié par lien e-mail PKCE dans le même navigateur ; modification depuis Mon compte avec confirmation du nouveau mot de passe. Aucun changement automatique des identifiants.
+- Sauvegarde ZIP des dossiers, variantes de CV et PDF privés (100 Mo maximum), contrôle d’intégrité CRC et appartenance au compte. Restauration des éléments manquants seulement, sans écraser les éléments existants, modifier l’identité ou les droits, ni importer de jetons Gmail. Les liens de fils Gmail des dossiers supprimés ne sont pas recréés.
+
 ## Configuration
+
+Dans la configuration Auth Supabase, autoriser `https://candidaturepro.ch/app/?recuperation=1` (et l’URL équivalente de préversion) pour le retour des liens de récupération. La livraison réelle du lien et le changement du mot de passe nécessitent une validation par le titulaire du compte.
 
 `config.js` contient uniquement l’URL Supabase et une clé publique. Les clés privées, la clé de service et les secrets OAuth restent côté serveur.
 
