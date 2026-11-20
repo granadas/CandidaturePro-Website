@@ -17,6 +17,10 @@
   let companyResults = [];
   let jobResults = [];
   let refreshPromise = null;
+  let deviceCheckPromise = null;
+  let deviceClaimPromise = null;
+  let deviceCheckAt = 0;
+  let devicePolicyMessageShown = false;
 
   const titles = {
     dashboard: ["Tableau de bord", "Votre recherche en un coup d’œil"],
@@ -24,10 +28,13 @@
     jobs: ["Postes ouverts", "Découvrez les offres correspondant à votre profil"],
     applications: ["Candidatures", "Préparez et contrôlez vos dossiers"],
     tracking: ["Suivi", "Réponses, relances et entretiens"],
+    account: ["Mon compte", "Statut du compte et utilisation du mois"],
     profile: ["Mon profil", "Vos informations de candidature"],
     documents: ["Documents", "CV et lettres de motivation"],
     premium: ["Premium", "Votre formule et les conditions Premium"],
     support: ["Support", "Assistance Candidature Pro"],
+    updates: ["Mises à jour", "Version web et dernière version Windows publiée"],
+    about: ["À propos", "Informations sur Candidature Pro"],
     admin: ["Administration", "Statistiques, utilisateurs et gestion du service"],
     settings: ["Paramètres", "Compte, e-mail et préférences"]
   };
@@ -52,10 +59,10 @@
   const appShell = document.querySelector(".app-shell");
   const guestHome = document.querySelector("#guest-home");
   const guestLogin = document.querySelector("#guest-login");
-
   const authModeSignin = document.querySelector("#auth-mode-signin"), authModeSignup = document.querySelector("#auth-mode-signup");
   const signupConfirm = document.querySelector("#signup-confirm"), signupResend = document.querySelector("#signup-resend");
   let authMode = "signin", authBusy = false, pendingConfirmationEmail = null, signupResendAfter = 0;
+
   function setAuthMode(mode) {
     if (authBusy || document.querySelector("#login-submit").disabled) return;
     authMode = mode === "signup" ? "signup" : "signin";
@@ -98,6 +105,73 @@
     };
   }
 
+  async function deviceRpc(session, name, token, timeoutMs = 5000) {
+    if (!session?.access_token || !token || !config.supabaseUrl || !config.supabasePublishableKey) return null;
+    try {
+      const response = await fetch(config.supabaseUrl + "/rest/v1/rpc/" + name, {
+        method: "POST",
+        headers: { apikey: config.supabasePublishableKey, Authorization: "Bearer " + session.access_token, "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ p_device_token: token }),
+        signal: AbortSignal.timeout(timeoutMs)
+      });
+      if (!response.ok) return null;
+      const result = await response.json().catch(() => null);
+      return typeof result === "boolean" ? result : null;
+    } catch { return null; }
+  }
+
+  function newDeviceToken() {
+    if (crypto?.randomUUID) return crypto.randomUUID();
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = [...bytes].map(value => value.toString(16).padStart(2, "0")).join("");
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  }
+
+  async function claimActiveDevice(session) {
+    if (deviceClaimPromise) return deviceClaimPromise;
+    const token = session.device_token || newDeviceToken();
+    deviceClaimPromise = (async () => {
+      const claimed = await deviceRpc(session, "claim_my_active_device", token);
+      if (claimed !== true) throw new Error("Impossible de confirmer cet appareil pour le moment. Réessayez dans un instant.");
+      return { ...session, device_token: token, device_policy_initialized: true };
+    })();
+    try { return await deviceClaimPromise; }
+    finally { deviceClaimPromise = null; }
+  }
+
+  async function releaseActiveDevice(session) {
+    if (!session?.device_token) return;
+    await deviceRpc(session, "release_my_active_device", session.device_token, 2500);
+  }
+
+  async function checkActiveDevice(force = false) {
+    const session = getSession();
+    if (!session?.device_policy_initialized || !session.device_token) return true;
+    if (!force && Date.now() - deviceCheckAt < 25000) return true;
+    if (deviceCheckPromise) return deviceCheckPromise;
+    deviceCheckAt = Date.now();
+    deviceCheckPromise = (async () => {
+      const active = await deviceRpc(session, "is_my_active_device", session.device_token);
+      const latest = getSession();
+      if (latest?.user?.id !== session.user?.id || latest?.device_token !== session.device_token) return true;
+      if (active === null) return true; // Réseau ou service indisponible : même comportement que l’application Windows.
+      if (active) return true;
+      profile = null;
+      setSession(null);
+      if (!devicePolicyMessageShown) {
+        devicePolicyMessageShown = true;
+        loginMessage.textContent = "Ce compte a été connecté sur un autre appareil. Reconnectez-vous ici pour reprendre la session.";
+        if (!dialog.open) dialog.showModal();
+      }
+      return false;
+    })();
+    try { return await deviceCheckPromise; }
+    finally { deviceCheckPromise = null; }
+  }
+
   function renderAccount() {
     const session = getSession();
     const signedIn = Boolean(session?.user?.id && session?.access_token);
@@ -119,6 +193,8 @@
     document.querySelector("#settings-account").textContent = email
       ? email + (profile ? " · " + (isPremium ? "Premium" : "Free") : "")
       : "Connectez-vous pour accéder à votre compte.";
+    document.querySelector("#account-view-email").textContent = email || "Compte non connecté";
+    document.querySelector("#account-view-plan").textContent = planLabel;
     document.querySelector("#premium-plan").textContent = "Formule actuelle · " + planLabel;
     document.querySelector("#plan-detail").textContent = !profile ? "Vérification des droits du compte" : isPremium ? "Candidatures illimitées" : "5 candidatures par mois";
   }
@@ -139,7 +215,10 @@
     document.querySelector("#companies-view").classList.toggle("active", isCompanies);
     document.querySelector("#jobs-view").classList.toggle("active", isJobs);
     document.querySelector("#tracking-view").classList.toggle("active", isTracking);
+    document.querySelector("#account-view").classList.toggle("active", name === "account");
     document.querySelector("#documents-view").classList.toggle("active", isDocuments);
+    document.querySelector("#updates-view").classList.toggle("active", name === "updates");
+    document.querySelector("#about-view").classList.toggle("active", name === "about");
     document.querySelector("#premium-view").classList.toggle("active", name === "premium");
     document.querySelector("#support-view").classList.toggle("active", name === "support");
     document.querySelector("#admin-view").classList.toggle("active", name === "admin");
@@ -167,7 +246,11 @@
       if (syncReplies) syncGmailRepliesAutomatically();
     }
     if (isDocuments) { loadDocuments(); loadCvVariants(); loadCvAnalysisHistory(); }
-    if (name === "settings") loadGmail();
+    if (name === "account") loadDashboard().catch(error => {
+      document.querySelector("#account-view-usage").textContent = error.message;
+    });
+    if (name === "updates") loadWebUpdates();
+    if (name === "settings") { loadGmail(); loadOutlook(); }
     sidebar.classList.remove("open");
   }
 
@@ -334,7 +417,37 @@
     if (!config.supabaseUrl || !config.supabasePublishableKey) {
       throw new Error("La connexion réelle n’est pas encore activée sur cette version de test.");
     }
-    return authRequest("password", { email, password });
+    const session = await authRequest("password", { email, password });
+    return claimActiveDevice(session);
+  }
+
+  async function loadWebUpdates() {
+    const status = document.querySelector("#web-update-status");
+    const notes = document.querySelector("#web-update-notes");
+    const download = document.querySelector("#windows-update-download");
+    status.textContent = "Recherche de la dernière version publiée…";
+    notes.textContent = "";
+    download.hidden = true;
+    try {
+      const url = config.supabaseUrl + "/rest/v1/app_releases?status=eq.published&select=version,installer_url,release_notes,is_mandatory,published_at&order=published_at.desc&limit=1";
+      const response = await fetch(url, { headers: { apikey: config.supabasePublishableKey, Accept: "application/json" }, signal: AbortSignal.timeout(10000) });
+      if (!response.ok) throw new Error("Le service de versions est temporairement indisponible.");
+      const rows = await response.json();
+      if (!Array.isArray(rows) || !rows.length) {
+        status.textContent = "Le site utilise automatiquement sa dernière version déployée. Aucune version Windows publiée n’est actuellement répertoriée.";
+        return;
+      }
+      const release = rows[0];
+      status.textContent = `Le site utilise automatiquement sa dernière version déployée. Dernière version Windows publiée : ${release.version || "—"}.` +
+        (release.is_mandatory === true ? " Cette mise à jour est indiquée comme obligatoire pour Windows." : "");
+      notes.textContent = release.release_notes || "Aucune note de version n’a été publiée.";
+      if (typeof release.installer_url === "string" && /^https:\/\//i.test(release.installer_url)) {
+        download.href = release.installer_url;
+        download.hidden = false;
+      }
+    } catch (error) {
+      status.textContent = error.message || "Impossible de vérifier la dernière version.";
+    }
   }
 
   async function refreshSession() {
@@ -342,7 +455,8 @@
     refreshPromise = (async () => {
       const session = getSession();
       if (!session?.refresh_token) throw new Error("Session expirée.");
-      const refreshed = await authRequest("refresh_token", { refresh_token: session.refresh_token });
+      const refreshedAuth = await authRequest("refresh_token", { refresh_token: session.refresh_token });
+      const refreshed = { ...refreshedAuth, device_token: session.device_token, device_policy_initialized: session.device_policy_initialized };
       setSession(refreshed);
       return refreshed;
     })();
@@ -353,8 +467,15 @@
   async function ensureSession() {
     const session = getSession();
     if (!session) return null;
-    if (Number(session.expires_at || 0) > Math.floor(Date.now() / 1000) + 60) return session;
-    try { return await refreshSession(); }
+    try {
+      let current = Number(session.expires_at || 0) > Math.floor(Date.now() / 1000) + 60 ? session : await refreshSession();
+      if (!current.device_policy_initialized) {
+        current = await claimActiveDevice(current);
+        setSession(current);
+      }
+      if (!await checkActiveDevice()) return null;
+      return current;
+    }
     catch {
       profile = null;
       setSession(null);
@@ -906,7 +1027,7 @@
       context.requestId = typeof saved.requestId === "string" ? saved.requestId : null;
       replyDraft.readOnly = replyGenerate.disabled = Boolean(context.requestId);
       replyEditorStatus.textContent = context.requestId
-        ? "Un envoi a déjà été demandé pour ce texte. Une nouvelle vérification réutilisera le même identifiant. Vérifiez aussi les messages envoyés dans Gmail."
+        ? "Un envoi a déjà été demandé pour ce texte. Une nouvelle vérification réutilisera le même identifiant. Vérifiez aussi les éléments Envoyés de votre messagerie."
         : "Brouillon restauré depuis cet onglet.";
       replyEditor.open = true;
     } catch { /* Le formulaire reste disponible sans stockage local. */ }
@@ -977,16 +1098,17 @@
     }
     replyDraft.readOnly = replyGenerate.disabled = true;
     try {
-      const result = await invokeEdgeFunction("gmail-web", { action: "send_reply",
+      const provider = context.provider === "outlook" ? "outlook-web" : "gmail-web";
+      const result = await invokeEdgeFunction(provider, { action: "send_reply",
         applicationId: context.applicationId, replyId: context.replyTo.id, recipient: context.replyTo.recipient, requestId: context.requestId, message });
-      if (result.sent !== true) throw new Error("Gmail n’a pas confirmé l’envoi.");
-      try { sessionStorage.removeItem(replyDraftKey(context)); } catch { /* Gmail a confirmé l’envoi. */ }
+      if (result.sent !== true) throw new Error("La messagerie n’a pas confirmé l’envoi.");
+      try { sessionStorage.removeItem(replyDraftKey(context)); } catch { /* Le fournisseur a confirmé l’envoi. */ }
       context.requestId = null;
       if (replyContext !== context) return;
       replyDraft.value = ""; replyDraft.readOnly = replyGenerate.disabled = false;
       replyEditorStatus.textContent = result.tracked === false
-        ? "Réponse envoyée dans Gmail. L’enregistrement du suivi est indisponible ; ne renvoyez pas le message."
-        : "Réponse envoyée dans le fil Gmail.";
+        ? "Réponse envoyée. L’enregistrement du suivi est indisponible ; ne renvoyez pas le message."
+        : "Réponse envoyée dans le fil " + (context.provider === "outlook" ? "Outlook." : "Gmail.");
     } catch (error) {
       if (error.status && error.status < 500 && error.uncertain !== true) {
         context.requestId = null;
@@ -1008,10 +1130,10 @@
     }
     try {
       await navigator.clipboard.writeText(replyDraft.value);
-      replyEditorStatus.textContent = "Texte copié. Ouvrez le fil Gmail pour répondre.";
+      replyEditorStatus.textContent = "Texte copié. Ouvrez le fil dans votre messagerie pour répondre.";
     } catch {
       replyDraft.select();
-      replyEditorStatus.textContent = "Copiez le texte sélectionné, puis ouvrez le fil Gmail.";
+      replyEditorStatus.textContent = "Copiez le texte sélectionné, puis ouvrez le fil dans votre messagerie.";
     }
   });
 
@@ -1047,11 +1169,15 @@
     replyContent.textContent = "Chargement…";
     replyDialog.showModal();
     try {
-      const result = await invokeEdgeFunction("gmail-web", {
-        action: "open_reply", applicationId: button.dataset.openReply, preview: true
+      const applicationId = button.dataset.openReply;
+      const delivery = await invokeEdgeFunction("gmail-web", { action: "delivery_provider", applicationId });
+      const provider = delivery.provider === "outlook" ? "outlook" : "gmail";
+      const result = await invokeEdgeFunction(provider === "outlook" ? "outlook-web" : "gmail-web", {
+        action: "open_reply", applicationId, preview: true
       });
       if (request !== replyRequest || !replyDialog.open || !userId || getSession()?.user?.id !== userId) return;
-      replyGmail.href = "https://mail.google.com/mail/u/0/#all/" + encodeURIComponent(result.threadId);
+      replyGmail.href = result.openUrl || ("https://mail.google.com/mail/u/0/#all/" + encodeURIComponent(result.threadId));
+      replyGmail.textContent = "Ouvrir le fil dans " + (provider === "outlook" ? "Outlook" : "Gmail");
       replyGmail.hidden = false;
       replyConsent.hidden = !result.needsConsent;
       const previews = Array.isArray(result.previewMessages) ? result.previewMessages :
@@ -1061,7 +1187,7 @@
       const replies = messages.map(item => item.text);
       if (replies.length) {
         const application = button.closest(".application-row");
-        replyContext = { userId, applicationId: button.dataset.openReply, replyTo: result.replyTo, body: replies.at(-1).slice(0, 8000),
+        replyContext = { userId, applicationId, provider, replyTo: result.replyTo, body: replies.at(-1).slice(0, 8000),
           companyName: application.querySelector(".application-main strong").textContent,
           jobTitle: application.querySelector(".application-main span").textContent };
         replyEditor.hidden = false;
@@ -1069,7 +1195,7 @@
         restoreReplyDraft(replyContext);
       }
       replyContent.textContent = result.needsConsent ? "Autorisez la lecture pour afficher le message ici." :
-        replies.length ? "" : "Le contenu de ce message est disponible dans Gmail.";
+        replies.length ? "" : "Le contenu de ce message est disponible dans " + (provider === "outlook" ? "Outlook." : "Gmail.");
       for (const item of messages) {
         const content = item.text.replace(/\r\n?/g, "\n").trim();
         const quoted = /\n(?:_{8,}|-{3,}\s*(?:Original Message|Message d’origine)\s*-{3,}|On .+ wrote:|Le .+ a écrit\s*:|From:.*\nSent:|De :.*\nEnvoyé :)/i.exec(content);
@@ -1186,7 +1312,7 @@
       editor.readOnly = Boolean(row.requestId);
       const status = document.createElement("p");
       status.setAttribute("role", "status");
-      if (row.requestId) status.textContent = "Un envoi a déjà été demandé pour ce texte. Une nouvelle vérification utilisera le même identifiant pour éviter un doublon. Vérifiez aussi les messages envoyés dans Gmail.";
+      if (row.requestId) status.textContent = "Un envoi a déjà été demandé pour ce texte. Une nouvelle vérification utilisera le même identifiant pour éviter un doublon. Vérifiez aussi les éléments Envoyés de votre messagerie.";
       const ai = document.createElement("button");
       ai.type = "button"; ai.className = "secondary";
       ai.textContent = "Proposer une relance avec IA";
@@ -1271,9 +1397,10 @@
         try {
           row.requestId ||= crypto.randomUUID();
           if (!saveFollowupDraft(userId, row)) throw new Error("Le navigateur ne peut pas mémoriser cet envoi. Aucun message envoyé pour ce dossier.");
-          const response = await invokeEdgeFunction("gmail-web", { action: "send_followup",
+          const delivery = await invokeEdgeFunction("gmail-web", { action: "delivery_provider", applicationId: row.id });
+          const response = await invokeEdgeFunction(delivery.provider === "outlook" ? "outlook-web" : "gmail-web", { action: "send_followup",
             applicationId: row.id, recipient: row.company_email, requestId: row.requestId, message: row.editor.value.trim() });
-          if (response.sent !== true) throw new Error("Gmail n’a pas confirmé l’envoi.");
+          if (response.sent !== true) throw new Error("La messagerie n’a pas confirmé l’envoi.");
           sessionStorage.removeItem(followupDraftKey(userId, row.id));
           row.requestId = null;
           results.push(row.company_name + (response.tracked === false
@@ -1479,7 +1606,7 @@
   let trackingLoadRequest = 0;
 
   async function fetchTrackingRows(current) {
-    const path = "user_applications?select=id,company_name,company_email,job_title,status,sent_at,next_follow_up_at,last_inbound_at,last_follow_up_sent_at,follow_up_delay_days,hidden_at,last_automatic_reply_at,last_human_reply_at,last_reply_read_at,notes,updated_at,last_activity_at" +
+    const path = "user_applications?select=id,company_name,company_city,company_email,job_title,status,sent_at,next_follow_up_at,last_inbound_at,last_follow_up_sent_at,follow_up_delay_days,hidden_at,last_automatic_reply_at,last_human_reply_at,last_reply_read_at,notes,updated_at,last_activity_at" +
       "&status=in.(sent,reply_received,interview,accepted,rejected)";
     const rows = await fetchApplicationPages(path, current);
     const reminderTime = row => row.next_follow_up_at ? Date.parse(row.next_follow_up_at) : Infinity;
@@ -1533,6 +1660,8 @@
             ? '<label><input type="checkbox" data-followup-choice value="' + escapeHtml(row.id) + '"> Sélectionner pour relance</label>' : '') +
           (row.last_inbound_at ? '<button type="button" class="secondary compact" data-open-reply="' +
             escapeHtml(row.id) + '">Lire la réponse</button>' : '') +
+          (row.status === "interview" ? '<button type="button" class="primary compact" data-interview-prep="' +
+            escapeHtml(row.id) + '">Préparer l’entretien</button>' : '') +
           (row.sent_at ? '<button type="button" class="secondary compact" data-tracking-resend="' + escapeHtml(row.id) + '">Préparer un nouvel envoi</button>' : '') +
           '<button type="button" class="secondary compact" data-tracking-edit="' + escapeHtml(row.id) + '">Modifier le statut ou la note</button>' +
           '<button type="button" class="secondary compact" data-tracking-visibility="'  + escapeHtml(row.id) + '">' +
@@ -1576,6 +1705,80 @@
   const trackingDetailsClose = document.querySelector("#tracking-details-close");
   const trackingDetailsSave = trackingDetailsForm.querySelector("[type=submit]");
   let trackingDetailsRow = null;
+
+  const interviewPrepDialog = document.querySelector("#interview-prep-dialog");
+  const interviewPrepForm = document.querySelector("#interview-prep-form");
+  const interviewPrepStatus = document.querySelector("#interview-prep-status");
+  const interviewPrepResult = document.querySelector("#interview-prep-result");
+  const interviewPrepGenerate = document.querySelector("#interview-prep-generate");
+  let interviewPrepRow = null;
+
+  trackingList.addEventListener("click", event => {
+    const button = event.target.closest("[data-interview-prep]");
+    if (!button || interviewPrepDialog.open) return;
+    interviewPrepRow = trackingRows.find(row => row.id === button.dataset.interviewPrep);
+    if (!interviewPrepRow || interviewPrepRow.status !== "interview") return;
+    document.querySelector("#interview-prep-title").textContent = "Préparer l’entretien · " + interviewPrepRow.company_name;
+    document.querySelector("#interview-prep-context").textContent = [interviewPrepRow.job_title, interviewPrepRow.company_city]
+      .filter(Boolean).join(" · ") || "Candidature";
+    interviewPrepForm.elements.instruction.value = "";
+    interviewPrepStatus.textContent = "";
+    interviewPrepResult.hidden = true;
+    interviewPrepResult.replaceChildren();
+    interviewPrepDialog.showModal();
+  });
+
+  document.querySelector("#interview-prep-close").addEventListener("click", () => interviewPrepDialog.close());
+  interviewPrepDialog.addEventListener("cancel", event => {
+    if (interviewPrepGenerate.disabled) event.preventDefault();
+  });
+  interviewPrepForm.addEventListener("submit", async event => {
+    event.preventDefault();
+    const row = interviewPrepRow;
+    const userId = getSession()?.user?.id;
+    if (!row || !userId || row.status !== "interview" || interviewPrepGenerate.disabled) return;
+    interviewPrepGenerate.disabled = true;
+    interviewPrepStatus.textContent = "Préparation en cours…";
+    interviewPrepResult.hidden = true;
+    try {
+      const [details, variants] = await Promise.all([
+        fetchProfileDetails(userId),
+        supabaseFetch("web_cv_variants?select=label,fields&order=updated_at.desc&limit=1")
+      ]);
+      if (getSession()?.user?.id !== userId || interviewPrepRow?.id !== row.id) return;
+      const fields = variants[0]?.fields || {};
+      const result = await invokeEdgeFunction("generate-interview-prep", {
+        instruction: interviewPrepForm.elements.instruction.value.trim() ||
+          "Prépare une fiche d’entretien en français : résumé de l’entreprise et du poste à partir des seules informations fournies, présentation personnelle de 60 secondes, questions probables et réponses adaptées au CV, questions pertinentes à poser au recruteur, points à clarifier et conseils pratiques. N’invente aucun fait absent des informations fournies.",
+        company: row.company_name,
+        jobTitle: row.job_title || details.desired_jobs || "",
+        city: row.company_city || details.city || "",
+        jobOffer: "",
+        originalApplicationMessage: "",
+        recruiterReplySubject: "",
+        recruiterReplyBody: "",
+        cv: {
+          professionalTitle: fields.title || details.desired_jobs || "",
+          summary: fields.summary || "",
+          experiences: fields.experience || "",
+          education: fields.education || "",
+          skills: [fields.skills, details.skills].filter(Boolean).join("\n"),
+          languages: details.languages || "",
+          certifications: ""
+        }
+      });
+      if (getSession()?.user?.id !== userId || interviewPrepRow?.id !== row.id) return;
+      const preparation = typeof result.preparation === "string" ? result.preparation.trim() : "";
+      if (!preparation) throw new Error("La préparation générée est vide. Réessayez.");
+      interviewPrepResult.textContent = preparation;
+      interviewPrepResult.hidden = false;
+      interviewPrepStatus.textContent = "Préparation prête. Vous pouvez la copier ou ajouter des précisions puis relancer la génération.";
+    } catch (error) {
+      if (getSession()?.user?.id === userId) interviewPrepStatus.textContent = error.message;
+    } finally {
+      interviewPrepGenerate.disabled = false;
+    }
+  });
 
   trackingList.addEventListener("click", event => {
     const button = event.target.closest("[data-tracking-edit]");
@@ -1626,6 +1829,9 @@
   const adminMode = document.querySelector("#admin-mode");
   const adminStatus = document.querySelector("#admin-status");
   const adminResults = document.querySelector("#admin-results");
+  const adminReleaseControls = document.querySelector("#admin-release-controls");
+  const adminReleaseForm = document.querySelector("#admin-release-form");
+  const adminReleaseStatus = document.querySelector("#admin-release-status");
   const adminViews = {
     blacklist: ["admin_list_blacklisted_companies", {}],
     audit: ["admin_list_audit_log", { p_limit: 100 }],
@@ -1893,12 +2099,33 @@
     if (profile?.is_admin !== true) return;
     const userId = getSession()?.user?.id;
     const mode = adminMode.value;
-    if (!userId || !Object.hasOwn(adminViews, mode)) return;
+    if (!userId) return;
     if (quiet && adminInFlight?.userId === userId && adminInFlight?.mode === mode) return;
     const request = ++adminRequest;
     adminInFlight = { userId, mode, request };
     adminUserControls.hidden = mode !== "users";
     adminCreditControls.hidden = mode !== "credits";
+    adminReleaseControls.hidden = mode !== "updates";
+    const current = () => request === adminRequest && getSession()?.user?.id === userId && profile?.is_admin === true && adminMode.value === mode;
+    if (mode === "updates") {
+      if (!quiet) { adminResults.replaceChildren(); adminUpdated.textContent = ""; adminStatus.textContent = "Lecture de la dernière version publiée…"; }
+      try {
+        const rows = await supabaseFetch("app_releases?status=eq.published&select=version,published_at,is_mandatory&order=published_at.desc&limit=1");
+        if (!current()) return;
+        const release = rows[0];
+        document.querySelector("#admin-release-current").textContent = release
+          ? `Version publiée : ${release.version}${release.is_mandatory ? " · obligatoire" : ""}${release.published_at ? " · " + new Intl.DateTimeFormat("fr-CH", { timeZone: "Europe/Zurich", dateStyle: "medium" }).format(new Date(release.published_at)) : ""}`
+          : "Aucune version publiée trouvée.";
+        adminUpdated.textContent = "Actualisé à " + new Intl.DateTimeFormat("fr-CH", { timeZone: "Europe/Zurich", timeStyle: "short" }).format(new Date());
+        adminStatus.textContent = "";
+      } catch (error) {
+        if (current()) adminStatus.textContent = "Lecture impossible : " + error.message;
+      } finally {
+        if (adminInFlight?.request === request) adminInFlight = null;
+      }
+      return;
+    }
+    if (!Object.hasOwn(adminViews, mode)) return;
     const [rpc, defaults] = adminViews[mode];
     const args = { ...defaults };
     if (mode === "users") args.p_search = adminUserSearch.value.trim();
@@ -1907,7 +2134,6 @@
       catch (error) { adminStatus.textContent = error.message; adminInFlight = null; return; }
     }
     if (!quiet) { adminResults.replaceChildren(); adminUpdated.textContent = ""; adminStatus.textContent = "Chargement…"; }
-    const current = () => request === adminRequest && getSession()?.user?.id === userId && profile?.is_admin === true && adminMode.value === mode;
     try {
       let rows = await supabaseRpc(rpc, args);
       if (!current()) return;
@@ -2010,6 +2236,42 @@
 
   adminMode.addEventListener("change", loadAdmin);
   document.querySelector("#admin-refresh").addEventListener("click", loadAdmin);
+  adminReleaseForm.addEventListener("submit", async event => {
+    event.preventDefault();
+    if (profile?.is_admin !== true || !getSession()?.user?.id) return;
+    const fields = adminReleaseForm.elements;
+    const version = fields.version.value.trim();
+    const installerUrl = fields.installer_url.value.trim();
+    const releaseStatus = fields.status.value;
+    if (!/^[0-9]+\.[0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-(?:preview|alpha|beta|rc)[0-9]+)?$/i.test(version)) {
+      adminReleaseStatus.textContent = "Version invalide. Exemples : 1.3.71 ou 1.3.71-rc1.";
+      return;
+    }
+    let parsedUrl;
+    try { parsedUrl = new URL(installerUrl); } catch { parsedUrl = null; }
+    if (parsedUrl?.protocol !== "https:") {
+      adminReleaseStatus.textContent = "L’URL de l’installateur doit commencer par https://.";
+      return;
+    }
+    if (releaseStatus === "published" && !window.confirm("Publier cette version ? Elle apparaîtra comme mise à jour Windows pour les utilisateurs.")) return;
+    const submit = adminReleaseForm.querySelector("[type=submit]");
+    submit.disabled = true;
+    adminReleaseStatus.textContent = "Enregistrement…";
+    try {
+      await supabaseRpc("admin_save_app_release", {
+        p_version: version,
+        p_release_notes: fields.release_notes.value,
+        p_is_mandatory: fields.is_mandatory.checked,
+        p_installer_url: installerUrl,
+        p_status: releaseStatus
+      });
+      adminReleaseStatus.textContent = releaseStatus === "published" ? "Version publiée." : "Version enregistrée en " + releaseStatus + ".";
+      await loadAdmin();
+      if (adminMode.value === "updates") adminReleaseStatus.textContent = releaseStatus === "published" ? "Version publiée." : "Version enregistrée en " + releaseStatus + ".";
+    } catch (error) {
+      adminReleaseStatus.textContent = error.message || "Impossible d’enregistrer cette version.";
+    } finally { submit.disabled = false; }
+  });
   adminUserSearch.addEventListener("input", () => {
     clearTimeout(adminSearchTimer);
     adminSearchTimer = setTimeout(() => { if (adminMode.value === "users" && document.querySelector("#admin-view").classList.contains("active")) void loadAdmin(); }, 350);
@@ -2763,6 +3025,36 @@
   const backupRestore = document.querySelector("#backup-restore");
   const backupPreview = document.querySelector("#backup-preview");
   const backupStatus = document.querySelector("#backup-status");
+  document.querySelector("#web-diagnostics-run").addEventListener("click", async event => {
+    const button = event.currentTarget;
+    const results = document.querySelector("#web-diagnostics-results");
+    button.disabled = true;
+    results.replaceChildren();
+    results.hidden = false;
+    let storageCount = null;
+    try { storageCount = localStorage.length; } catch { /* Storage may be blocked by browser policy. */ }
+    const checks = [
+      ["Connexion Internet", navigator.onLine ? "Connecté" : "Hors ligne", navigator.onLine],
+      ["Connexion sécurisée", isSecureContext ? "HTTPS actif" : "HTTPS requis", isSecureContext],
+      ["Compte", getSession()?.user?.email || "Non connecté", Boolean(getSession()?.user?.id)],
+      ["Stockage du navigateur", storageCount === null ? "Bloqué par le navigateur" : "Accessible · " + storageCount + " élément(s)", storageCount !== null],
+      ["Chiffrement requis", crypto?.subtle ? "Disponible" : "Indisponible", Boolean(crypto?.subtle)],
+      ["Fonctions de fichiers", typeof Blob !== "undefined" && typeof File !== "undefined" ? "Disponibles" : "Incomplètes", typeof Blob !== "undefined" && typeof File !== "undefined"]
+    ];
+    try {
+      if (navigator.storage?.estimate) {
+        const estimate = await navigator.storage.estimate();
+        const used = Number.isFinite(estimate.usage) ? (estimate.usage / 1024 / 1024).toFixed(1) + " Mo utilisés" : "Utilisation non communiquée";
+        checks.push(["Espace de stockage", estimate.quota ? used + " sur " + (estimate.quota / 1024 / 1024).toFixed(0) + " Mo estimés" : used, true]);
+      } else checks.push(["Espace de stockage", "Estimation non prise en charge par ce navigateur", true]);
+    } catch { checks.push(["Espace de stockage", "Estimation indisponible", true]); }
+    for (const [name, detail, ok] of checks) {
+      const item = document.createElement("li");
+      item.textContent = (ok ? "✓ " : "⚠ ") + name + " — " + detail;
+      results.append(item);
+    }
+    button.disabled = false;
+  });
   let backupRequest = 0;
   let backupCandidate = null;
   let backupBusy = false;
@@ -2974,13 +3266,13 @@
   }
 
   let accountSetupRequest = 0;
-  let accountSetup = { cv: null, gmail: null };
+  let accountSetup = { cv: null, mail: null };
 
   function renderAccountSetup() {
     const steps = [
       ["profile", profile ? candidateIdentityLocked() : null, "Identité enregistrée et verrouillée", "Confirmer le prénom, le nom et l’e-mail"],
       ["cv", accountSetup.cv, "CV ajouté ou enregistré", "Ajouter un PDF ou créer un CV"],
-      ["gmail", accountSetup.gmail, "Compte Gmail lié", "Connecter Gmail pour l’envoi et le suivi"]
+      ["mail", accountSetup.mail, "Gmail ou Outlook lié", "Connecter une messagerie pour l’envoi et le suivi"]
     ];
     let completed = getSession()?.user?.id ? 1 : 0;
     steps.forEach(([key, done, ready, missing], index) => {
@@ -2995,19 +3287,21 @@
 
   async function refreshAccountSetup(session) {
     const request = ++accountSetupRequest;
-    const [pdf, variant, gmail] = await Promise.allSettled([
+    const [pdf, variant, gmail, outlook] = await Promise.allSettled([
       documentRequest(session, "list/" + documentsBucket, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prefix: session.user.id + "/cv", limit: 1 })
       }).then(response => response.json()).then(files => files.some(file => Boolean(file.id))),
       supabaseFetch("web_cv_variants?select=id&limit=1").then(rows => rows.length > 0),
-      invokeEdgeFunction("gmail-web", { action: "status" }).then(result => result.connected === true)
+      invokeEdgeFunction("gmail-web", { action: "status" }).then(result => result.connected === true),
+      invokeEdgeFunction("outlook-web", { action: "status" }).then(result => result.connected === true)
     ]);
     if (request !== accountSetupRequest || getSession()?.user?.id !== session.user.id) return;
     const hasCv = [pdf, variant].some(result => result.status === "fulfilled" && result.value);
     accountSetup = {
       cv: hasCv ? true : pdf.status === "fulfilled" && variant.status === "fulfilled" ? false : null,
-      gmail: gmail.status === "fulfilled" ? gmail.value : null
+      mail: (gmail.status === "fulfilled" && gmail.value) || (outlook.status === "fulfilled" && outlook.value) ? true :
+        gmail.status === "rejected" || outlook.status === "rejected" ? null : false
     };
     renderAccountSetup();
   }
@@ -3050,6 +3344,10 @@
     void touchWebPresence();
     document.querySelector("#stat-sent").textContent = quota ? String(quota.used) : "—";
     document.querySelector("#monthly-quota-detail").textContent = describeSendQuota(quota);
+    document.querySelector("#account-view-usage").textContent = quota
+      ? quota.premium ? "Envois illimités · utilisation ce mois : " + quota.used
+        : quota.used + " / " + quota.limit + " candidatures envoyées ce mois · " + quota.remaining + " restante(s)"
+      : "Utilisation indisponible pour le moment.";
     renderAccountSetup();
     renderAccount();
     if (firstProfile || !document.querySelector("#profile-view").classList.contains("active")) renderProfile();
@@ -3400,19 +3698,27 @@
     el.addEventListener("click", () => showView(el.dataset.view || el.dataset.viewLink));
   });
   document.querySelector("#menu-toggle").addEventListener("click", () => sidebar.classList.toggle("open"));
+  document.querySelector("#account-refresh").addEventListener("click", async event => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    try { await loadDashboard(); }
+    catch (error) { document.querySelector("#account-view-usage").textContent = error.message; }
+    finally { button.disabled = false; }
+  });
   guestLogin.addEventListener("click", () => { setAuthMode("signin"); dialog.showModal(); });
   document.querySelector("#guest-signup").addEventListener("click", () => { setAuthMode("signup"); dialog.showModal(); });
   document.querySelector("#close-login").addEventListener("click", () => { if (!authBusy && !document.querySelector("#login-submit").disabled) dialog.close(); });
   loginButton.addEventListener("click", () => {
-    if (getSession()) showView("settings");
+    if (getSession()) showView("account");
     else { setAuthMode("signin"); dialog.showModal(); }
   });
-  signOutButton.addEventListener("click", () => {
+  signOutButton.addEventListener("click", async () => {
+    await releaseActiveDevice(getSession());
     profile = null; passwordRecoveryStatus.textContent = "";
     ++backupRequest; backupCandidate = null; backupFile.value = ""; backupPreview.textContent = backupStatus.textContent = "";
     if (passwordDialog.open) passwordDialog.close();
     ++accountSetupRequest;
-    accountSetup = { cv: null, gmail: null };
+    accountSetup = { cv: null, mail: null };
     profileDetailsUser = null;
     ++identityChangeRequest; identityChangeForm.reset(); identityChangeStatus.textContent = ""; identityChangePanel.open = false;
     ++profileDetailsRequest;
@@ -3442,6 +3748,7 @@
     document.querySelector("#support-report-status").textContent = "";
     document.querySelector("#cv-preview").replaceChildren();
     sessionStorage.removeItem(gmailFlowKey);
+    sessionStorage.removeItem(outlookFlowKey);
     documentForm.reset();
     documentForm.hidden = true;
     ++documentPreviewRequest;
@@ -3479,9 +3786,10 @@
         }
         session = normalizeSession(result.session);
       } else session = await signIn(email, password);
-      profile = null; setSession(session);
-      showView("dashboard"); dialog.close(); loginForm.reset(); pendingConfirmationEmail = null;
-      await loadDashboard().catch(error => { document.querySelector("#account-label").textContent = error.message; });
+      profile = null; setSession(session); showView("dashboard"); dialog.close(); loginForm.reset(); pendingConfirmationEmail = null;
+      await loadDashboard().catch(error => {
+        document.querySelector("#account-label").textContent = error.message;
+      });
     } catch (error) {
       loginMessage.textContent = error.message;
       if (error.code === "email_not_confirmed") { pendingConfirmationEmail = email; signupResend.hidden = false; }
@@ -3496,11 +3804,16 @@
     if (email !== pendingConfirmationEmail) { loginMessage.textContent = "L’adresse a changé. Relancez la connexion ou l’inscription pour cette adresse."; return; }
     if (Date.now() < signupResendAfter) { loginMessage.textContent = "Patientez encore " + Math.ceil((signupResendAfter - Date.now()) / 1000) + " seconde(s) avant de renvoyer le message."; return; }
     setAuthBusy(true); loginMessage.textContent = "Demande du message de confirmation…";
-    try {
-      await window.CP_SIGNUP.resend(email); signupResendAfter = Date.now() + 60000;
-      loginMessage.textContent = signupConfirmationMessage;
-    } catch (error) { loginMessage.textContent = error.message; }
+    try { await window.CP_SIGNUP.resend(email); signupResendAfter = Date.now() + 60000; loginMessage.textContent = signupConfirmationMessage; }
+    catch (error) { loginMessage.textContent = error.message; }
     finally { setAuthBusy(false); }
+  });
+
+  window.setInterval(() => {
+    if (!document.hidden) checkActiveDevice(true).catch(() => {});
+  }, 30000);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) checkActiveDevice(true).catch(() => {});
   });
 
   const batchSelection = new Set();
@@ -3605,7 +3918,7 @@
           const attachments = await encodeSendFiles(draft.files);
           await verifyReviewedApplication(draft);
           if (getSession()?.user?.id !== userId) break;
-          await invokeEdgeFunction("gmail-web", { action: "send", applicationId: draft.applicationId,
+          await invokeEdgeFunction(draft.provider === "outlook" ? "outlook-web" : "gmail-web", { action: "send", applicationId: draft.applicationId,
             recipient: draft.recipient, subject: draft.subject, message: draft.message, reviewedAt: draft.updatedAt, attachments });
           removeSendDraft(userId, draft.applicationId);
           batchSelection.delete(draft.applicationId);
@@ -3638,6 +3951,7 @@
   const sendForm = document.querySelector("#send-form");
   const sendSubmit = document.querySelector("#send-submit");
   const sendStatus = document.querySelector("#send-status");
+  const sendProvider = document.querySelector("#send-provider");
   let sendApplication = null;
   let reviewed = null;
   const sendAi = document.querySelector("#send-ai");
@@ -3888,6 +4202,7 @@
     sendSaveDraft.hidden = false;
     sendReview.hidden = true;
     sendAi.hidden = false;
+    sendProvider.closest("label").hidden = false;
     librarySelect.closest("label").hidden = false;
     libraryAdd.hidden = false;
     renderSelectedDocuments();
@@ -3970,18 +4285,19 @@
     else cancelBatch();
   });
   async function checkSendDraft(application, files) {
-    const [blockedResponse, gmail] = await Promise.all([
+    const provider = document.querySelector("#send-provider").value;
+    const [blockedResponse, mailStatus] = await Promise.all([
       supabaseRpc("is_company_email_blocked", {
         p_company_name: application.company_name, p_city: application.company_city || "", p_email: application.company_email
       }),
-      invokeEdgeFunction("gmail-web", { action: "status" }),
+      invokeEdgeFunction(provider === "outlook" ? "outlook-web" : "gmail-web", { action: "status" }),
       Promise.all(files.map(validateSendPdf))
     ]);
     const blocked = Array.isArray(blockedResponse) ? blockedResponse[0] : blockedResponse;
     if (blocked === true) throw new Error("Cette adresse est bloquée dans la base entreprises. Vérifiez le contact dans le dossier.");
     if (blocked !== false) throw new Error("Impossible de vérifier le destinataire. Réessayez.");
-    if (!gmail.configured) throw new Error("Le service Gmail est indisponible.");
-    if (!gmail.connected) throw new Error("Connectez Gmail dans Paramètres avant de poursuivre.");
+    if (!mailStatus.configured) throw new Error("Le service de messagerie choisi est indisponible.");
+    if (!mailStatus.connected) throw new Error("Connectez " + (provider === "outlook" ? "Outlook" : "Gmail") + " dans Paramètres avant de poursuivre.");
   }
 
   sendForm.addEventListener("submit", async event => {
@@ -3992,7 +4308,8 @@
     if (!reviewed) {
       const dossier = sendApplication;
       const [subject, message, fileInput] = sendInputs;
-      const draft = { subject: subject.value.trim(), message: message.value.trim(), files: [...fileInput.files, ...selectedDocuments] };
+      const draft = { subject: subject.value.trim(), message: message.value.trim(), provider: document.querySelector("#send-provider").value,
+        files: [...fileInput.files, ...selectedDocuments] };
       if (!draft.subject || !draft.message) {
         sendStatus.textContent = "Renseignez l’objet et le message.";
         return;
@@ -4003,7 +4320,7 @@
         return;
       }
       sendSubmit.disabled = true;
-      sendStatus.textContent = "Vérification du destinataire, de Gmail et des pièces jointes…";
+      sendStatus.textContent = "Vérification du destinataire, de la messagerie et des pièces jointes…";
       try {
         await checkSendDraft(dossier, draft.files);
         if (!sendDialog.open || sendApplication !== dossier || getSession()?.user?.id !== userId) return;
@@ -4032,8 +4349,9 @@
         : "Aucune pièce jointe";
       sendStatus.textContent = "";
       sendTitle.textContent = "Contrôle final";
-      sendSubmit.textContent = batchSize ? "Valider ce dossier pour le lot" : "Confirmer l’envoi via Gmail";
+      sendSubmit.textContent = batchSize ? "Valider ce dossier pour le lot" : "Confirmer l’envoi via " + (draft.provider === "outlook" ? "Outlook" : "Gmail");
       sendAi.hidden = true;
+      sendProvider.closest("label").hidden = true;
       librarySelect.closest("label").hidden = true;
       libraryAdd.hidden = true;
       librarySummary.hidden = true;
@@ -4060,7 +4378,7 @@
       const attachments = await encodeSendFiles(draft.files);
       await verifyReviewedApplication(draft);
       if (!userId || getSession()?.user?.id !== userId) return;
-      await invokeEdgeFunction("gmail-web", {
+      await invokeEdgeFunction(draft.provider === "outlook" ? "outlook-web" : "gmail-web", {
         action: "send", attachments, applicationId: application.id, recipient: application.company_email,
         subject: draft.subject, message: draft.message, reviewedAt: draft.updatedAt
       });
@@ -4070,7 +4388,7 @@
       sendDialog.close();
       await Promise.all([loadApplications(), loadDashboard().catch(() => {})]);
       if (getSession()?.user?.id !== userId) return;
-      document.querySelector("#applications-message").textContent = "Candidature envoyée via Gmail.";
+      document.querySelector("#applications-message").textContent = "Candidature envoyée via " + (draft.provider === "outlook" ? "Outlook." : "Gmail.");
       nextBatchApplication();
     } catch (error) {
       if (getSession()?.user?.id === userId) sendStatus.textContent = error.message;
@@ -4103,6 +4421,10 @@
   const gmailConnect = document.querySelector("#gmail-connect");
   const gmailDisconnect = document.querySelector("#gmail-disconnect");
   const gmailFlowKey = "candidature-pro-gmail-flow";
+  const outlookStatus = document.querySelector("#outlook-status");
+  const outlookConnect = document.querySelector("#outlook-connect");
+  const outlookDisconnect = document.querySelector("#outlook-disconnect");
+  const outlookFlowKey = "candidature-pro-outlook-flow";
 
   function gmailEncode(bytes) {
     return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -4124,15 +4446,19 @@
     try {
       const checks = await Promise.allSettled([
         supabaseFetch("user_applications?select=id&limit=1"),
-        invokeEdgeFunction("gmail-web", { action: "status" })
+        invokeEdgeFunction("gmail-web", { action: "status" }),
+        invokeEdgeFunction("outlook-web", { action: "status" })
       ]);
       if (getSession()?.user?.id !== userId) return;
-      const [applicationsCheck, gmailCheck] = checks;
+      const [applicationsCheck, gmailCheck, outlookCheck] = checks;
       showChecks([
         applicationsCheck.status === "fulfilled" ? "Accès aux candidatures opérationnel." : "Accès aux candidatures indisponible.",
         gmailCheck.status !== "fulfilled" ? "Service Gmail indisponible." :
           !gmailCheck.value.configured ? "Service Gmail en attente de configuration." :
-          gmailCheck.value.connected ? "Connexion Gmail enregistrée." : "Aucun compte Gmail lié."
+          gmailCheck.value.connected ? "Connexion Gmail enregistrée." : "Aucun compte Gmail lié.",
+        outlookCheck.status !== "fulfilled" ? "Service Outlook indisponible." :
+          !outlookCheck.value.configured ? "Service Outlook en attente de configuration Microsoft." :
+          outlookCheck.value.connected ? "Connexion Outlook enregistrée." : "Aucun compte Outlook lié."
       ]);
     } finally {
       settingsCheck.disabled = false;
@@ -4154,6 +4480,75 @@
         result.configured ? "Aucun compte Gmail connecté." : "La connexion Gmail web attend la configuration Google.";
     } catch {
       if (getSession()?.user?.id === userId) gmailStatus.textContent = "Le service Gmail est indisponible.";
+    }
+  }
+
+  async function loadOutlook() {
+    const userId = getSession()?.user?.id;
+    outlookConnect.hidden = true;
+    outlookDisconnect.hidden = true;
+    outlookStatus.textContent = userId ? "Vérification de la connexion Outlook…" : "Connectez-vous à Candidature Pro pour lier Outlook.";
+    if (!userId) return;
+    try {
+      const result = await invokeEdgeFunction("outlook-web", { action: "status" });
+      if (getSession()?.user?.id !== userId) return;
+      outlookConnect.hidden = !result.configured || result.connected;
+      outlookDisconnect.hidden = !result.connected;
+      outlookStatus.textContent = result.connected ? "Compte Outlook connecté." :
+        result.configured ? "Aucun compte Outlook connecté." : "La connexion Outlook web attend la configuration Microsoft.";
+    } catch {
+      if (getSession()?.user?.id === userId) outlookStatus.textContent = "Le service Outlook est indisponible.";
+    }
+  }
+
+  outlookConnect.addEventListener("click", async () => {
+    outlookConnect.disabled = true;
+    const userId = getSession()?.user?.id;
+    try {
+      const verifier = gmailEncode(crypto.getRandomValues(new Uint8Array(32)));
+      const state = gmailEncode(crypto.getRandomValues(new Uint8Array(32)));
+      const challenge = gmailEncode(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))));
+      const result = await invokeEdgeFunction("outlook-web", { action: "start", challenge, state });
+      if (getSession()?.user?.id !== userId) return;
+      const url = new URL(result.url);
+      if (url.origin !== "https://login.microsoftonline.com" || !url.pathname.endsWith("/oauth2/v2.0/authorize")) {
+        throw new Error("Adresse Microsoft inattendue.");
+      }
+      sessionStorage.setItem(outlookFlowKey, JSON.stringify({ verifier, state, userId, startedAt: Date.now() }));
+      location.assign(url.href);
+    } catch (error) {
+      outlookStatus.textContent = error.message;
+    } finally { outlookConnect.disabled = false; }
+  });
+
+  outlookDisconnect.addEventListener("click", async () => {
+    outlookDisconnect.disabled = true;
+    try {
+      await invokeEdgeFunction("outlook-web", { action: "disconnect" });
+      await loadOutlook();
+    } catch (error) { outlookStatus.textContent = error.message; }
+    finally { outlookDisconnect.disabled = false; }
+  });
+
+  async function finishOutlookConnection() {
+    const url = new URL(location.href);
+    if (!url.searchParams.has("state") || !(url.searchParams.has("code") || url.searchParams.has("error"))) return;
+    let flow;
+    try { flow = JSON.parse(sessionStorage.getItem(outlookFlowKey) || "null"); } catch { flow = null; }
+    if (!flow || flow.state !== url.searchParams.get("state")) return;
+    sessionStorage.removeItem(outlookFlowKey);
+    history.replaceState(null, "", url.pathname);
+    showView("settings", false);
+    try {
+      if (!flow || flow.state !== url.searchParams.get("state") || Date.now() - flow.startedAt > 10 * 60 * 1000 ||
+          !flow.userId || flow.userId !== getSession()?.user?.id) throw new Error("La demande de connexion Outlook a expiré. Réessayez.");
+      const oauthError = url.searchParams.get("error");
+      if (oauthError) throw new Error(oauthError === "access_denied" ? "L’autorisation Outlook a été refusée." : "Microsoft n’a pas pu autoriser Outlook. Réessayez.");
+      await invokeEdgeFunction("outlook-web", { action: "exchange", code: url.searchParams.get("code"), verifier: flow.verifier });
+      await loadOutlook();
+    } catch (error) {
+      await loadOutlook();
+      outlookStatus.textContent = error.message;
     }
   }
 
@@ -4187,30 +4582,41 @@
     lastGmailSync = Date.now();
     lastGmailSyncUser = userId;
     refreshReplies.disabled = true;
-    if (manual) repliesStatus.textContent = "Recherche des réponses Gmail…";
+    if (manual) repliesStatus.textContent = "Recherche des réponses reçues…";
     let updated = 0;
     let checked = 0;
-    let after = null;
+    let needsGmailConsent = false;
     try {
-      do {
-        const result = await invokeEdgeFunction("gmail-web", { action: "refresh_replies", after });
-        if (getSession()?.user?.id !== userId) return;
-        updated += result.updated || 0;
-        checked += result.checked || 0;
-        authorizeReplies.hidden = !result.needsConsent;
-        if (result.needsConsent) {
-          repliesStatus.textContent = "Autorisez Gmail pour vérifier les réponses à vos candidatures.";
-          return;
-        }
-        after = result.next || null;
-        if (after && manual) repliesStatus.textContent = checked + " dossiers vérifiés…";
-        if (after && !manual && !gmailSyncVisible()) {
-          lastGmailSync = 0;
-          return;
-        }
-      } while (after);
+      const providers = await Promise.all(["gmail", "outlook"].map(async provider => {
+        try {
+          const status = await invokeEdgeFunction(provider === "gmail" ? "gmail-web" : "outlook-web", { action: "status" });
+          return status.connected ? provider : null;
+        } catch { return null; }
+      }));
+      const connected = providers.filter(Boolean);
+      if (!connected.length) {
+        authorizeReplies.hidden = true;
+        repliesStatus.textContent = "Connectez Gmail ou Outlook dans Paramètres pour actualiser les réponses.";
+        return;
+      }
+      for (const provider of connected) {
+        let after = null;
+        do {
+          const result = await invokeEdgeFunction(provider === "gmail" ? "gmail-web" : "outlook-web", { action: "refresh_replies", after });
+          if (getSession()?.user?.id !== userId) return;
+          updated += result.updated || 0;
+          checked += result.checked || 0;
+          if (result.needsConsent && provider === "gmail") needsGmailConsent = true;
+          if (result.needsConsent) break;
+          after = result.next || null;
+          if (after && manual) repliesStatus.textContent = checked + " dossiers vérifiés…";
+          if (after && !manual && !gmailSyncVisible()) { lastGmailSync = 0; return; }
+        } while (after);
+      }
+      authorizeReplies.hidden = !needsGmailConsent;
       repliesStatus.textContent = updated ? updated + " candidature(s) mise(s) à jour." :
-        checked ? "Aucune nouvelle réponse." : "Aucun envoi Gmail à vérifier.";
+        needsGmailConsent ? "Autorisez Gmail pour actualiser aussi les fils Gmail." :
+        checked ? "Aucune nouvelle réponse." : "Aucun envoi à vérifier.";
     } catch (error) {
       if (getSession()?.user?.id === userId) repliesStatus.textContent = error.message;
     } finally {
@@ -4268,6 +4674,7 @@
     let flow;
     try { flow = JSON.parse(sessionStorage.getItem(gmailFlowKey) || "null"); }
     catch { flow = null; }
+    if (!flow || flow.state !== url.searchParams.get("state")) return;
     sessionStorage.removeItem(gmailFlowKey);
     history.replaceState(null, "", url.pathname);
     showView(flow?.readReplies && flow?.fromTracking ? "tracking" : "settings", false);
@@ -4301,11 +4708,13 @@
     renderAccount();
     showView("dashboard", false);
     await finishGmailConnection();
+    await finishOutlookConnection();
     syncGmailRepliesAutomatically();
     const url = new URL(location.href);
     const signupRequested = url.searchParams.has("inscription"), signinRequested = url.searchParams.has("connexion");
     if (signupRequested || signinRequested) {
-      url.searchParams.delete("connexion"); url.searchParams.delete("inscription"); history.replaceState(null, "", url);
+      url.searchParams.delete("connexion"); url.searchParams.delete("inscription");
+      history.replaceState(null, "", url);
       if (appShell.hidden) { setAuthMode(signupRequested ? "signup" : "signin"); dialog.showModal(); }
     }
     if (signupConfirmation?.error) {

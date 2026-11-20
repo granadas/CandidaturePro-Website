@@ -136,6 +136,13 @@
 #tracking-details-status { margin: 0; }
 #tracking-details-form textarea { width: 100%; font: inherit; }
 
+#interview-prep-dialog{width:min(760px,calc(100% - 24px));max-height:90dvh;overflow:auto}
+#interview-prep-form{display:grid;gap:14px;padding:clamp(18px,4vw,30px)}
+#interview-prep-form h2,#interview-prep-status{margin:0}
+#interview-prep-form textarea{width:100%;font:inherit}
+.interview-prep-disclosure{margin:0;padding:10px 12px;border-radius:10px;background:#f2f4fb;color:var(--muted);font-size:13px}
+#interview-prep-result{white-space:pre-wrap;overflow-wrap:anywhere;max-height:48dvh;overflow:auto;padding:18px;border:1px solid var(--line);border-radius:14px;background:#fff;line-height:1.65}
+
 #document-preview-dialog {
   width: min(900px, calc(100% - 24px));
   padding: 18px;
@@ -213,3 +220,6 @@
 #login-dialog [hidden] { display: none; }
 .auth-notice { padding: 12px; border-radius: 10px; background: #f5f2fc; font-size: 13px; line-height: 1.6; }
 .auth-notice a { color: #5424a2; }
+/* Keep the expanded navigation usable on short mobile screens. */
+.sidebar{overflow-y:auto}
+.profile-form input[type="checkbox"]{width:auto}

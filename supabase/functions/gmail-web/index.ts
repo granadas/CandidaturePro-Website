@@ -64,6 +64,16 @@ Deno.serve(async (request: Request) => {
       return json({ configured, connected: rows.length > 0 });
     }
 
+    if (body?.action === "delivery_provider") {
+      const applicationId = body.applicationId;
+      if (typeof applicationId !== "string" || !/^[0-9a-f-]{36}$/i.test(applicationId)) return json({ message: "Dossier invalide." }, 400);
+      const response = await fetch(root + "/rest/v1/web_gmail_deliveries" + filter + "&application_id=eq." +
+        encodeURIComponent(applicationId) + "&select=provider", { headers: serviceHeaders });
+      if (!response.ok) return json({ message: "Fournisseur de messagerie indisponible." }, 503);
+      const [delivery] = await response.json();
+      return delivery ? json({ provider: delivery.provider === "outlook" ? "outlook" : "gmail" }) : json({ message: "Aucun envoi associé à ce dossier." }, 404);
+    }
+
     if (body?.action === "disconnect") {
       const read = await fetch(endpoint + filter + "&select=refresh_token,connected_at", { headers: serviceHeaders });
       if (!read.ok) return json({ message: "Déconnexion Gmail indisponible." }, 503);
@@ -253,7 +263,7 @@ Deno.serve(async (request: Request) => {
       }
       const pageSize = 10;
       const deliveries = await fetch(rest + "web_gmail_deliveries" + filter +
-        "&select=application_id,message_id&message_id=not.is.null&order=application_id.asc&limit=" + (pageSize + 1) +
+        "&select=application_id,message_id&provider=eq.gmail&message_id=not.is.null&order=application_id.asc&limit=" + (pageSize + 1) +
         (after ? "&application_id=gt." + after : ""), { headers: serviceHeaders });
       if (!deliveries.ok) return json({ message: "Dossiers envoyés indisponibles." }, 503);
       const rows = await deliveries.json();

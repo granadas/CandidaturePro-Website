@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#5b21b6">
   <meta name="description" content="Candidature Pro en ligne : recherchez, préparez, envoyez et suivez vos candidatures.">
   <title>Candidature Pro — Espace en ligne</title>
-  <link rel="stylesheet" href="app.css?v=20261118-signup">
+  <link rel="stylesheet" href="app.css?v=20261120-signup-outlook-parity">
 </head>
 <body>
   <main id="guest-home" class="guest-home">
@@ -31,6 +31,7 @@
         <button class="nav-item" data-view="jobs"><span>▤</span>Postes ouverts</button>
         <button class="nav-item" data-view="applications"><span>✉</span>Candidatures</button>
         <button class="nav-item" data-view="tracking"><span aria-hidden="true">◷</span>Suivi <span id="tracking-unread-badge" hidden></span></button>
+        <button class="nav-item" data-view="account"><span>◯</span>Mon compte</button>
         <button class="nav-item" data-view="profile"><span>◯</span>Mon profil</button>
         <button class="nav-item" data-view="documents"><span>▱</span>Documents</button>
         <button class="nav-item" data-view="admin" id="admin-nav" hidden>Administration</button>
@@ -40,6 +41,8 @@
         <div class="plan"><small>FORMULE ACTUELLE</small><strong id="current-plan">Vérification…</strong><span id="plan-detail">Vérification des droits du compte</span></div>
         <button class="nav-item" data-view="premium"><span aria-hidden="true">☆</span>Premium</button>
         <button class="nav-item" data-view="support"><span aria-hidden="true">?</span>Support</button>
+        <button class="nav-item" data-view="updates"><span aria-hidden="true">↻</span>Mises à jour</button>
+        <button class="nav-item" data-view="about"><span aria-hidden="true">ⓘ</span>À propos</button>
         <button class="nav-item" data-view="settings"><span>⚙</span>Paramètres</button>
         <button id="sign-out" class="nav-item danger" hidden><span>↪</span>Déconnexion</button>
       </div>
@@ -70,7 +73,7 @@
             <div class="check done"><i aria-hidden="true">✓</i><span><b>Compte Candidature Pro</b><small>Session ouverte</small></span></div>
             <div class="check" data-setup="profile"><i aria-hidden="true">2</i><span><b>Profil</b><small></small></span><button type="button" class="secondary compact" data-view-link="profile">Ouvrir</button></div>
             <div class="check" data-setup="cv"><i aria-hidden="true">3</i><span><b>CV</b><small></small></span><button type="button" class="secondary compact" data-view-link="documents">Ouvrir</button></div>
-            <div class="check" data-setup="gmail"><i aria-hidden="true">4</i><span><b>Gmail</b><small></small></span><button type="button" class="secondary compact" data-view-link="settings">Ouvrir</button></div>
+            <div class="check" data-setup="mail"><i aria-hidden="true">4</i><span><b>Messagerie</b><small></small></span><button type="button" class="secondary compact" data-view-link="settings">Ouvrir</button></div>
           </article>
         </div>
       </section>
@@ -255,6 +258,22 @@
         </article>
       </section>
 
+      <section id="account-view" class="view">
+        <article class="panel">
+          <div class="panel-head"><div><small>COMPTE CANDIDATURE PRO</small><h2 id="account-view-email">Compte non connecté</h2></div></div>
+          <p>Formule actuelle : <strong id="account-view-plan">Vérification…</strong></p>
+        </article>
+        <article class="panel">
+          <div class="panel-head"><div><small>QUOTA</small><h2>Utilisation ce mois-ci</h2></div><button id="account-refresh" type="button" class="secondary compact">Actualiser</button></div>
+          <p id="account-view-usage" role="status">Chargement de l’utilisation…</p>
+        </article>
+        <article class="panel">
+          <h2>Sécurité et paramètres</h2>
+          <p>Modifiez votre mot de passe, gérez Gmail et retrouvez vos sauvegardes dans les paramètres.</p>
+          <button type="button" class="secondary" data-view-link="settings">Ouvrir les paramètres du compte</button>
+        </article>
+      </section>
+
       <section id="profile-view" class="view">
         <article class="panel profile-panel">
           <div class="panel-head">
@@ -403,10 +422,48 @@
         </article>
       </section>
 
+      <section id="updates-view" class="view">
+        <article class="panel">
+          <h2>Mises à jour</h2>
+          <p id="web-update-status" role="status">Le site se met à jour automatiquement lors de chaque déploiement.</p>
+          <h3>Dernière version Windows publiée</h3>
+          <p id="web-update-notes" class="muted"></p>
+          <a id="windows-update-download" class="secondary" href="https://github.com/granadas/CandidaturePro-Releases/releases/latest/download/CandidaturePro_Setup_x64.exe" rel="noopener noreferrer" hidden>Télécharger pour Windows</a>
+          <button class="secondary" type="button" data-view-link="updates">Vérifier de nouveau</button>
+        </article>
+      </section>
+
+      <section id="about-view" class="view">
+        <article class="panel">
+          <h2>À propos de Candidature Pro</h2>
+          <p>Candidature Pro vous aide à organiser votre recherche d’emploi : entreprises, offres, dossiers, documents et suivi des réponses.</p>
+          <h3>Formules</h3>
+          <p>La formule gratuite comprend 5 candidatures par mois. Premium coûte 14,99 CHF par mois et permet un usage illimité.</p>
+          <details><summary>Conditions d’utilisation</summary><p>Candidature Pro est un outil d’aide à la recherche d’emploi. Les informations, suggestions, analyses de CV, recherches d’entreprises et contenus générés doivent être vérifiés avant utilisation ou envoi. Vous restez responsable de vos candidatures, des informations communiquées aux employeurs et du respect des conditions des services tiers. Premium est un abonnement mensuel à 14,99 CHF, personnel et lié au compte auquel il a été attribué. Il est interdit de revendre, partager, contourner ou falsifier un accès Premium. Conservez une sauvegarde de vos documents importants. Pour toute question : jobrufali@gmail.com.</p></details>
+          <h3>Contact</h3>
+          <p><a href="mailto:jobrufali@gmail.com">jobrufali@gmail.com</a></p>
+          <p><a href="../privacy.html">Politique de confidentialité</a></p>
+        </article>
+      </section>
+
       <section id="admin-view" class="view">
         <article class="panel">
           <h2>Administration</h2>
-          <label>Vue<select id="admin-mode"><option value="blacklist">Liste noire</option><option value="audit">Historique</option><option value="statistics">Statistiques d’usage</option><option value="online">Utilisateurs en ligne</option><option value="credits">Crédits fournisseurs</option><option value="job-market">Actualisation des offres</option><option value="contacts">Changements de contact</option><option value="invalid">E-mails incorrects</option><option value="verification">Vérifications entreprises</option><option value="reports">Signalements</option><option value="users">Utilisateurs</option><option value="identity">Corrections d’identité</option></select></label>
+          <label>Vue<select id="admin-mode"><option value="blacklist">Liste noire</option><option value="audit">Historique</option><option value="statistics">Statistiques d’usage</option><option value="online">Utilisateurs en ligne</option><option value="credits">Crédits fournisseurs</option><option value="job-market">Actualisation des offres</option><option value="contacts">Changements de contact</option><option value="invalid">E-mails incorrects</option><option value="verification">Vérifications entreprises</option><option value="reports">Signalements</option><option value="users">Utilisateurs</option><option value="identity">Corrections d’identité</option><option value="updates">Mises à jour Windows</option></select></label>
+          <article id="admin-release-controls" class="panel" hidden>
+            <h3>Publication des mises à jour Windows</h3>
+            <p id="admin-release-current" role="status">Lecture de la dernière version publiée…</p>
+            <p class="muted">L’installateur doit déjà être accessible à l’adresse HTTPS indiquée. Cette page enregistre les informations de version ; la création et l’envoi de l’installateur Windows restent dans le processus de publication de l’application.</p>
+            <form id="admin-release-form" class="profile-form">
+              <label>Version<input name="version" required maxlength="40" placeholder="Ex. 1.3.71 ou 1.3.71-rc1"></label>
+              <label class="wide">URL HTTPS de l’installateur<input name="installer_url" type="url" required maxlength="2000" placeholder="https://github.com/…/CandidaturePro_Setup_x64.exe"></label>
+              <label class="wide">Notes de version<textarea name="release_notes" maxlength="8000" rows="4"></textarea></label>
+              <label>Publication<select name="status"><option value="draft">Brouillon</option><option value="test">Test</option><option value="published">Publiée</option></select></label>
+              <label><span><input name="is_mandatory" type="checkbox"> Mise à jour obligatoire</span></label>
+              <div class="wide"><button type="submit" class="primary">Enregistrer la version</button></div>
+              <p id="admin-release-status" class="wide" role="status"></p>
+            </form>
+          </article>
           <div id="admin-user-controls" class="admin-filters" hidden><label>Rechercher un compte par e-mail<input id="admin-user-search" type="search" maxlength="254" autocomplete="off" placeholder="Adresse e-mail ou partie de l’adresse"></label></div>
           <div id="admin-credit-controls" class="admin-filters" hidden><label>Période des crédits<input id="admin-credit-month" type="month" min="2000-01"></label><small>Sans mois sélectionné : tout l’historique. Le regroupement mensuel utilise les dates du serveur (UTC).</small><button id="admin-credit-current" type="button" class="secondary compact">Ce mois</button><button id="admin-credit-all" type="button" class="secondary compact">Tout l’historique</button></div>
           <button type="button" class="secondary" id="admin-refresh">Actualiser</button>
@@ -430,10 +487,16 @@
           <p>L’archive ZIP contient vos dossiers, vos variantes de CV et vos PDF réutilisables. Conservez-la dans un emplacement privé.</p>
           <button id="backup-export" type="button" class="secondary">Télécharger ma sauvegarde</button>
           <label>Restaurer une sauvegarde créée avec ce compte<input id="backup-file" type="file" accept=".zip,application/zip"></label>
-          <p>La restauration ajoute les éléments manquants et conserve les éléments déjà présents. L’identité, l’abonnement et la connexion Gmail sont gérés par votre compte. Un ancien fil Gmail peut ne plus être disponible après la restauration d’un dossier supprimé.</p>
+          <p>La restauration ajoute les éléments manquants et conserve les éléments déjà présents. L’identité, l’abonnement et les connexions Gmail/Outlook sont gérés par votre compte. Un ancien fil peut ne plus être disponible après la restauration d’un dossier supprimé.</p>
           <p id="backup-preview" role="status"></p>
           <button id="backup-restore" type="button" class="secondary" hidden disabled>Ajouter les éléments manquants</button>
           <p id="backup-status" role="status"></p>
+        </article>
+        <article class="panel">
+          <h2>Stabilité et diagnostic</h2>
+          <p>Vérifiez que ce navigateur dispose des fonctions nécessaires pour utiliser Candidature Pro.</p>
+          <button id="web-diagnostics-run" type="button" class="secondary">Vérifier le navigateur</button>
+          <ul id="web-diagnostics-results" aria-live="polite" hidden></ul>
         </article>
         <article class="panel">
           <div class="panel-head"><h2>Gmail</h2></div>
@@ -442,6 +505,12 @@
           <button id="gmail-disconnect" class="secondary" hidden>Déconnecter Gmail</button>
           <button id="settings-check" class="secondary" type="button">Vérifier la connexion</button>
           <ul id="settings-check-results" aria-live="polite" hidden></ul>
+        </article>
+        <article class="panel">
+          <div class="panel-head"><h2>Outlook</h2></div>
+          <p id="outlook-status" role="status"></p>
+          <button id="outlook-connect" class="secondary" hidden>Connecter Outlook</button>
+          <button id="outlook-disconnect" class="secondary" hidden>Déconnecter Outlook</button>
         </article>
       </section>
     </main>
@@ -466,7 +535,7 @@
 
   <dialog id="reply-dialog" aria-labelledby="reply-title">
     <form method="dialog">
-      <h2 id="reply-title">Réponses Gmail</h2>
+      <h2 id="reply-title">Réponses reçues</h2>
       <div id="reply-content" role="status" tabindex="0"></div>
       <details id="reply-editor" hidden>
         <summary>Préparer une réponse</summary>
@@ -481,7 +550,7 @@
       </details>
       <div class="reply-actions">
         <button id="reply-consent" type="button" class="secondary" hidden>Autoriser la lecture dans Candidature Pro</button>
-        <a id="reply-gmail" class="secondary" target="_blank" rel="noopener noreferrer" hidden>Ouvrir le fil dans Gmail</a>
+        <a id="reply-gmail" class="secondary" target="_blank" rel="noopener noreferrer" hidden>Ouvrir le fil dans la messagerie</a>
         <button class="primary" autofocus>Fermer</button>
       </div>
     </form>
@@ -522,6 +591,21 @@
     </form>
   </dialog>
 
+  <dialog id="interview-prep-dialog" aria-labelledby="interview-prep-title">
+    <form id="interview-prep-form">
+      <h2 id="interview-prep-title">Préparer l’entretien</h2>
+      <p id="interview-prep-context"></p>
+      <label>Informations utiles pour la préparation<textarea name="instruction" rows="4" maxlength="3000" placeholder="Date, format de l’entretien, questions ou points à travailler…"></textarea></label>
+      <p class="interview-prep-disclosure">La préparation utilise les informations de cette candidature et votre profil/CV enregistré, si disponible.</p>
+      <p id="interview-prep-status" role="status" aria-live="polite"></p>
+      <article id="interview-prep-result" hidden></article>
+      <div class="batch-actions">
+        <button id="interview-prep-generate" type="submit" class="primary compact">Générer la préparation</button>
+        <button id="interview-prep-close" type="button" class="secondary compact">Fermer</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog id="followup-dialog" aria-labelledby="followup-title">
     <form id="followup-form">
       <h2 id="followup-title">Relances en lot</h2>
@@ -548,6 +632,7 @@
     <form id="send-form">
       <h2 id="send-title">Préparer l’envoi</h2>
       <p id="send-recipient"></p>
+      <label>Messagerie utilisée<select id="send-provider"><option value="gmail">Gmail</option><option value="outlook">Outlook</option></select></label>
       <p id="batch-progress" hidden></p>
       <label>Objet<input id="send-subject" maxlength="120" required></label>
       <label>Message<textarea id="send-message" rows="8" maxlength="12000" required></textarea></label>
@@ -619,7 +704,7 @@
   <script src="cv-import.js?v=20261118"></script>
   <script src="admin-tools.js?v=20261118"></script>
   <script src="cv-word.js?v=20261118"></script>
-  <script src="account-signup.js?v=20261118"></script>
-  <script src="app.js?v=20261118-signup"></script>
+  <script src="account-signup.js?v=20261120"></script>
+  <script src="app.js?v=20261120-signup-outlook-parity"></script>
 </body>
 </html>
