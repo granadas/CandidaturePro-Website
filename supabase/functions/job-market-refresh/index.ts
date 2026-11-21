@@ -44,12 +44,10 @@ Deno.serve(async (req: Request) => {
   const suppliedSecret = req.headers.get("x-job-market-secret") ?? "";
   const authorization = req.headers.get("Authorization") ?? "";
   let requestedCity = "Genève";
-  let requestedRadius = "30 km";
   let requestedQuery = "";
   try {
     const payload = await req.json();
     requestedCity = String(payload?.city ?? "Genève").trim() || "Genève";
-    requestedRadius = String(payload?.radius ?? "30 km").trim() || "30 km";
     requestedQuery = String(payload?.query ?? "").trim();
   } catch { /* Le cron hebdomadaire utilise les valeurs par défaut. */ }
 
@@ -102,7 +100,7 @@ Deno.serve(async (req: Request) => {
     headers: { ...headers, Prefer: "return=representation" },
     body: JSON.stringify({
       status: "running", credits_used: 0,
-      message: `${caller === "admin" ? "Actualisation manuelle Admin" : "Actualisation hebdomadaire"} • ${requestedCity} • ${requestedRadius}`
+      message: `${caller === "admin" ? "Actualisation manuelle Admin" : "Actualisation hebdomadaire"} • ${requestedCity}`
     })
   });
   if (runResponse.status === 409) return json({ status: "busy", credits: 0, added: 0, monthCredits: used, message: "Une actualisation est déjà en cours. Réessayez après sa fin." }, 409);
@@ -170,7 +168,7 @@ Deno.serve(async (req: Request) => {
         method: "PATCH", headers,
         body: JSON.stringify({
           status: "failed", completed_at: new Date().toISOString(), credits_used: credits,
-          offers_added: 0, message: `Aucune annonce directe trouvée pour ${requestedCity} (${requestedRadius})`
+          offers_added: 0, message: `Aucune annonce directe trouvée pour ${requestedCity}`
         })
       });
       if (!emptyResultResponse.ok) throw new Error(`Enregistrement de l’échec HTTP ${emptyResultResponse.status}`);
