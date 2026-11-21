@@ -924,8 +924,10 @@
         const checkedAt = Date.parse(job.updated_at || "");
         return !Number.isFinite(checkedAt) || Date.now() - checkedAt > 30 * 86400000;
       }).length;
+      const missingEmployers = jobResults.filter(job => !String(job.company_name || "").trim()).length;
       message.textContent = jobResults.length
         ? "Annonces référencées correspondant à vos critères. " +
+          (missingEmployers ? missingEmployers + " employeur(s) à vérifier. " : "") +
           (olderThan30Days ? olderThan30Days + " offre(s) non revérifiée(s) depuis plus de 30 jours. " : "") +
           "Vérifiez leur disponibilité sur le site source."
         : "Aucune annonce référencée ne correspond à ces critères.";
