@@ -137,3 +137,10 @@ test("job search can show only offers with identified employers without spending
   assert.match(app, /jobs-known-employer-only"\)\.addEventListener\("change"/);
   assert.match(app, /jobs-known-employer-only"\)\.checked = false/);
 });
+
+test("indexed job listings never claim availability was verified", () => {
+  assert.match(html, /ANNONCES RÉFÉRENCÉES/);
+  assert.doesNotMatch(html, /OFFRES DISPONIBLES/);
+  assert.match(app, /disponibilité à confirmer/);
+  assert.match(app, /Vérifiez leur disponibilité sur le site source/);
+});
