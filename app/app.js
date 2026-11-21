@@ -801,6 +801,9 @@
         : "";
       const checkedAt = Date.parse(job.updated_at || "");
       const daysSinceCheck = Number.isFinite(checkedAt) ? Math.floor((Date.now() - checkedAt) / 86400000) : Infinity;
+      const lastSearched = Number.isFinite(checkedAt)
+        ? '<small>Retrouvée dans une recherche le ' + escapeHtml(new Date(checkedAt).toLocaleDateString("fr-CH", { day: "numeric", month: "long", year: "numeric" })) + '</small>'
+        : "";
       const freshnessNote = daysSinceCheck > 30
         ? '<small>Annonce non revérifiée depuis plus de 30 jours — vérifiez sa disponibilité sur le site source.</small>'
         : "";
@@ -808,7 +811,7 @@
         '<div class="job-card-main"><strong>' + escapeHtml(job.title) + '</strong>' +
         '<span>' + escapeHtml(job.company_name) + ' • ' + escapeHtml(job.location) + '</span>' +
         '<small>Catégorie de recherche : ' + escapeHtml(job.sector) + ' • ' + escapeHtml(job.source) + '</small>' +
-        '<p>' + escapeHtml(job.snippet) + '</p>' + freshnessNote + '</div>' +
+        '<p>' + escapeHtml(job.snippet) + '</p>' + lastSearched + freshnessNote + '</div>' +
         '<div class="job-card-actions">' + sourceLink +
         '<button class="primary compact" data-action="add-job">Ajouter aux candidatures</button></div></article>';
     }).join("");
@@ -845,6 +848,7 @@
     document.querySelector("#jobs-query").value = "";
     document.querySelector("#jobs-sector").value = "";
     document.querySelector("#jobs-city").value = "";
+    document.querySelector("#jobs-recent-only").checked = false;
     showView("jobs");
   });
 
