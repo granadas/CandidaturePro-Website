@@ -148,7 +148,7 @@ test("preserves existing employer and location when refreshed search omits them"
   assert.ok(start >= 0 && end > start);
   const section = edge.slice(start, end);
   assert.match(section, /existingByUrl\.get\(offer\.url\)/);
-  assert.match(section, /offer\.company_name\.trim\(\) \|\| previous\?\.company_name/);
+  assert.match(section, /previous.*company_name.*trim.*offer.*company_name.*trim/);
   assert.match(section, /offer\.location === "À vérifier"/);
   assert.match(edge, /body: JSON\.stringify\(preservedOffers\)/);
 });
