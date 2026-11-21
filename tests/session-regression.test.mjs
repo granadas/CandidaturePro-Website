@@ -44,6 +44,13 @@ test("read retry retains original session generation", () => {
   assert.match(read, /await refreshSession\(\)/);
 });
 
+test("refresh rejects responses for another user or without credentials", () => {
+  const refresh = block("async function refreshSession()", "async function ensureSession()");
+  assert.match(refresh, /refreshed\.user\.id\s*!==\s*session\.user\?\.id/);
+  assert.match(refresh, /!refreshed\.access_token\s*\|\|\s*!refreshed\.refresh_token/);
+  assert.ok(refresh.indexOf("refreshed.user.id !== session.user?.id") < refresh.indexOf("setSession(refreshed)"));
+});
+
 test("session refresh never overwrites a replaced session", () => {
   const refresh = block("async function refreshSession()", "async function ensureSession()");
   assert.match(refresh, /latest\?\.refresh_token\s*!==\s*session\.refresh_token/);
