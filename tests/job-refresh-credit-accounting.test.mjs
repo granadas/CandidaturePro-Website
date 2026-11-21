@@ -119,3 +119,12 @@ test("ignores malformed individual provider entries", () => {
   assert.match(section, /typeof item\.link === "string"/);
   assert.match(section, /typeof item\.title === "string"/);
 });
+
+test("only infers employer from an explicit company-city caption", () => {
+  const start = edge.indexOf("function jobIdentity(");
+  const end = edge.indexOf("Deno.serve(", start);
+  const section = edge.slice(start, end);
+  assert.match(section, /employerLocationCaption/);
+  assert.match(section, /safeCaptionEmployer/);
+  assert.match(section, /company \|\| captionCompany \|\| safeCaptionEmployer/);
+});
