@@ -42,3 +42,10 @@ test("Word export rejects an unknown template", () => {
 test("Word export requires candidate identity", () => {
   assert.throws(() => generate({ ...fields, name: "" }), /nom et le titre/);
 });
+
+test("Word export respects editorial and sans-serif font choices", () => {
+  const editorial = generate({ ...fields, font: "editorial" }).files["word/styles.xml"];
+  const sans = generate({ ...fields, font: "sans" }).files["word/styles.xml"];
+  assert.ok(editorial.includes('w:ascii="Georgia"'));
+  assert.ok(sans.includes('w:ascii="Aptos"'));
+});
