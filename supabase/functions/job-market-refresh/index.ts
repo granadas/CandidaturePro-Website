@@ -221,7 +221,7 @@ Deno.serve(async (req: Request) => {
           (!("snippet" in item) || typeof item.snippet === "string") &&
           item.title.trim().length > 0 &&
           /^https:\/\/(www\.)?jobscout24\.ch\/fr\/job\/[0-9a-f-]+\/?(?:\?.*)?$/i.test(item.link) &&
-          !/Postes et offres d'emploi en Suisse|Sur JobScout24, vous trouverez de nombreuses offres|Emplois similaires/i.test(item.snippet ?? ""))
+          !/Postes et offres d'emploi en Suisse|Sur JobScout24, vous trouverez de nombreuses offres|Emplois similaires/i.test("snippet" in item ? item.snippet ?? "" : ""))
         .map((item: { title: string; link: string; snippet?: string }) => ({
           ...item,
           link: new URL(item.link).origin.replace("://www.", "://") +
