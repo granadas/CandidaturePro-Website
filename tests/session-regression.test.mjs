@@ -89,3 +89,10 @@ test("admin refresh shows remaining credits and disables when budget is exhauste
   assert.match(admin, /button\.disabled = true/);
   assert.match(admin, /Budget Serper indisponible/);
 });
+
+test("admin paid refresh rejects submit when budget is blocked and stays disabled", () => {
+  const admin = block("function renderAdminJobMarket(", "let adminJobRefreshRunning =");
+  assert.match(admin, /adminJobRefreshRunning \|\|\s*remainingCredits === null \|\| remainingCredits === 0/);
+  assert.match(admin, /button\.disabled = remainingCredits === null \|\| remainingCredits === 0/);
+  assert.doesNotMatch(admin, /adminJobRefreshRunning = button\.disabled = false/);
+});
