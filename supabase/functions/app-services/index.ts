@@ -381,6 +381,19 @@ function isRelevantPlace(
    RECHERCHE ENTREPRISES
    ============================================================ */
 
+function officialWebsiteCandidate(value: unknown) {
+  const website = String(value || "").trim();
+  if (!website) return "";
+  try {
+    const host = new URL(website).hostname.toLowerCase().replace(/^www\./, "");
+    if (["google.", "linkedin.", "facebook.", "instagram.", "local.ch", "search.ch",
+      "jobs.ch", "jobup.ch", "indeed.", "yellowpages.", "wikipedia.", "comparatus.net",
+      "hellowork.com"].some(blocked => host === blocked.replace(/\.$/, "") || host.endsWith("." + blocked.replace(/\.$/, "")) ||
+        (blocked.endsWith(".") && host.startsWith(blocked)))) return "";
+    return website;
+  } catch { return ""; }
+}
+
 async function companySearch(p: any, key: string, webKey: string, userId: string) {
 
   const city = String(p?.city || "").trim();
@@ -482,7 +495,7 @@ async function companySearch(p: any, key: string, webKey: string, userId: string
         city
       ),
       sector: profile.label,
-      website: String(x.website || ""),
+      website: officialWebsiteCandidate(x.website),
       phone: String(
         x["contact:phone"] ||
         x.phone ||
@@ -500,21 +513,14 @@ async function companySearch(p: any, key: string, webKey: string, userId: string
     Web officiels. Chaque résultat est dédupliqué avant retour au client.
   */
   if (profile.type === "logistics" && webKey) {
-    const blockedHosts = [
-      "google.", "linkedin.", "facebook.", "instagram.",
-      "local.ch", "search.ch", "jobs.ch", "jobup.ch",
-      "indeed.", "yellowpages.", "wikipedia."
-    ];
-
     const addCompany = (candidate: any) => {
       const name = String(candidate?.name || "").trim();
-      const website = String(candidate?.website || "").trim();
+      const website = officialWebsiteCandidate(candidate?.website);
       const address = String(candidate?.address || "").trim();
       if (!name) return;
 
       let host = "";
       try { host = website ? new URL(website).hostname.toLowerCase().replace(/^www\./, "") : ""; } catch {}
-      if (host && blockedHosts.some((blocked) => host.includes(blocked))) return;
 
       const duplicate = companies.some((company) => {
         let existingHost = "";
