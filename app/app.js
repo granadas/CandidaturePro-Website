@@ -2266,7 +2266,7 @@
   const cvVariants = document.querySelector("#cv-variants");
   const cvLabel = document.querySelector("#cv-label");
   const cvSaveStatus = document.querySelector("#cv-save-status");
-  const cvFieldNames = ["name", "title", "contact", "summary", "experience", "education", "skills", "target", "offer", "template", "photo"];
+  const cvFieldNames = ["name", "title", "contact", "summary", "experience", "education", "skills", "target", "offer", "template", "photo", "accent", "font"];
   let savedCvVariants = [];
   let editingCvId = null;
 

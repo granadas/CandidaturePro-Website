@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#5b21b6">
   <meta name="description" content="Candidature Pro en ligne : recherchez, préparez, envoyez et suivez vos candidatures.">
   <title>Candidature Pro — Espace en ligne</title>
-  <link rel="stylesheet" href="app.css?v=20261121-redesign">
+  <link rel="stylesheet" href="app.css?v=20261121-studio">
 </head>
 <body>
   <main id="guest-home" class="guest-home">
@@ -338,6 +338,7 @@
               <button class="cv-template-card" type="button" data-cv-template="modern" aria-pressed="false"><span class="cv-template-sheet cv-template-sheet-modern" aria-hidden="true"><i></i><b></b><em></em><em></em><b></b><em></em></span><strong>Contemporain <span class="cv-template-premium">Premium</span></strong><small>Une touche de couleur</small></button>
               <button class="cv-template-card" type="button" data-cv-template="compact" aria-pressed="false"><span class="cv-template-sheet cv-template-sheet-compact" aria-hidden="true"><i></i><b></b><em></em><em></em><b></b><em></em></span><strong>Compact <span class="cv-template-premium">Premium</span></strong><small>Plus d’espace pour votre parcours</small></button>
             </div>
+            <div class="wide cv-design-options"><label>Palette de couleurs<select name="accent"><option value="copper">Bleu nuit et cuivre</option><option value="jade">Jade et bleu profond</option><option value="plum">Prune et lilas</option><option value="blue">Bleu classique</option></select></label><label>Typographie<select name="font"><option value="editorial">Éditoriale</option><option value="sans">Moderne sans empattement</option></select></label></div>
             <div class="wide cv-premium-banner"><p id="cv-premium-access-status" role="status">Vérification des droits du compte…</p><button type="button" class="secondary compact" data-view-link="premium">Voir la formule Premium</button></div>
             <div class="wide cv-studio-heading" id="cv-identity"><span>02 · IDENTITÉ</span><h3>Présentez-vous</h3><p>Une première impression claire, avec les informations essentielles.</p></div>
             <label class="wide">Nom de la variante<input id="cv-label" maxlength="120"></label>
@@ -354,9 +355,9 @@
             <label class="wide">Coordonnées<input name="contact" maxlength="240"></label>
             <div class="wide cv-studio-heading" id="cv-story"><span>03 · PARCOURS</span><h3>Racontez votre expérience</h3><p>Privilégiez des réalisations concrètes et des compétences que vous maîtrisez.</p></div>
             <label class="wide">Profil<textarea name="summary" maxlength="2000" rows="3"></textarea></label>
-            <label class="wide">Expériences<textarea name="experience" maxlength="6000" rows="5"></textarea></label>
-            <label class="wide">Formation<textarea name="education" maxlength="3000" rows="3"></textarea></label>
-            <label class="wide">Compétences et langues<textarea name="skills" maxlength="3000" rows="3"></textarea></label>
+            <label class="wide">Expériences<textarea name="experience" maxlength="6000" rows="8" placeholder="Responsable de projets · 2022–2026&#10;Entreprise, Genève&#10;• Pilotage de projets et résultats mesurables.&#10;&#10;Chargé de projets · 2019–2022&#10;Autre entreprise, Lausanne&#10;• Une réalisation concrète."></textarea><small>Un poste par paragraphe : fonction · dates, entreprise, puis réalisations précédées de •. Séparez les postes par une ligne vide.</small></label>
+            <label class="wide">Formation<textarea name="education" maxlength="3000" rows="4" placeholder="Bachelor en économie · 2018&#10;Haute école de gestion, Genève"></textarea><small>Un diplôme par paragraphe : intitulé · date, puis établissement.</small></label>
+            <label class="wide">Compétences et langues<textarea name="skills" maxlength="3000" rows="4" placeholder="Gestion de projet&#10;Coordination d’équipes&#10;Français · langue maternelle"></textarea><small>Une compétence ou une langue par ligne.</small></label>
             <details id="cv-targeting" class="wide" hidden>
               <summary>Adapter le CV à une offre</summary>
               <p id="cv-target-context"></p>
@@ -661,8 +662,8 @@
   <script src="cv-import.js?v=20261118"></script>
   <script src="admin-tools.js?v=20261118"></script>
   <script src="cv-word.js?v=20261118"></script>
-  <script src="cv-render.js?v=20261121-redesign"></script>
+  <script src="cv-render.js?v=20261121-studio"></script>
   <script src="account-signup.js?v=20261118"></script>
-  <script src="app.js?v=20261121-redesign"></script>
+  <script src="app.js?v=20261121-studio"></script>
 </body>
 </html>
