@@ -40,3 +40,17 @@ test("legacy offer cleanup errors cannot be reported as successful refreshes", (
   assert.match(cleanup, /if \(!legacyDeactivationResponse\.ok\)/);
   assert.match(cleanup, /throw new Error/);
 });
+
+test("malformed credit totals block paid searches", () => {
+  const start = edge.indexOf("let usageRows: unknown;");
+  const end = edge.indexOf("const runResponse = await fetch", start);
+  assert.ok(start >= 0 && end > start);
+  const section = edge.slice(start, end);
+  assert.match(section, /catch \{/);
+  assert.match(section, /!Array\.isArray\(usageRows\)/);
+  assert.match(section, /!Number\.isSafeInteger\(row\.credits_used\)/);
+  assert.match(section, /Number\(row\.credits_used\) < 0/);
+  assert.match(section, /!Number\.isSafeInteger\(used\)/);
+  assert.match(section, /Actualisation bloquée/);
+  assert.match(section, /Math\.max\(0, 100 - used\)/);
+});
