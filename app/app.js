@@ -809,7 +809,7 @@
         : "";
       return '<article class="job-card" data-job-index="' + index + '">' +
         '<div class="job-card-main"><strong>' + escapeHtml(job.title) + '</strong>' +
-        '<span>' + escapeHtml(job.company_name) + ' • ' + escapeHtml(job.location) + '</span>' +
+        '<span>' + escapeHtml(job.company_name || "Employeur à vérifier") + ' • ' + escapeHtml(job.location) + '</span>' +
         '<small>Catégorie de recherche : ' + escapeHtml(job.sector) + ' • ' + escapeHtml(job.source) + '</small>' +
         '<p>' + escapeHtml(job.snippet) + '</p>' + lastSearched + freshnessNote + '</div>' +
         '<div class="job-card-actions">' + sourceLink +
