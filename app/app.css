@@ -375,6 +375,10 @@
 .cv-sheet-modern .cv-sheet-education .cv-entry-organization{color:#c8d6dd}
 .cv-sheet-modern .cv-sheet-skills .cv-skill-list{display:grid;gap:1.3cqi}
 .cv-sheet-modern .cv-sheet-skills .cv-skill{color:#f2f6f7;background:transparent;border-left:2px solid var(--cv-accent);padding:.1cqi 0 .1cqi 1.2cqi}
+.cv-sheet-modern .cv-sheet-content{grid-template-rows:1fr;align-content:stretch}
+.cv-sheet-modern .cv-sheet-main{grid-column:2;grid-row:1;display:grid;align-content:start;gap:4cqi;padding:5% 9% 9% 8%}
+.cv-sheet-modern .cv-sheet-side{grid-column:1;grid-row:1;display:grid;align-content:start;gap:5cqi;padding:9% 9% 9% 10%}
+.cv-sheet-modern .cv-sheet-main>.cv-sheet-section,.cv-sheet-modern .cv-sheet-side>.cv-sheet-section{grid-column:auto;grid-row:auto;padding:0}
 .cv-sheet-compact .cv-sheet-head,.cv-sheet-compact .cv-sheet-contact{background:var(--cv-deep)}
 .cv-sheet-compact .cv-sheet-head{min-height:20cqi}
 .cv-sheet-compact .cv-sheet-contact{border-color:var(--cv-soft)}
