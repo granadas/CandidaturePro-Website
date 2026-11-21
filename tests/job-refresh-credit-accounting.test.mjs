@@ -140,3 +140,14 @@ test("rejects invalid refresh JSON and non-string search inputs before paid call
   assert.match(section, /typeof fields\.city !== "string"/);
   assert.match(section, /typeof fields\.query !== "string"/);
 });
+
+test("preserves existing employer and location when refreshed search omits them", () => {
+  const start = edge.indexOf("const existingRows: unknown");
+  const end = edge.indexOf("const storeResponse = await fetch(", start);
+  assert.ok(start >= 0 && end > start);
+  const section = edge.slice(start, end);
+  assert.match(section, /existingByUrl\.get\(offer\.url\)/);
+  assert.match(section, /offer\.company_name\.trim\(\) \|\| previous\?\.company_name/);
+  assert.match(section, /offer\.location === "À vérifier"/);
+  assert.match(edge, /body: JSON\.stringify\(preservedOffers\)/);
+});

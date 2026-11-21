@@ -251,16 +251,33 @@ Deno.serve(async (req: Request) => {
         // Count only URLs that were not already stored, not all upserted search results.
         const uniqueUrls: string[] = [...new Set<string>(offers.map((offer: { url: string }) => offer.url))];
         const existingResponse = await fetch(
-          `${url}/rest/v1/job_market_offers?select=url&url=in.(${uniqueUrls.map((value: string) => `"${encodeURIComponent(value)}"`).join(",")})`,
+          `${url}/rest/v1/job_market_offers?select=url,company_name,location&url=in.(${uniqueUrls.map((value: string) => `"${encodeURIComponent(value)}"`).join(",")})`,
           { headers }
         );
         if (!existingResponse.ok) throw new Error(`Vérification des doublons HTTP ${existingResponse.status}`);
-        const existingUrls = new Set((await existingResponse.json()).map((row: { url: string }) => row.url));
-        const newOfferCount = uniqueUrls.filter((value: string) => !existingUrls.has(value)).length;
+        const existingRows: unknown = await existingResponse.json();
+        if (!Array.isArray(existingRows) ||
+            existingRows.some(row => !row || typeof row.url !== "string" ||
+              typeof row.company_name !== "string" || typeof row.location !== "string"))
+          throw new Error("Réponse invalide lors de la vérification des annonces existantes");
+        const existingByUrl = new Map<string, { company_name: string; location: string }>(
+          existingRows.map(row => [row.url, row])
+        );
+        const newOfferCount = uniqueUrls.filter((value: string) => !existingByUrl.has(value)).length;
+        // Search snippets may omit the employer or workplace on later runs.
+        // Never overwrite a previously known value with an empty/unknown one.
+        const preservedOffers = offers.map(offer => {
+          const previous = existingByUrl.get(offer.url);
+          return {
+            ...offer,
+            company_name: offer.company_name.trim() || previous?.company_name || "",
+            location: offer.location === "À vérifier" ? previous?.location || offer.location : offer.location
+          };
+        });
         const storeResponse = await fetch(`${url}/rest/v1/job_market_offers?on_conflict=url`, {
           method: "POST",
           headers: { ...headers, Prefer: "resolution=merge-duplicates" },
-          body: JSON.stringify(offers)
+          body: JSON.stringify(preservedOffers)
         });
         if (!storeResponse.ok) throw new Error(`Enregistrement HTTP ${storeResponse.status}`);
         added += newOfferCount;
