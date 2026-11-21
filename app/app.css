@@ -334,3 +334,59 @@
 .cv-sheet-compact .cv-sheet-section h2{color:#156b72;margin-bottom:1.5cqi}
 .cv-sheet-compact .cv-sheet-section p{line-height:1.5}
 @media print{ @page{size:A4;margin:0} body:has(#cv-dialog[open]) #cv-dialog{background:#fff;padding:0} #cv-preview{width:210mm;container-type:inline-size} #cv-preview .cv-sheet{min-height:297mm;box-shadow:none;-webkit-print-color-adjust:exact;print-color-adjust:exact} }
+
+/* CV studio: shared on-screen and printed composition. */
+.cv-sheet{--cv-accent:#a85d3a;--cv-deep:#152f40;--cv-soft:#d9aa88;font-family:Georgia,'Times New Roman',serif}
+.cv-sheet.cv-font-sans,.cv-sheet.cv-font-sans h1{font-family:Arial,Helvetica,sans-serif}
+.cv-sheet h1{font-size:clamp(24px,4.3cqi,41px);font-weight:700}
+.cv-sheet-contact{display:flex;flex-wrap:wrap;gap:.6cqi 2.2cqi}
+.cv-sheet-contact span{display:inline-block}
+.cv-sheet-content{align-content:start}
+.cv-sheet-section h2{position:relative}
+.cv-sheet-prose{line-height:1.58}
+.cv-entry-list{display:grid;gap:2.6cqi}
+.cv-entry{break-inside:avoid;min-width:0}
+.cv-entry-heading{display:flex;justify-content:space-between;align-items:baseline;gap:1.5cqi;line-height:1.35}
+.cv-entry-heading strong{font-family:Arial,Helvetica,sans-serif;font-size:clamp(10px,1.7cqi,16px);font-weight:750}
+.cv-entry-dates{font:600 clamp(8px,1.2cqi,11px)/1.4 Arial,Helvetica,sans-serif;white-space:nowrap;color:var(--cv-accent)}
+.cv-entry-organization{font:500 clamp(9px,1.35cqi,13px)/1.5 Arial,Helvetica,sans-serif;color:#667488;margin:.35cqi 0 .8cqi}
+.cv-entry p{white-space:pre-wrap}
+.cv-entry-bullets{margin:.5cqi 0 0;padding-left:2.3cqi;color:inherit}
+.cv-entry-bullets li{padding-left:.25cqi;margin:.35cqi 0;line-height:1.5}
+.cv-entry-bullets li::marker{color:var(--cv-accent)}
+.cv-skill-list{display:flex;flex-wrap:wrap;gap:.8cqi}
+.cv-skill{font:600 clamp(8px,1.3cqi,12px)/1.4 Arial,Helvetica,sans-serif;padding:.65cqi 1.1cqi;background:#f0f3f5;border-radius:.35cqi}
+.cv-sheet-classic{border-top:1.2cqi solid var(--cv-deep)}
+.cv-sheet-classic .cv-sheet-head{border:0;padding-bottom:3%}
+.cv-sheet-classic .cv-sheet-section h2{color:var(--cv-deep)}
+.cv-sheet-classic .cv-sheet-section h2:after{content:"";display:block;width:5cqi;height:.35cqi;background:var(--cv-accent);margin:.7cqi 0 1.3cqi}
+.cv-sheet-classic .cv-sheet-section h2{border:0!important}
+.cv-sheet-modern{background:linear-gradient(90deg,var(--cv-deep) 32%,#fff 32%)}
+.cv-sheet-modern .cv-sheet-head{min-height:20cqi}
+.cv-sheet-modern h1{color:var(--cv-deep)}
+.cv-sheet-modern .cv-sheet-role,.cv-sheet-modern .cv-sheet-section h2{color:var(--cv-accent)}
+.cv-sheet-modern .cv-sheet-contact{display:grid;align-self:center;gap:1.5cqi}
+.cv-sheet-modern .cv-sheet-section{padding:6% 9% 5% 8%}
+.cv-sheet-modern .cv-sheet-education,.cv-sheet-modern .cv-sheet-skills{padding:11% 9% 5% 10%}
+.cv-sheet-modern .cv-sheet-education h2,.cv-sheet-modern .cv-sheet-skills h2{color:var(--cv-soft)}
+.cv-sheet-modern .cv-sheet-education .cv-entry-heading{display:block}
+.cv-sheet-modern .cv-sheet-education .cv-entry-heading strong{color:#fff}
+.cv-sheet-modern .cv-sheet-education .cv-entry-dates{display:block;color:var(--cv-soft)}
+.cv-sheet-modern .cv-sheet-education .cv-entry-organization{color:#c8d6dd}
+.cv-sheet-modern .cv-sheet-skills .cv-skill-list{display:grid;gap:1.3cqi}
+.cv-sheet-modern .cv-sheet-skills .cv-skill{color:#f2f6f7;background:transparent;border-left:2px solid var(--cv-accent);padding:.1cqi 0 .1cqi 1.2cqi}
+.cv-sheet-compact .cv-sheet-head,.cv-sheet-compact .cv-sheet-contact{background:var(--cv-deep)}
+.cv-sheet-compact .cv-sheet-head{min-height:20cqi}
+.cv-sheet-compact .cv-sheet-contact{border-color:var(--cv-soft)}
+.cv-sheet-compact .cv-sheet-role{color:var(--cv-soft)}
+.cv-sheet-compact .cv-sheet-section h2{color:var(--cv-accent)}
+.cv-sheet-compact .cv-skill-list{gap:.6cqi}
+.cv-sheet-compact .cv-sheet-skill{background:#eaf1f0;color:var(--cv-deep)}
+.cv-sheet-compact .cv-entry-heading{display:block}
+.cv-sheet-compact .cv-entry-dates{display:block;margin-top:.3cqi}
+.cv-sheet-compact .cv-entry-list{gap:2cqi}
+.cv-design-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:end}
+.cv-design-options label{font-weight:700}
+.cv-design-options select{width:100%}
+@media(max-width:600px){.cv-design-options{grid-template-columns:1fr}}
+@media print{#cv-preview .cv-sheet{overflow:visible}.cv-sheet-modern,.cv-sheet-compact{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
