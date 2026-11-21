@@ -213,4 +213,5 @@
 #login-dialog [hidden] { display: none; }
 .auth-notice { padding: 12px; border-radius: 10px; background: #f5f2fc; font-size: 13px; line-height: 1.6; }
 .auth-notice a { color: #5424a2; }
-\n.jobs-recent-toggle{grid-column:1/-1;display:flex;align-items:center;gap:8px;font-size:.9rem}.jobs-recent-toggle input{width:auto;margin:0;flex:none}\n
+
+.jobs-recent-toggle{grid-column:1/-1;display:flex;align-items:center;gap:8px;font-size:.9rem}.jobs-recent-toggle input{width:auto;margin:0;flex:none}
