@@ -54,3 +54,14 @@ test("malformed credit totals block paid searches", () => {
   assert.match(section, /Actualisation bloquée/);
   assert.match(section, /Math\.max\(0, 100 - used\)/);
 });
+
+test("optional offer count cannot invalidate a completed refresh or fabricate zero", () => {
+  const start = edge.indexOf("const completionResponse =");
+  const end = edge.indexOf('return json({ status: "completed"', start);
+  assert.ok(start >= 0 && end > start);
+  const section = edge.slice(start, end);
+  assert.match(section, /let totalOffers: number \| null = null/);
+  assert.match(section, /countResponse\.ok \? countResponse\.headers\.get/);
+  assert.match(section, /Number\.isSafeInteger\(Number\(count\)\)/);
+  assert.match(section, /\} catch \{/);
+});
