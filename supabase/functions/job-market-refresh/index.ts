@@ -189,10 +189,21 @@ Deno.serve(async (req: Request) => {
       });
       if (!searchResponse.ok) throw new Error(`Serper HTTP ${searchResponse.status}`);
       const data = await searchResponse.json();
-      const offers = (data.organic ?? [])
+      const seenLinks = new Set<string>();
+      const offers = (Array.isArray(data.organic) ? data.organic : [])
         .filter((item: { link?: string; title?: string; snippet?: string }) =>
           item.link && item.title && /^https:\/\/(www\.)?jobscout24\.ch\/fr\/job\/[0-9a-f-]+\/?(?:\?.*)?$/i.test(item.link) &&
           !/Postes et offres d'emploi en Suisse|Sur JobScout24, vous trouverez de nombreuses offres|Emplois similaires/i.test(item.snippet ?? ""))
+        .map((item: { title: string; link: string; snippet?: string }) => ({
+          ...item,
+          link: new URL(item.link).origin.replace("://www.", "://") +
+            new URL(item.link).pathname.replace(/\/$/, "")
+        }))
+        .filter((item: { link: string }) => {
+          if (seenLinks.has(item.link)) return false;
+          seenLinks.add(item.link);
+          return true;
+        })
         .map((item: { title: string; link: string; snippet?: string }) => {
           const identity = jobIdentity(item.title, item.snippet ?? "");
           const snippet = item.snippet ?? "";

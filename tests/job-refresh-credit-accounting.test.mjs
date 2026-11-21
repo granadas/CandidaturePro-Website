@@ -89,3 +89,14 @@ test("rejects malformed search inputs before creating paid refresh run", () => {
   assert.match(section, /requestedQuery.length > 120/);
   assert.match(section, /return json\(\{ message: "Ville ou recherche invalide/);
 });
+
+test("canonicalizes and deduplicates JobScout24 URLs before storing", () => {
+  const start = edge.indexOf("const seenLinks = new Set<string>();");
+  const end = edge.indexOf("if (offers.length > 0)", start);
+  assert.ok(start >= 0 && end > start);
+  const section = edge.slice(start, end);
+  assert.match(section, /Array\.isArray\(data\.organic\)/);
+  assert.match(section, /new URL\(item\.link\)\.pathname\.replace/);
+  assert.match(section, /seenLinks\.has\(item\.link\)/);
+  assert.match(section, /seenLinks\.add\(item\.link\)/);
+});
