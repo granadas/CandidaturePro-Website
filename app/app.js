@@ -474,7 +474,7 @@
     });
     if (response.status === 401 && retry) {
       const userId = session.user?.id;
-      const generation = sessionGeneration;
+      // Reuse the generation captured before the original request, not a newer one.
       await refreshSession();
       if (!userId || generation !== sessionGeneration || getSession()?.user?.id !== userId) {
         throw new Error("La session a changé. Reconnectez-vous avant de relancer la recherche.");
