@@ -825,7 +825,7 @@
     try {
       jobResults = await supabaseFetch(
         "job_market_offers?select=id,title,company_name,location,sector,source,url,snippet,discovered_at,updated_at&" +
-        filters.join("&") + "&order=discovered_at.desc&limit=60"
+        filters.join("&") + "&order=updated_at.desc&limit=1000"
       );
       renderJobs();
       message.textContent = jobResults.length
