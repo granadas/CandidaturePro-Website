@@ -21,6 +21,13 @@ test("search forms keep independent locks", () => {
   assert.doesNotMatch(jobs, /companySearchRunning/);
 });
 
+test("coalesced refresh cannot return another account's session", () => {
+  const ensure = block("async function ensureSession()", "async function supabaseFetch(");
+  assert.match(ensure, /refreshed\?\.user\?\.id\s*!==\s*session\.user\?\.id/);
+  assert.match(ensure, /current\?\.user\?\.id\s*!==\s*session\.user\?\.id/);
+  assert.match(ensure, /current\?\.refresh_token\s*!==\s*refreshed\.refresh_token/);
+});
+
 test("temporary refresh failures do not delete the saved login", () => {
   const auth = block("async function authRequest(", "function authErrorMessage(");
   const ensure = block("async function ensureSession()", "async function supabaseFetch(");
