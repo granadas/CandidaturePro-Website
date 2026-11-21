@@ -3218,6 +3218,7 @@
       renderCompanies();
       message.textContent = error.message;
     } finally {
+      companySearchRunning = false;
       button.disabled = false;
       button.textContent = "Rechercher";
     }
