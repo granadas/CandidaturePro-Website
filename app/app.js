@@ -19,6 +19,7 @@
   let companySearchRunning = false;
   let jobResults = [];
   let jobsLoadRequest = 0;
+  let sessionGeneration = 0;
   let refreshPromise = null;
 
   const titles = {
@@ -150,6 +151,8 @@
   }
 
   function setSession(session) {
+    const previousUserId = getSession()?.user?.id;
+    if (!session || session.user?.id !== previousUserId) sessionGeneration++;
     if (session) localStorage.setItem(storageKey, JSON.stringify(session));
     else localStorage.removeItem(storageKey);
     renderAccount();
@@ -806,8 +809,10 @@
     const message = document.querySelector("#jobs-message");
     const request = ++jobsLoadRequest;
     const session = getSession();
-    const sessionToken = session?.access_token;
-    const current = () => request === jobsLoadRequest && getSession()?.access_token === sessionToken;
+    const userId = session?.user?.id;
+    const generation = sessionGeneration;
+    const current = () => request === jobsLoadRequest && generation === sessionGeneration &&
+      Boolean(userId) && getSession()?.user?.id === userId;
     if (!getSession()) {
       jobResults = [];
       renderJobs();
