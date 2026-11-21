@@ -399,7 +399,7 @@ async function companySearch(p: any, key: string, webKey: string, userId: string
 
   const geo = await fetch(
     `https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(city)}` +
-    `&format=json&type=city&limit=1&lang=fr` +
+    `&format=json&type=city&limit=1&lang=fr&filter=countrycode:ch` +
     `&apiKey=${encodeURIComponent(key)}`
   );
 
@@ -411,7 +411,7 @@ async function companySearch(p: any, key: string, webKey: string, userId: string
 
   const gd = await geo.json();
 
-  if (!gd?.results?.length) {
+  if (!gd?.results?.length || String(gd.results[0]?.country_code || "").toLowerCase() !== "ch") {
     return { companies: [] };
   }
 
@@ -452,7 +452,7 @@ async function companySearch(p: any, key: string, webKey: string, userId: string
       NOUVEAU :
       contrôle individuel AVANT ajout à la liste.
     */
-    if (!isRelevantPlace(x, profile)) {
+    if (String(x.country_code || "").toLowerCase() !== "ch" || !isRelevantPlace(x, profile)) {
       continue;
     }
 
@@ -540,23 +540,13 @@ async function companySearch(p: any, key: string, webKey: string, userId: string
     };
 
     const localQueries = [
-      `transport logistique ${city}`,
-      "transport logistique Meyrin",
-      "transport logistique Vernier",
-      "transport logistique Satigny",
-      "transport logistique Plan-les-Ouates",
-      "transitaire fret cargo aéroport Genève",
-      "livraison messagerie Genève",
-      "déménagement garde-meubles Genève",
-      "transporteur marchandises Genève",
-      "transport international Genève",
-      "stockage entreposage Genève",
-      "courrier express Genève",
-      "transport logistique Carouge",
-      "transport logistique Lancy",
-      "transport logistique Onex",
-      "transport logistique Grand-Saconnex"
+      `transport logistique ${city} Suisse`,
+      `transitaire fret cargo ${city} Suisse`,
+      `déménagement garde-meubles ${city} Suisse`
     ];
+    const swissAddress = (address: string) =>
+      !/\b(France|Deutschland|Germany|Italia|Italie|Italy)\b/i.test(address) &&
+      /\b(Suisse|Switzerland|Schweiz|CH-[1-9]\d{3}|[1-9]\d{3})\b/i.test(address);
 
     const localResponses = await Promise.all(
       localQueries.map(async (query) => {
@@ -592,7 +582,7 @@ async function companySearch(p: any, key: string, webKey: string, userId: string
 
     for (const place of localResponses.flat()) {
       const address = String(place?.address || "");
-      if (/\bFrance\b/i.test(address)) continue;
+      if (!swissAddress(address)) continue;
 
       // When coordinates are supplied, enforce the radius selected in the app.
       const placeLat = Number(place?.latitude);
@@ -639,7 +629,7 @@ async function companySearch(p: any, key: string, webKey: string, userId: string
         for (const item of webData?.organic || []) {
           const title = String(item?.title || "").trim();
           const website = String(item?.link || "").trim();
-          if (!title || !website) continue;
+          if (!title || !website || !swissAddress(String(item?.snippet || ""))) continue;
           addCompany({
             name: title.split(/\s+[|–—-]\s+/)[0].replace(/\s*(accueil|home)$/i, "").trim(),
             website,
