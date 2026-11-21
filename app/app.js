@@ -10,6 +10,7 @@
 
   const config = window.CANDIDATURE_PRO_CONFIG || {};
   const storageKey = "candidature-pro-web-session";
+  const microsoftFlowKey = "candidature-pro-microsoft-oauth";
   let profile = null;
   let accountLastRefreshed = 0;
   let accountRefreshPromise = null;
@@ -55,6 +56,7 @@
 
   const authModeSignin = document.querySelector("#auth-mode-signin"), authModeSignup = document.querySelector("#auth-mode-signup");
   const signupConfirm = document.querySelector("#signup-confirm"), signupResend = document.querySelector("#signup-resend");
+  const microsoftSignin = document.querySelector("#microsoft-signin");
   let authMode = "signin", authBusy = false, pendingConfirmationEmail = null, signupResendAfter = 0;
   function setAuthMode(mode) {
     if (authBusy || document.querySelector("#login-submit").disabled) return;
@@ -71,12 +73,74 @@
     signupResend.hidden = true; pendingConfirmationEmail = null;
     authModeSignin.setAttribute("aria-pressed", String(!signup)); authModeSignup.setAttribute("aria-pressed", String(signup));
     document.querySelector("#login-submit").textContent = signup ? "Créer mon compte gratuit" : "Se connecter";
+    microsoftSignin.hidden = signup;
     loginMessage.textContent = "";
   }
   authModeSignin.addEventListener("click", () => setAuthMode("signin"));
   authModeSignup.addEventListener("click", () => setAuthMode("signup"));
   dialog.addEventListener("cancel", event => { if (authBusy || document.querySelector("#login-submit").disabled) event.preventDefault(); });
   dialog.addEventListener("close", () => { document.querySelector("#password").value = signupConfirm.value = ""; });
+
+  function oauthBase64(bytes) {
+    return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+
+  microsoftSignin.addEventListener("click", async () => {
+    if (authBusy || !config.supabaseUrl || !config.supabasePublishableKey) return;
+    setAuthBusy(true);
+    loginMessage.textContent = "Ouverture de Microsoft…";
+    try {
+      const verifier = oauthBase64(crypto.getRandomValues(new Uint8Array(32)));
+      const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
+      const challenge = oauthBase64(new Uint8Array(digest));
+      sessionStorage.setItem(microsoftFlowKey, JSON.stringify({ verifier, startedAt: Date.now() }));
+      const authorize = new URL(config.supabaseUrl + "/auth/v1/authorize");
+      authorize.searchParams.set("provider", "azure");
+      authorize.searchParams.set("redirect_to", location.origin + location.pathname);
+      authorize.searchParams.set("scopes", "email");
+      authorize.searchParams.set("code_challenge", challenge);
+      authorize.searchParams.set("code_challenge_method", "s256");
+      location.assign(authorize.href);
+    } catch (error) {
+      sessionStorage.removeItem(microsoftFlowKey);
+      loginMessage.textContent = "Impossible d’ouvrir la connexion Microsoft. Réessayez.";
+      setAuthBusy(false);
+    }
+  });
+
+  async function finishMicrosoftConnection() {
+    const raw = sessionStorage.getItem(microsoftFlowKey);
+    if (!raw) return false;
+    const url = new URL(location.href);
+    if (!url.searchParams.has("code") && !url.searchParams.has("error")) return false;
+    sessionStorage.removeItem(microsoftFlowKey);
+    const code = url.searchParams.get("code");
+    const oauthError = url.searchParams.get("error");
+    url.searchParams.delete("code"); url.searchParams.delete("error"); url.searchParams.delete("error_code"); url.searchParams.delete("error_description");
+    history.replaceState(null, "", url.pathname + url.search + url.hash);
+    try {
+      const flow = JSON.parse(raw);
+      if (!flow?.verifier || Date.now() - flow.startedAt > 10 * 60 * 1000 || !code || oauthError) {
+        throw new Error(oauthError ? "La connexion Microsoft a été annulée ou refusée." : "La connexion Microsoft a expiré. Réessayez.");
+      }
+      const response = await fetch(config.supabaseUrl + "/auth/v1/token?grant_type=pkce", {
+        method: "POST",
+        headers: { "apikey": config.supabasePublishableKey, "Content-Type": "application/json" },
+        body: JSON.stringify({ auth_code: code, code_verifier: flow.verifier })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.access_token || !result.refresh_token || !result.user?.id) {
+        throw new Error(authErrorMessage(result, "Microsoft n’a pas pu terminer la connexion."));
+      }
+      profile = null; setSession(normalizeSession(result));
+      return true;
+    } catch (error) {
+      setAuthMode("signin");
+      loginMessage.textContent = error.message;
+      if (!dialog.open) dialog.showModal();
+      return true;
+    }
+  }
 
   function getSession() {
     try { return JSON.parse(localStorage.getItem(storageKey) || "null"); }
@@ -3456,7 +3520,7 @@
 
   function setAuthBusy(busy) {
     authBusy = busy;
-    for (const node of [document.querySelector("#login-submit"), passwordForgot, signupResend, authModeSignin, authModeSignup, document.querySelector("#close-login")]) node.disabled = busy;
+    for (const node of [document.querySelector("#login-submit"), passwordForgot, signupResend, authModeSignin, authModeSignup, document.querySelector("#close-login"), microsoftSignin]) node.disabled = busy;
   }
   const signupConfirmationMessage = "Si cette adresse peut être utilisée, un message de confirmation a été envoyé. Ouvrez-le dans ce même navigateur, puis connectez-vous. Si vous avez déjà un compte, utilisez la connexion ou « Mot de passe oublié ». Vérifiez aussi les courriers indésirables.";
   loginForm.addEventListener("submit", async event => {
@@ -4360,6 +4424,7 @@
 
   async function bootstrap() {
     if (await finishPasswordRecovery()) return;
+    await finishMicrosoftConnection();
     await ensureSession();
     const signupConfirmation = await window.CP_SIGNUP.complete(getSession()?.user?.email || null);
     if (signupConfirmation?.session) { profile = null; setSession(normalizeSession(signupConfirmation.session)); }
