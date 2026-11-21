@@ -74,3 +74,8 @@ test("Word export preserves individual skills separated by semicolons or pipes",
   }
   assert.ok(!document.includes("Français; Anglais"));
 });
+
+test("black and gold palette is preserved in Word styles", () => {
+  const styles = generate({ ...fields, accent: "gold" }).files["word/styles.xml"];
+  assert.ok(styles.includes("F5B800"));
+});
