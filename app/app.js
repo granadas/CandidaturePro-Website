@@ -198,6 +198,7 @@
     document.querySelector("#cv-targeting").hidden = !isPremium;
     const cvTemplateSelect = document.querySelector("#cv-form [name=template]");
     cvTemplateSelect.querySelectorAll("option:not([value=classic])").forEach(option => { option.disabled = !isPremium; });
+    document.querySelector("#cv-premium-access-status").textContent = !profile ? "Vérification des droits du compte…" : isPremium ? "Premium actif : les trois modèles de CV sont disponibles." : "Formule Free : seul le modèle Classique est disponible. Vérifiez votre formule dans Premium.";
     if (!isPremium && cvTemplateSelect.value !== "classic") {
       cvTemplateSelect.value = "classic";
       document.querySelector("#cv-save-status").textContent = "Votre formule actuelle donne accès au modèle Classique. Les modèles Contemporain et Compact nécessitent Premium.";
