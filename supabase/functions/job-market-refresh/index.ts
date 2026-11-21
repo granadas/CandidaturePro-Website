@@ -25,13 +25,13 @@ function jobLocation(title: string, snippet: string) {
   return findCity(snippet) ?? "À vérifier";
 }
 
-function jobIdentity(title: string) {
+function jobIdentity(title: string, snippet: string) {
   const marker = " poste chez ";
   const index = title.toLowerCase().indexOf(marker);
-  if (index < 0) return { title, company: "" };
-  const jobTitle = title.slice(0, index).trim();
-  const company = title.slice(index + marker.length).replace(/\s+-\s+[^-]+$/, "").trim();
-  return { title: jobTitle, company };
+  const jobTitle = index < 0 ? title : title.slice(0, index).trim();
+  const company = index < 0 ? "" : title.slice(index + marker.length).replace(/\s+-\s+[^-]+$/, "").trim();
+  const captionCompany = snippet.match(/\bchez\s+(.+?)\s+-\s+.+?\s+sur\s+JobScout24\b/i)?.[1]?.trim() ?? "";
+  return { title: jobTitle, company: company || captionCompany.slice(0, 120) };
 }
 
 Deno.serve(async (req: Request) => {
@@ -142,7 +142,7 @@ Deno.serve(async (req: Request) => {
           item.link && item.title && /^https:\/\/(www\.)?jobscout24\.ch\/fr\/job\/[0-9a-f-]+\/?(?:\?.*)?$/i.test(item.link) &&
           !/Postes et offres d'emploi en Suisse|Sur JobScout24, vous trouverez de nombreuses offres|Emplois similaires/i.test(item.snippet ?? ""))
         .map((item: { title: string; link: string; snippet?: string }) => {
-          const identity = jobIdentity(item.title);
+          const identity = jobIdentity(item.title, item.snippet ?? "");
           const snippet = item.snippet ?? "";
           return {
           title: identity.title,
