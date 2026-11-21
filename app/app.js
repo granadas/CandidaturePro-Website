@@ -751,11 +751,16 @@
       const sourceLink = safeUrl
         ? '<a class="secondary compact" href="' + escapeHtml(safeUrl) + '" target="_blank" rel="noopener noreferrer">Voir l’annonce</a>'
         : "";
+      const checkedAt = Date.parse(job.updated_at || "");
+      const daysSinceCheck = Number.isFinite(checkedAt) ? Math.floor((Date.now() - checkedAt) / 86400000) : Infinity;
+      const freshnessNote = daysSinceCheck > 30
+        ? '<small>Annonce non revérifiée depuis plus de 30 jours — vérifiez sa disponibilité sur le site source.</small>'
+        : "";
       return '<article class="job-card" data-job-index="' + index + '">' +
         '<div class="job-card-main"><strong>' + escapeHtml(job.title) + '</strong>' +
         '<span>' + escapeHtml(job.company_name) + ' • ' + escapeHtml(job.location) + '</span>' +
         '<small>' + escapeHtml(job.sector) + ' • ' + escapeHtml(job.source) + '</small>' +
-        '<p>' + escapeHtml(job.snippet) + '</p></div>' +
+        '<p>' + escapeHtml(job.snippet) + '</p>' + freshnessNote + '</div>' +
         '<div class="job-card-actions">' + sourceLink +
         '<button class="primary compact" data-action="add-job">Ajouter aux candidatures</button></div></article>';
     }).join("");
@@ -819,13 +824,13 @@
     message.textContent = "Chargement…";
     try {
       jobResults = await supabaseFetch(
-        "job_market_offers?select=id,title,company_name,location,sector,source,url,snippet,discovered_at&" +
+        "job_market_offers?select=id,title,company_name,location,sector,source,url,snippet,discovered_at,updated_at&" +
         filters.join("&") + "&order=discovered_at.desc&limit=60"
       );
       renderJobs();
       message.textContent = jobResults.length
-        ? "Offres actives correspondant à vos critères."
-        : "Aucune offre active ne correspond à ces critères.";
+        ? "Annonces référencées correspondant à vos critères. Vérifiez leur disponibilité sur le site source."
+        : "Aucune annonce référencée ne correspond à ces critères.";
     } catch (error) {
       jobResults = [];
       renderJobs();
