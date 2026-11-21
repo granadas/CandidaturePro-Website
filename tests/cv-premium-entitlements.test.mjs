@@ -43,5 +43,17 @@ test("opening a saved premium template respects current entitlement", () => {
 test("CV preview and Word export also check Premium access", () => {
   const exportAndPreview = app.slice(app.indexOf('document.querySelector("#cv-word-export").addEventListener'));
   assert.match(exportAndPreview, /!hasPremiumCv\(\)\) fields\.template = "classic"/);
-  assert.match(exportAndPreview, /hasPremiumCv\(\) \? String\(data\.get\("template"\)\) : "classic"/);
+  assert.match(exportAndPreview, /window\.CP_CV_RENDER\.render\(document\.querySelector\("#cv-preview"\), fields\)/);
+});
+
+test("CV editor and example page use the same renderer", () => {
+  const renderer = readFileSync(new URL("../app/cv-render.js", import.meta.url), "utf8");
+  const demo = readFileSync(new URL("../app/cv-modeles.html", import.meta.url), "utf8");
+  assert.match(html, /cv-render\.js/);
+  assert.match(html, /href="cv-modeles\.html"/);
+  assert.match(demo, /cv-render\.js/);
+  for (const model of ["classic", "modern", "compact"]) {
+    assert.match(renderer, new RegExp(model));
+    assert.match(demo, new RegExp('"' + model + '"'));
+  }
 });

@@ -2282,12 +2282,9 @@
       button.classList.toggle("is-locked", premiumLocked);
       button.setAttribute("aria-label", button.querySelector("strong").textContent.trim() + (premiumLocked ? " — nécessite Premium" : ""));
     });
-    const paper = document.querySelector("#cv-live-paper");
-    paper.dataset.template = template;
     document.querySelector("#cv-live-style").textContent = cvTemplateNames[template] || "Classique";
-    for (const [field, fallback] of [["name", "Votre nom"], ["title", "Votre métier"], ["contact", ""], ["summary", "Une courte présentation de votre parcours apparaîtra ici."], ["experience", "Vos expériences et réalisations."], ["education", "Vos études et certifications."], ["skills", "Vos points forts."]]) {
-      document.querySelector("#cv-live-" + field).textContent = form.elements.namedItem(field).value.trim() || fallback;
-    }
+    const fields = Object.fromEntries(cvFieldNames.map(name => [name, form.elements.namedItem(name).value]));
+    window.CP_CV_RENDER.render(document.querySelector("#cv-live-paper"), fields, { placeholder: true });
   }
   document.querySelectorAll("[data-cv-template]").forEach(button => button.addEventListener("click", () => {
     if (button.dataset.cvTemplate !== "classic" && !hasPremiumCv()) {
@@ -2781,28 +2778,9 @@
     event.preventDefault();
     if (!getSession()?.user?.id || !cvPhotoReady()) return;
     const data = new FormData(cvForm);
-    const preview = document.querySelector("#cv-preview");
-    preview.replaceChildren();
-    preview.dataset.template = hasPremiumCv() ? String(data.get("template")) : "classic";
-    const photo = data.get("photo");
-    if (validCvPhoto(photo)) {
-      const image = document.createElement("img"); image.className = "cv-portrait";
-      image.alt = "Photo du candidat"; image.src = photo; preview.append(image);
-    }
-    const name = document.createElement("h1");
-    name.textContent = String(data.get("name")).trim();
-    const title = document.createElement("p");
-    title.textContent = [data.get("title"), data.get("contact")].map(value => String(value).trim()).filter(Boolean).join(" · ");
-    preview.append(name, title);
-    for (const [key, label] of [["summary", "Profil"], ["experience", "Expériences"], ["education", "Formation"], ["skills", "Compétences et langues"]]) {
-      const value = String(data.get(key)).trim();
-      if (!value) continue;
-      const heading = document.createElement("h2");
-      heading.textContent = label;
-      const paragraph = document.createElement("p");
-      paragraph.textContent = value;
-      preview.append(heading, paragraph);
-    }
+    const fields = Object.fromEntries(cvFieldNames.map(name => [name, String(data.get(name) || "")]));
+    if (!hasPremiumCv()) fields.template = "classic";
+    window.CP_CV_RENDER.render(document.querySelector("#cv-preview"), fields);
     cvDialog.showModal();
   });
   document.querySelector("#cv-print").addEventListener("click", () => window.print());
