@@ -3178,7 +3178,6 @@
     try {
       await loadJobs();
     } finally {
-      companySearchRunning = false;
       button.disabled = false;
       button.textContent = "Rechercher";
     }
