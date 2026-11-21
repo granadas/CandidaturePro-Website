@@ -2298,6 +2298,43 @@
   cvForm.addEventListener("input", syncCvStudio);
   cvForm.addEventListener("change", syncCvStudio);
 
+  function appendCvEntry(targetName, values, feedbackId, clearIds) {
+    const target = cvForm.elements.namedItem(targetName);
+    const feedback = document.querySelector(feedbackId);
+    const block = values.join("\n").trim();
+    if (target.value.trim().length + block.length + 2 > target.maxLength) {
+      feedback.textContent = "Ce champ est plein. Raccourcissez une entrée avant d’en ajouter une autre.";
+      return;
+    }
+    target.value = [target.value.trim(), block].filter(Boolean).join("\n\n");
+    clearIds.forEach(id => { document.querySelector(id).value = ""; });
+    feedback.textContent = "Ajouté au CV. Vous pouvez modifier le texte directement dans la rubrique ci-dessus.";
+    syncCvStudio();
+  }
+  document.querySelector("#cv-add-job").addEventListener("click", () => {
+    const role = document.querySelector("#cv-job-role").value.trim();
+    const company = document.querySelector("#cv-job-company").value.trim();
+    const dates = document.querySelector("#cv-job-dates").value.trim();
+    const results = document.querySelector("#cv-job-results").value.trim().split(/\r?\n/).map(line => line.replace(/^[•●\-*]\s*/, "").trim()).filter(Boolean);
+    if (!role || !company) {
+      document.querySelector("#cv-job-feedback").textContent = "Indiquez la fonction et l’entreprise.";
+      return;
+    }
+    appendCvEntry("experience", [role + (dates ? " · " + dates : ""), company, ...results.map(line => "• " + line)], "#cv-job-feedback",
+      ["#cv-job-role", "#cv-job-company", "#cv-job-dates", "#cv-job-results"]);
+  });
+  document.querySelector("#cv-add-degree").addEventListener("click", () => {
+    const degree = document.querySelector("#cv-degree").value.trim();
+    const school = document.querySelector("#cv-school").value.trim();
+    const dates = document.querySelector("#cv-degree-dates").value.trim();
+    if (!degree || !school) {
+      document.querySelector("#cv-degree-feedback").textContent = "Indiquez le diplôme et l’établissement.";
+      return;
+    }
+    appendCvEntry("education", [degree + (dates ? " · " + dates : ""), school], "#cv-degree-feedback",
+      ["#cv-degree", "#cv-school", "#cv-degree-dates"]);
+  });
+
   const cvPdfFile = document.querySelector("#cv-pdf-file"), cvPdfStatus = document.querySelector("#cv-pdf-status");
   const cvPdfText = document.querySelector("#cv-pdf-text"), cvPdfReview = document.querySelector("#cv-pdf-review");
   const cvPdfCancel = document.querySelector("#cv-pdf-cancel");
