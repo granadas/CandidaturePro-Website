@@ -70,7 +70,7 @@
           for (const line of lines) sectionBody += paragraph(line.replace(/^[•●\-*]\s*/, '• '), /^[•●\-*]/.test(line) ? 'EntryBullet' : 'EntryDetail');
         }
       } else if (key === 'skills') {
-        for (const line of value.split(/\r?\n/).map(item => item.trim()).filter(Boolean)) sectionBody += paragraph(line, 'EntryDetail');
+        for (const line of value.split(/\r?\n/).flatMap(item => item.split(/\s*[;|]\s*/)).map(item => item.trim()).filter(Boolean)) sectionBody += paragraph(line, 'EntryDetail');
       } else sectionBody += paragraph(value);
       if (fields.template === 'modern') {
         if (key === 'education' || key === 'skills') sideSections += sectionBody;
