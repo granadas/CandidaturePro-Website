@@ -17,6 +17,7 @@
   let applications = [];
   let companyResults = [];
   let jobResults = [];
+  let jobsLoadRequest = 0;
   let refreshPromise = null;
 
   const titles = {
@@ -802,6 +803,9 @@
 
   async function loadJobs() {
     const message = document.querySelector("#jobs-message");
+    const request = ++jobsLoadRequest;
+    const userId = getSession()?.user?.id;
+    const current = () => request === jobsLoadRequest && getSession()?.user?.id === userId;
     if (!getSession()) {
       jobResults = [];
       renderJobs();
@@ -823,15 +827,18 @@
 
     message.textContent = "Chargement…";
     try {
-      jobResults = await supabaseFetch(
+      const results = await supabaseFetch(
         "job_market_offers?select=id,title,company_name,location,sector,source,url,snippet,discovered_at,updated_at&" +
         filters.join("&") + "&order=updated_at.desc&limit=1000"
       );
+      if (!current()) return;
+      jobResults = results;
       renderJobs();
       message.textContent = jobResults.length
         ? "Annonces référencées correspondant à vos critères. Vérifiez leur disponibilité sur le site source."
         : "Aucune annonce référencée ne correspond à ces critères.";
     } catch (error) {
+      if (!current()) return;
       jobResults = [];
       renderJobs();
       message.textContent = error.message;
