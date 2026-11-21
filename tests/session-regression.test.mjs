@@ -21,6 +21,15 @@ test("search forms keep independent locks", () => {
   assert.doesNotMatch(jobs, /companySearchRunning/);
 });
 
+test("temporary refresh failures do not delete the saved login", () => {
+  const auth = block("async function authRequest(", "function authErrorMessage(");
+  const ensure = block("async function ensureSession()", "async function supabaseFetch(");
+  assert.match(auth, /error\.status\s*=\s*response\.status/);
+  assert.match(ensure, /error\?\.status\s*===\s*400/);
+  assert.match(ensure, /error\?\.status\s*===\s*401/);
+  assert.match(ensure, /if\s*\(invalidToken\s*&&\s*getSession\(\)\?\.refresh_token\s*===\s*session\.refresh_token\)/);
+});
+
 test("read retry retains original session generation", () => {
   const read = block("async function supabaseFetch(", "async function supabaseWrite(");
   assert.equal((read.match(/const generation\s*=\s*sessionGeneration/g) || []).length, 1);
