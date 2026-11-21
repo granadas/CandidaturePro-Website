@@ -152,6 +152,14 @@ Deno.serve(async (req: Request) => {
   try {
     for (const sector of sectors) {
       if (credits >= allowed) break;
+      // Reserve and persist a credit before each provider request. If the Edge
+      // process stops after dispatch, the monthly cap still counts that attempt.
+      credits++;
+      const creditCheckpoint = await fetch(`${url}/rest/v1/job_market_refresh_runs?id=eq.${run.id}`, {
+        method: "PATCH", headers,
+        body: JSON.stringify({ credits_used: credits })
+      });
+      if (!creditCheckpoint.ok) throw new Error(`Enregistrement du crédit HTTP ${creditCheckpoint.status}`);
       const searchResponse = await fetch("https://google.serper.dev/search", {
         method: "POST",
         headers: { "X-API-KEY": serperKey, "Content-Type": "application/json" },
@@ -161,15 +169,6 @@ Deno.serve(async (req: Request) => {
         })
       });
       if (!searchResponse.ok) throw new Error(`Serper HTTP ${searchResponse.status}`);
-      // A successful provider response may be billable even when its JSON is malformed.
-      credits++;
-      // Persist every consumed search immediately so an unexpected shutdown cannot
-      // erase usage from the monthly Serper budget calculation.
-      const creditCheckpoint = await fetch(`${url}/rest/v1/job_market_refresh_runs?id=eq.${run.id}`, {
-        method: "PATCH", headers,
-        body: JSON.stringify({ credits_used: credits })
-      });
-      if (!creditCheckpoint.ok) throw new Error(`Enregistrement du crédit HTTP ${creditCheckpoint.status}`);
       const data = await searchResponse.json();
       const offers = (data.organic ?? [])
         .filter((item: { link?: string; title?: string; snippet?: string }) =>

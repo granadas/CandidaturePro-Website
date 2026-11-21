@@ -4,16 +4,18 @@ import test from "node:test";
 
 const edge = readFileSync(new URL("../supabase/functions/job-market-refresh/index.ts", import.meta.url), "utf8");
 
-test("successful Serper responses are counted before JSON parsing", () => {
-  const start = edge.indexOf("if (!searchResponse.ok) throw new Error");
+test("Serper credits are reserved and persisted before sending paid requests", () => {
+  const start = edge.indexOf("for (const sector of sectors)");
   const end = edge.indexOf("const offers =", start);
   assert.ok(start >= 0 && end > start);
   const section = edge.slice(start, end);
   const counted = section.indexOf("credits++;");
   const checkpoint = section.indexOf("const creditCheckpoint = await fetch");
   const checked = section.indexOf("if (!creditCheckpoint.ok)");
+  const dispatched = section.indexOf('await fetch("https://google.serper.dev/search"');
   const parsed = section.indexOf("await searchResponse.json()");
-  assert.ok(counted >= 0 && checkpoint > counted && checked > checkpoint && parsed > checked);
+  assert.ok(counted >= 0 && checkpoint > counted && checked > checkpoint &&
+    dispatched > checked && parsed > dispatched);
 });
 
 test("stale refresh recovery retains credit checkpoints", () => {
