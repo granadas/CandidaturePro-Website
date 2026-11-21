@@ -2022,8 +2022,10 @@
       '<label class="wide">Métier ou mot-clé<input name="query" maxlength="120"></label>' +
       '<div class="wide"><button type="submit" class="primary">Actualiser les postes maintenant</button></div>' +
       '<p class="wide" role="status"></p>';
-    const usedCredits = Number(row?.month_credits_used);
-    const knownBudget = row && Number.isFinite(usedCredits) && usedCredits >= 0;
+    const usedCredits = row?.month_credits_used;
+    // Do not coerce null, missing or malformed statistics to a false zero.
+    const knownBudget = typeof usedCredits === "number" &&
+      Number.isSafeInteger(usedCredits) && usedCredits >= 0;
     const remainingCredits = knownBudget ? Math.max(0, 100 - usedCredits) : null;
     form.querySelector("#job-market-summary").textContent = knownBudget
       ? usedCredits + "/100 crédits Serper ce mois · " + remainingCredits + " restant(s) · " +
