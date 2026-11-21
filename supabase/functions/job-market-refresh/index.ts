@@ -110,6 +110,7 @@ Deno.serve(async (req: Request) => {
 
   let credits = 0;
   let added = 0;
+  let found = 0;
   try {
     for (const sector of sectors) {
       if (credits >= allowed) break;
@@ -117,7 +118,7 @@ Deno.serve(async (req: Request) => {
         method: "POST",
         headers: { "X-API-KEY": serperKey, "Content-Type": "application/json" },
         body: JSON.stringify({
-          q: `${requestedQuery ? requestedQuery + " " : ""}${sector} emploi (${requestedCity} OR Carouge OR Meyrin OR Vernier OR Lancy OR Nyon) site:jobscout24.ch/fr/job/`,
+          q: `${requestedQuery ? requestedQuery + " " : ""}${sector} emploi "${requestedCity}" Suisse site:jobscout24.ch/fr/job/`,
           gl: "ch", hl: "fr", location: `${requestedCity}, Switzerland`, num: 10
         })
       });
@@ -143,17 +144,27 @@ Deno.serve(async (req: Request) => {
         }});
 
       if (offers.length > 0) {
+        found += offers.length;
+        // Count only URLs that were not already stored, not all upserted search results.
+        const uniqueUrls = [...new Set(offers.map((offer: { url: string }) => offer.url))];
+        const existingResponse = await fetch(
+          `${url}/rest/v1/job_market_offers?select=url&url=in.(${uniqueUrls.map((value: string) => `"${encodeURIComponent(value)}"`).join(",")})`,
+          { headers }
+        );
+        if (!existingResponse.ok) throw new Error(`Vérification des doublons HTTP ${existingResponse.status}`);
+        const existingUrls = new Set((await existingResponse.json()).map((row: { url: string }) => row.url));
+        const newOfferCount = uniqueUrls.filter((value: string) => !existingUrls.has(value)).length;
         const storeResponse = await fetch(`${url}/rest/v1/job_market_offers?on_conflict=url`, {
           method: "POST",
           headers: { ...headers, Prefer: "resolution=merge-duplicates" },
           body: JSON.stringify(offers)
         });
         if (!storeResponse.ok) throw new Error(`Enregistrement HTTP ${storeResponse.status}`);
-        added += offers.length;
+        added += newOfferCount;
       }
     }
 
-    if (added === 0) {
+    if (found === 0) {
       await fetch(`${url}/rest/v1/job_market_refresh_runs?id=eq.${run.id}`, {
         method: "PATCH", headers,
         body: JSON.stringify({
@@ -166,7 +177,7 @@ Deno.serve(async (req: Request) => {
         message: `Aucune annonce directe trouvée pour ${requestedCity}. La base existante n’a pas été remplacée.`
       }, 422);
     }
-    if (added > 0) {
+    if (found > 0) {
       await fetch(`${url}/rest/v1/job_market_offers?source=eq.Recherche%20web`, {
         method: "PATCH", headers,
         body: JSON.stringify({ active: false, updated_at: new Date().toISOString() })
