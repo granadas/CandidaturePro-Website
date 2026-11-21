@@ -238,11 +238,20 @@ Deno.serve(async (req: Request) => {
       body: JSON.stringify({ status: "completed", completed_at: new Date().toISOString(), credits_used: credits, offers_added: added, message: "Actualisation terminée" })
     });
     if (!completionResponse.ok) throw new Error(`Enregistrement de fin d’actualisation HTTP ${completionResponse.status}`);
-    const countResponse = await fetch(`${url}/rest/v1/job_market_offers?active=eq.true&select=id`, {
-      method: "HEAD", headers: { ...headers, Prefer: "count=exact" }
-    });
-    const range = countResponse.headers.get("content-range") ?? "*/0";
-    const totalOffers = Number(range.split("/")[1] ?? 0);
+    // Counting is informational: a failed HEAD must not turn a completed
+    // refresh into a failed one or incorrectly report zero available offers.
+    let totalOffers: number | null = null;
+    try {
+      const countResponse = await fetch(`${url}/rest/v1/job_market_offers?active=eq.true&select=id`, {
+        method: "HEAD", headers: { ...headers, Prefer: "count=exact" }
+      });
+      const range = countResponse.ok ? countResponse.headers.get("content-range") : null;
+      const count = range?.split("/")[1];
+      if (count && /^\\d+$/.test(count) && Number.isSafeInteger(Number(count)))
+        totalOffers = Number(count);
+    } catch {
+      // The refresh was already recorded as completed; count is unavailable.
+    }
     return json({ status: "completed", credits, added, totalOffers, monthCredits: used + credits, message: "Actualisation terminée avec succès." });
   } catch (error) {
     await fetch(`${url}/rest/v1/job_market_refresh_runs?id=eq.${run.id}`, {
