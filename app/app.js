@@ -878,6 +878,7 @@
     document.querySelector("#jobs-sector").value = "";
     document.querySelector("#jobs-city").value = "";
     document.querySelector("#jobs-recent-only").checked = false;
+    document.querySelector("#jobs-known-employer-only").checked = false;
     showView("jobs");
   });
 
@@ -907,6 +908,7 @@
     }
     if (city) filters.push("location=ilike." + encodeURIComponent("*" + city + "*"));
     if (sector) filters.push("sector=eq." + encodeURIComponent(sector));
+    if (document.querySelector("#jobs-known-employer-only").checked) filters.push("company_name=neq.");
     if (document.querySelector("#jobs-recent-only").checked) {
       filters.push("updated_at=gte." + encodeURIComponent(new Date(Date.now() - 30 * 86400000).toISOString()));
     }
@@ -3307,6 +3309,7 @@
   });
 
   document.querySelector("#jobs-recent-only").addEventListener("change", () => { void loadJobs(); });
+  document.querySelector("#jobs-known-employer-only").addEventListener("change", () => { void loadJobs(); });
 
   document.querySelector("#jobs-results").addEventListener("click", async event => {
     if (event.target.dataset.action !== "add-job") return;
