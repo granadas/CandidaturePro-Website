@@ -12,9 +12,7 @@ function jobLocation(title: string, snippet: string) {
     const normalized = text.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
     return cities.find(city => {
       const name = city.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
-      const index = normalized.indexOf(name);
-      return index >= 0 && (index === 0 || !/[a-z]/.test(normalized[index - 1])) &&
-        (index + name.length === normalized.length || !/[a-z]/.test(normalized[index + name.length]));
+      return new RegExp(`(^|[^a-z])${name}($|[^a-z])`).test(normalized);
     });
   };
   const inTitle = findCity(title);
