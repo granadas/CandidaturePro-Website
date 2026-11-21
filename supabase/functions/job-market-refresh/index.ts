@@ -110,6 +110,7 @@ Deno.serve(async (req: Request) => {
 
   let credits = 0;
   let added = 0;
+  let found = 0;
   try {
     for (const sector of sectors) {
       if (credits >= allowed) break;
@@ -143,6 +144,7 @@ Deno.serve(async (req: Request) => {
         }});
 
       if (offers.length > 0) {
+        found += offers.length;
         // Count only URLs that were not already stored, not all upserted search results.
         const uniqueUrls = [...new Set(offers.map((offer: { url: string }) => offer.url))];
         const existingResponse = await fetch(
@@ -162,7 +164,7 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    if (added === 0) {
+    if (found === 0) {
       await fetch(`${url}/rest/v1/job_market_refresh_runs?id=eq.${run.id}`, {
         method: "PATCH", headers,
         body: JSON.stringify({
@@ -175,7 +177,7 @@ Deno.serve(async (req: Request) => {
         message: `Aucune annonce directe trouvée pour ${requestedCity}. La base existante n’a pas été remplacée.`
       }, 422);
     }
-    if (added > 0) {
+    if (found > 0) {
       await fetch(`${url}/rest/v1/job_market_offers?source=eq.Recherche%20web`, {
         method: "PATCH", headers,
         body: JSON.stringify({ active: false, updated_at: new Date().toISOString() })
