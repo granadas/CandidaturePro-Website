@@ -94,6 +94,22 @@ Deno.serve(async (req: Request) => {
     Authorization: `Bearer ${serviceKey}`,
     "Content-Type": "application/json"
   };
+  // A terminated Edge invocation can leave a running row behind. After two
+  // hours it is no longer an active refresh; preserve its credit checkpoints.
+  const staleBefore = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+  const staleResponse = await fetch(
+    `${url}/rest/v1/job_market_refresh_runs?status=eq.running&started_at=lt.${encodeURIComponent(staleBefore)}`,
+    {
+      method: "PATCH", headers,
+      body: JSON.stringify({
+        status: "failed", completed_at: new Date().toISOString(),
+        message: "Actualisation interrompue (délai de sécurité dépassé)"
+      })
+    }
+  );
+  if (!staleResponse.ok)
+    return json({ message: "Impossible de vérifier les actualisations interrompues." }, 500);
+
   const month = new Date();
   month.setUTCDate(1);
   month.setUTCHours(0, 0, 0, 0);
