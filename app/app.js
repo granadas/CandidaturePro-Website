@@ -872,8 +872,14 @@
       if (!current()) return;
       jobResults = results;
       renderJobs();
+      const olderThan30Days = jobResults.filter(job => {
+        const checkedAt = Date.parse(job.updated_at || "");
+        return !Number.isFinite(checkedAt) || Date.now() - checkedAt > 30 * 86400000;
+      }).length;
       message.textContent = jobResults.length
-        ? "Annonces référencées correspondant à vos critères. Vérifiez leur disponibilité sur le site source."
+        ? "Annonces référencées correspondant à vos critères. " +
+          (olderThan30Days ? olderThan30Days + " offre(s) non revérifiée(s) depuis plus de 30 jours. " : "") +
+          "Vérifiez leur disponibilité sur le site source."
         : "Aucune annonce référencée ne correspond à ces critères.";
     } catch (error) {
       if (!current()) return;
