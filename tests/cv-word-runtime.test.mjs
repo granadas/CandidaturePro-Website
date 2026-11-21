@@ -74,3 +74,25 @@ test("Word export preserves individual skills separated by semicolons or pipes",
   }
   assert.ok(!document.includes("Français; Anglais"));
 });
+
+
+test("Word exports are real readable ZIP archives for all three templates", async () => {
+  const backupSource = readFileSync(new URL("../app/backup.js", import.meta.url), "utf8");
+  const window = {};
+  const context = { window, TextEncoder, TextDecoder, Blob, Uint8Array, DataView, atob };
+  runInNewContext(backupSource, context);
+  runInNewContext(source, context);
+  for (const template of ["classic", "modern", "compact"]) {
+    const blob = window.CP_CV_WORD.create({ ...fields, template });
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    assert.equal(bytes[0], 80);
+    assert.equal(bytes[1], 75);
+    const entries = window.CP_BACKUP.readArchive(bytes);
+    for (const path of ["[Content_Types].xml", "word/document.xml", "word/styles.xml", "word/_rels/document.xml.rels"]) {
+      assert.ok(entries.has(path), "Missing real ZIP entry: " + path);
+    }
+    const document = new TextDecoder().decode(entries.get("word/document.xml"));
+    assert.ok(document.includes("Camille Exemple"));
+    assert.equal(document.includes("<w:tbl>"), template === "modern");
+  }
+});
