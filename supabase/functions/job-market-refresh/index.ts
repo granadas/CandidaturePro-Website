@@ -117,7 +117,7 @@ Deno.serve(async (req: Request) => {
         method: "POST",
         headers: { "X-API-KEY": serperKey, "Content-Type": "application/json" },
         body: JSON.stringify({
-          q: `${requestedQuery ? requestedQuery + " " : ""}${sector} emploi (${requestedCity} OR Carouge OR Meyrin OR Vernier OR Lancy OR Nyon) site:jobscout24.ch/fr/job/`,
+          q: `${requestedQuery ? requestedQuery + " " : ""}${sector} emploi "${requestedCity}" Suisse site:jobscout24.ch/fr/job/`,
           gl: "ch", hl: "fr", location: `${requestedCity}, Switzerland`, num: 10
         })
       });
@@ -143,13 +143,22 @@ Deno.serve(async (req: Request) => {
         }});
 
       if (offers.length > 0) {
+        // Count only URLs that were not already stored, not all upserted search results.
+        const uniqueUrls = [...new Set(offers.map((offer: { url: string }) => offer.url))];
+        const existingResponse = await fetch(
+          `${url}/rest/v1/job_market_offers?select=url&url=in.(${uniqueUrls.map((value: string) => `"${encodeURIComponent(value)}"`).join(",")})`,
+          { headers }
+        );
+        if (!existingResponse.ok) throw new Error(`Vérification des doublons HTTP ${existingResponse.status}`);
+        const existingUrls = new Set((await existingResponse.json()).map((row: { url: string }) => row.url));
+        const newOfferCount = uniqueUrls.filter((value: string) => !existingUrls.has(value)).length;
         const storeResponse = await fetch(`${url}/rest/v1/job_market_offers?on_conflict=url`, {
           method: "POST",
           headers: { ...headers, Prefer: "resolution=merge-duplicates" },
           body: JSON.stringify(offers)
         });
         if (!storeResponse.ok) throw new Error(`Enregistrement HTTP ${storeResponse.status}`);
-        added += offers.length;
+        added += newOfferCount;
       }
     }
 
