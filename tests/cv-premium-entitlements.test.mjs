@@ -41,7 +41,7 @@ test("opening a saved premium template respects current entitlement", () => {
 });
 
 test("CV preview and Word export also check Premium access", () => {
-  const exportAndPreview = section('document.querySelector("#cv-word-export").addEventListener', 'const cvDialog =');
+  const exportAndPreview = app.slice(app.indexOf('document.querySelector("#cv-word-export").addEventListener'));
   assert.match(exportAndPreview, /!hasPremiumCv\(\)\) fields\.template = "classic"/);
   assert.match(exportAndPreview, /hasPremiumCv\(\) \? String\(data\.get\("template"\)\) : "classic"/);
 });
