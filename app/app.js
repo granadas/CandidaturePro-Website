@@ -195,8 +195,13 @@
 
     const isPremium = hasPremiumCv();
     const planLabel = profile ? (isPremium ? "Premium" : "Free") : "Vérification…";
-    document.querySelector("#cv-targeting").hidden = !hasPremiumCv();
-    document.querySelectorAll("#cv-form [name=template] option:not([value=classic])").forEach(option => { option.disabled = !hasPremiumCv(); });
+    document.querySelector("#cv-targeting").hidden = !isPremium;
+    const cvTemplateSelect = document.querySelector("#cv-form [name=template]");
+    cvTemplateSelect.querySelectorAll("option:not([value=classic])").forEach(option => { option.disabled = !isPremium; });
+    if (!isPremium && cvTemplateSelect.value !== "classic") {
+      cvTemplateSelect.value = "classic";
+      document.querySelector("#cv-save-status").textContent = "Votre formule actuelle donne accès au modèle Classique. Les modèles Contemporain et Compact nécessitent Premium.";
+    }
     document.querySelector("#current-plan").textContent = planLabel;
     document.querySelector("#settings-account").textContent = email
       ? email + (profile ? " · " + (isPremium ? "Premium" : "Free") : "")
