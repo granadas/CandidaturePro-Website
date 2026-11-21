@@ -2027,6 +2027,8 @@
     const knownBudget = typeof usedCredits === "number" &&
       Number.isSafeInteger(usedCredits) && usedCredits >= 0;
     const remainingCredits = knownBudget ? Math.max(0, 100 - usedCredits) : null;
+    const serverRefreshRunning = row?.last_status === "running";
+    const refreshBlocked = remainingCredits === null || remainingCredits === 0 || serverRefreshRunning;
     form.querySelector("#job-market-summary").textContent = knownBudget
       ? usedCredits + "/100 crédits Serper ce mois · " + remainingCredits + " restant(s) · " +
         (row.month_runs ?? 0) + " actualisation(s)" +
@@ -2034,16 +2036,23 @@
       : "Budget Serper indisponible. Actualisation désactivée par précaution.";
     const button = form.querySelector("button");
     const status = form.querySelector("[role=status]");
-    if (remainingCredits === null || remainingCredits === 0) {
+    if (refreshBlocked) {
       button.disabled = true;
-      status.textContent = remainingCredits === 0
-        ? "Plafond mensuel atteint : aucune nouvelle recherche payante."
-        : "Impossible de vérifier les crédits restants.";
+      status.textContent = serverRefreshRunning
+        ? "Une actualisation est déjà en cours sur le serveur. Rechargez les statistiques pour suivre son état."
+        : remainingCredits === 0
+          ? "Plafond mensuel atteint : aucune nouvelle recherche payante."
+          : "Impossible de vérifier les crédits restants.";
+    } else if (row?.last_status === "failed") {
+      status.textContent = "La dernière actualisation a échoué. Vous pouvez réessayer.";
+    } else if (row?.last_status === "completed") {
+      status.textContent = "Dernière actualisation terminée : " +
+        (row.last_offers_added ?? 0) + " offre(s) ajoutée(s), " +
+        (row.last_credits_used ?? 0) + " crédit(s) réservé(s).";
     }
     form.addEventListener("submit", async event => {
       event.preventDefault();
-      if (!current() || profile?.is_admin !== true || adminJobRefreshRunning ||
-          remainingCredits === null || remainingCredits === 0) return;
+      if (!current() || profile?.is_admin !== true || adminJobRefreshRunning || refreshBlocked) return;
       const city = form.elements.city.value.trim();
       if (!city) { status.textContent = "Indiquez une ville suisse."; return; }
       if (!window.confirm("Actualiser les offres pour " + city + " ? Cette recherche utilise des crédits Serper.")) return;
@@ -2064,7 +2073,7 @@
       } finally {
         adminJobRefreshRunning = false;
         // Do not re-enable a budget-blocked action, even after a failed request.
-        button.disabled = remainingCredits === null || remainingCredits === 0;
+        button.disabled = refreshBlocked;
       }
     });
     adminResults.append(form);
