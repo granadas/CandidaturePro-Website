@@ -796,7 +796,7 @@
   document.querySelector("#open-all-jobs").addEventListener("click", () => {
     document.querySelector("#jobs-query").value = "";
     document.querySelector("#jobs-sector").value = "";
-    document.querySelector("#jobs-city").value = document.querySelector("#company-city").value.trim() || "Genève";
+    document.querySelector("#jobs-city").value = "";
     showView("jobs");
   });
 
