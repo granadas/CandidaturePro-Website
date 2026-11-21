@@ -215,3 +215,8 @@
 .auth-notice a { color: #5424a2; }
 
 .jobs-recent-toggle{grid-column:1/-1;display:flex;align-items:center;gap:8px;font-size:.9rem}.jobs-recent-toggle input{width:auto;margin:0;flex:none}
+
+#job-company-form{padding:28px;display:grid;gap:14px}
+#job-company-form h2,#job-company-form p{margin:0}
+#job-company-form p{color:var(--muted)}
+#job-company-status:not(:empty){color:#9b1c30}
