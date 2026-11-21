@@ -2490,7 +2490,9 @@
       if (!variant) throw new Error("Cette variante n’est plus disponible.");
       if (beforeLabel !== cvLabel.value || beforeVariant !== editingCvId || before !== JSON.stringify(cvFieldNames.map(name => cvForm.elements.namedItem(name).value))) throw new Error("Vos modifications ont été conservées. Rouvrez le CV lorsque vous êtes prêt à remplacer le formulaire.");
       for (const name of cvFieldNames) cvForm.elements.namedItem(name).value = typeof variant.fields[name] === "string" ? variant.fields[name] : "";
-      if (!cvForm.elements.template.value) cvForm.elements.template.value = "classic";
+      if (!cvForm.elements.template.value || (!hasPremiumCv() && cvForm.elements.template.value !== "classic")) {
+        cvForm.elements.template.value = "classic";
+      }
       ++cvPhotoRequest; cvPhotoPreparing = false; cvPhotoFile.value = ""; renderCvPhoto();
       cvPhotoStatus.textContent = "La photo affichée appartient à cette variante.";
       cvLabel.value = variant.label;
