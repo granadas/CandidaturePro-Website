@@ -465,8 +465,10 @@
   }
 
   async function supabaseWrite(path, method, body, retry = true) {
+    const generation = sessionGeneration;
     const session = await ensureSession();
-    if (!session) throw new Error("Connectez-vous pour modifier vos données.");
+    if (!session || generation !== sessionGeneration || getSession()?.user?.id !== session.user?.id)
+      throw new Error("La session a changé. Reconnectez-vous avant de modifier vos données.");
     const response = await fetch(config.supabaseUrl + "/rest/v1/" + path, {
       method,
       headers: {
@@ -479,15 +481,15 @@
       body: JSON.stringify(body)
     });
     if (response.status === 401 && retry) {
-      const userId = session.user?.id;
-      const generation = sessionGeneration;
       await refreshSession();
-      if (!userId || generation !== sessionGeneration || getSession()?.user?.id !== userId) {
+      if (generation !== sessionGeneration || getSession()?.user?.id !== session.user?.id) {
         throw new Error("La session a changé. Vérifiez votre connexion avant de réessayer.");
       }
       return supabaseWrite(path, method, body, false);
     }
     const result = await response.json().catch(() => []);
+    if (generation !== sessionGeneration || getSession()?.user?.id !== session.user?.id)
+      throw new Error("La session a changé pendant l’enregistrement des données.");
     if (!response.ok) throw new Error(result.message || "Impossible d’enregistrer les données.");
     return result;
   }
