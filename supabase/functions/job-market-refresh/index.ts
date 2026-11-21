@@ -15,9 +15,13 @@ function jobLocation(title: string, snippet: string) {
       return new RegExp(`(^|[^a-z])${name}($|[^a-z])`).test(normalized);
     });
   };
+  // A JobScout24 "chez ... - lieu sur JobScout24" caption states the actual workplace.
+  // Do not infer a city from an unrelated mention elsewhere in the snippet.
+  const captionPlace = snippet.match(/\bchez\s+.+?\s+-\s+([^–.]+?)\s+sur\s+JobScout24\b/i)?.[1];
+  if (captionPlace) return findCity(captionPlace) ?? "À vérifier";
   const inTitle = findCity(title);
   if (inTitle) return inTitle;
-  if (/Postes et offres d'emploi en Suisse|Emplois similaires/i.test(snippet)) return "À vérifier";
+  if (/Postes et offres d'emploi en Suisse|Emplois similaires|Sur JobScout24, vous trouverez de nombreuses offres/i.test(snippet)) return "À vérifier";
   return findCity(snippet) ?? "À vérifier";
 }
 
@@ -134,8 +138,9 @@ Deno.serve(async (req: Request) => {
       const data = await searchResponse.json();
       credits++;
       const offers = (data.organic ?? [])
-        .filter((item: { link?: string; title?: string }) =>
-          item.link && item.title && /^https:\/\/(www\.)?jobscout24\.ch\/fr\/job\/[0-9a-f-]+\/?(?:\?.*)?$/i.test(item.link))
+        .filter((item: { link?: string; title?: string; snippet?: string }) =>
+          item.link && item.title && /^https:\/\/(www\.)?jobscout24\.ch\/fr\/job\/[0-9a-f-]+\/?(?:\?.*)?$/i.test(item.link) &&
+          !/Postes et offres d'emploi en Suisse|Sur JobScout24, vous trouverez de nombreuses offres|Emplois similaires/i.test(item.snippet ?? ""))
         .map((item: { title: string; link: string; snippet?: string }) => {
           const identity = jobIdentity(item.title);
           const snippet = item.snippet ?? "";
