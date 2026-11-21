@@ -805,8 +805,9 @@
   async function loadJobs() {
     const message = document.querySelector("#jobs-message");
     const request = ++jobsLoadRequest;
-    const userId = getSession()?.user?.id;
-    const current = () => request === jobsLoadRequest && getSession()?.user?.id === userId;
+    const session = getSession();
+    const sessionToken = session?.access_token;
+    const current = () => request === jobsLoadRequest && getSession()?.access_token === sessionToken;
     if (!getSession()) {
       jobResults = [];
       renderJobs();
