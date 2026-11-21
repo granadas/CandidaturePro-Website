@@ -5,11 +5,13 @@ on:
     branches: [main]
     paths:
       - 'app/**'
+      - 'tests/**'
       - 'supabase/functions/**'
       - '.github/workflows/validate-web-javascript.yml'
   pull_request:
     paths:
       - 'app/**'
+      - 'tests/**'
       - 'supabase/functions/**'
       - '.github/workflows/validate-web-javascript.yml'
 
@@ -26,6 +28,8 @@ jobs:
       - name: Validate browser JavaScript syntax
         run: |
           find app -type f -name '*.js' -print0 | xargs -0 -r -n 1 node --check
+      - name: Check session and search regressions
+        run: node --test tests/*.test.mjs
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
