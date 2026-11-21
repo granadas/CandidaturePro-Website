@@ -50,7 +50,8 @@
     }
     if (!fields.name.trim() || !fields.title.trim()) throw Error('Complétez le nom et le titre professionnel avant d’exporter le CV.');
     if (!['classic', 'modern', 'compact'].includes(fields.template)) throw Error('Le modèle de CV n’est pas reconnu.');
-    const color = fields.template === 'modern' ? '6025BD' : fields.template === 'compact' ? '202938' : '17345C';
+    const palettes = { copper: 'A85D3A', jade: '147C75', plum: '754A7D', blue: '305E9C' };
+    const color = palettes[fields.accent] || 'A85D3A';
     const compact = fields.template === 'compact', image = imageEntry(fields.photo);
     let body = paragraph(fields.name.trim(), 'CandidateName') + paragraph(fields.title.trim(), 'CandidateTitle');
     if (fields.contact.trim()) body += paragraph(fields.contact.trim(), 'Contact');
@@ -59,7 +60,16 @@
       const value = fields[key].trim();
       if (!value) continue;
       body += paragraph(label, 'SectionHeading');
-      for (const block of value.split(/\n\s*\n/)) body += paragraph(block);
+      if (key === 'experience' || key === 'education') {
+        for (const block of value.split(/\n\s*\n/)) {
+          const lines = block.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+          if (!lines.length) continue;
+          body += paragraph(lines.shift(), 'EntryHeading');
+          for (const line of lines) body += paragraph(line.replace(/^[•●\-*]\s*/, '• '), /^[•●\-*]/.test(line) ? 'EntryBullet' : 'EntryDetail');
+        }
+      } else if (key === 'skills') {
+        for (const line of value.split(/\r?\n/).map(item => item.trim()).filter(Boolean)) body += paragraph(line, 'EntryDetail');
+      } else body += paragraph(value);
     }
     const section = '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1000" w:right="1100" w:bottom="1000" w:left="1100" w:header="500" w:footer="500" w:gutter="0"/></w:sectPr>';
     const header = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
@@ -67,7 +77,10 @@
       '<w:style w:type="paragraph" w:styleId="CandidateName"><w:name w:val="Nom du candidat"/><w:basedOn w:val="Normal"/><w:pPr><w:keepNext/></w:pPr><w:rPr><w:b/><w:color w:val="' + color + '"/><w:sz w:val="40"/></w:rPr></w:style>' +
       '<w:style w:type="paragraph" w:styleId="CandidateTitle"><w:name w:val="Titre professionnel"/><w:basedOn w:val="Normal"/><w:pPr><w:keepNext/></w:pPr><w:rPr><w:b/><w:sz w:val="26"/></w:rPr></w:style>' +
       '<w:style w:type="paragraph" w:styleId="Contact"><w:name w:val="Coordonnées"/><w:basedOn w:val="Normal"/><w:rPr><w:color w:val="52617A"/><w:sz w:val="20"/></w:rPr></w:style>' +
-      '<w:style w:type="paragraph" w:styleId="SectionHeading"><w:name w:val="Titre de rubrique"/><w:basedOn w:val="Normal"/><w:pPr><w:keepNext/><w:spacing w:before="240" w:after="100"/><w:outlineLvl w:val="0"/></w:pPr><w:rPr><w:b/><w:color w:val="' + color + '"/><w:sz w:val="24"/></w:rPr></w:style></w:styles>';
+      '<w:style w:type="paragraph" w:styleId="SectionHeading"><w:name w:val="Titre de rubrique"/><w:basedOn w:val="Normal"/><w:pPr><w:keepNext/><w:spacing w:before="240" w:after="100"/><w:outlineLvl w:val="0"/></w:pPr><w:rPr><w:b/><w:color w:val="' + color + '"/><w:sz w:val="24"/></w:rPr></w:style>' +
+      '<w:style w:type="paragraph" w:styleId="EntryHeading"><w:name w:val="Fonction ou diplôme"/><w:basedOn w:val="Normal"/><w:pPr><w:keepNext/><w:spacing w:before="140" w:after="40"/></w:pPr><w:rPr><w:b/><w:sz w:val="22"/></w:rPr></w:style>' +
+      '<w:style w:type="paragraph" w:styleId="EntryDetail"><w:name w:val="Détail du parcours"/><w:basedOn w:val="Normal"/><w:pPr><w:spacing w:after="60"/></w:pPr><w:rPr><w:color w:val="52617A"/></w:rPr></w:style>' +
+      '<w:style w:type="paragraph" w:styleId="EntryBullet"><w:name w:val="Réalisation"/><w:basedOn w:val="Normal"/><w:pPr><w:ind w:left="300"/><w:spacing w:after="50"/></w:pPr></w:style></w:styles>';
     const relNs = 'http://schemas.openxmlformats.org/package/2006/relationships', relation = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/';
     const documents = [
       { name: '[Content_Types].xml', text: header + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>' + (image ? '<Default Extension="' + image.extension + '" ContentType="' + image.type + '"/>' : '') + '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>' },
