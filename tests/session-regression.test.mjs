@@ -21,6 +21,13 @@ test("search forms keep independent locks", () => {
   assert.doesNotMatch(jobs, /companySearchRunning/);
 });
 
+test("read retry retains original session generation", () => {
+  const read = block("async function supabaseFetch(", "async function supabaseWrite(");
+  assert.equal((read.match(/const generation\s*=\s*sessionGeneration/g) || []).length, 1);
+  assert.match(read, /if\s*\(response\.status\s*===\s*401\s*&&\s*retry\)/);
+  assert.match(read, /await refreshSession\(\)/);
+});
+
 test("session refresh never overwrites a replaced session", () => {
   const refresh = block("async function refreshSession()", "async function ensureSession()");
   assert.match(refresh, /latest\?\.refresh_token\s*!==\s*session\.refresh_token/);
