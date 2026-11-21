@@ -893,7 +893,7 @@
     if (!getSession()) {
       jobResults = [];
       renderJobs();
-      message.textContent = "Connectez-vous pour consulter les postes ouverts.";
+      message.textContent = "Connectez-vous pour consulter les annonces référencées.";
       return;
     }
 
@@ -927,10 +927,12 @@
         return !Number.isFinite(checkedAt) || Date.now() - checkedAt > 30 * 86400000;
       }).length;
       const missingEmployers = jobResults.filter(job => !String(job.company_name || "").trim()).length;
+      const resultsTruncated = results.length >= 1000;
       message.textContent = jobResults.length
         ? "Annonces référencées correspondant à vos critères (disponibilité à confirmer). " +
           (missingEmployers ? missingEmployers + " employeur(s) à vérifier. " : "") +
           (olderThan30Days ? olderThan30Days + " offre(s) non revérifiée(s) depuis plus de 30 jours. " : "") +
+          (resultsTruncated ? "Seules les 1 000 annonces les plus récemment référencées sont affichées ; affinez les critères pour en consulter d’autres. " : "") +
           "Vérifiez leur disponibilité sur le site source."
         : "Aucune annonce référencée ne correspond à ces critères.";
     } catch (error) {
