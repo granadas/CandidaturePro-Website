@@ -6,10 +6,21 @@ const sectors = [
   "Éducation / Formation", "Crèches / Petite enfance", "Agences d’intérim / Recrutement"
 ];
 
-function jobLocation(text: string, fallback: string) {
+function jobLocation(title: string, snippet: string) {
   const cities = ["Genève", "Lausanne", "Nyon", "Morges", "Montreux", "Vevey", "Fribourg", "Neuchâtel", "Sion", "Martigny", "Delémont", "Berne", "Bâle", "Zurich", "Lugano"];
-  const normalized = text.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
-  return cities.find(city => normalized.includes(city.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase())) ?? fallback;
+  const findCity = (text: string) => {
+    const normalized = text.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+    return cities.find(city => {
+      const name = city.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+      const index = normalized.indexOf(name);
+      return index >= 0 && (index === 0 || !/[a-z]/.test(normalized[index - 1])) &&
+        (index + name.length === normalized.length || !/[a-z]/.test(normalized[index + name.length]));
+    });
+  };
+  const inTitle = findCity(title);
+  if (inTitle) return inTitle;
+  if (/Postes et offres d'emploi en Suisse|Emplois similaires/i.test(snippet)) return "À vérifier";
+  return findCity(snippet) ?? "À vérifier";
 }
 
 function jobIdentity(title: string) {
@@ -133,7 +144,7 @@ Deno.serve(async (req: Request) => {
           return {
           title: identity.title,
           company_name: identity.company,
-          location: jobLocation(`${item.title} ${snippet}`, requestedCity),
+          location: jobLocation(item.title, snippet),
           sector,
           source: "JobScout24",
           url: item.link,
