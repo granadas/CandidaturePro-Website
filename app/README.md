@@ -31,7 +31,7 @@ Le client OAuth Google est de type Application Web avec Gmail API activée. Auto
 
 La fonction `gmail-web` vérifie l’utilisateur, l’origine et l’appartenance des dossiers avant les opérations Gmail. Les envois initiaux et les réponses/relances disposent de réservations pour éviter de renvoyer automatiquement un message dont le résultat est incertain. Vérifier Gmail lorsqu’un envoi reste incertain.
 
-Pour Outlook, enregistrer une application Microsoft avec comptes personnels et professionnels, autoriser `https://candidaturepro.ch/app/` comme URI de redirection **Single-page application**, et déléguer `Mail.Read`, `Mail.Send` et `offline_access`. La fonction `outlook-web` lit `OUTLOOK_WEB_CLIENT_ID` (ou `MAIL_PROVIDER_B_CLIENT_ID`) et `OUTLOOK_WEB_REDIRECT_URI`. Le statut des paramètres reste « en attente de configuration » tant que ces valeurs manquent. La connexion réelle exige ensuite le consentement du titulaire du compte Microsoft.
+Pour Outlook, enregistrer une application Microsoft avec comptes personnels et professionnels, autoriser `https://candidaturepro.ch/app/` comme URI de redirection **Web**, et déléguer `Mail.Read`, `Mail.Send` et `offline_access`. La fonction `outlook-web` lit `OUTLOOK_WEB_CLIENT_ID`, `OUTLOOK_WEB_CLIENT_SECRET` et `OUTLOOK_WEB_REDIRECT_URI` (ou les deux variantes `MAIL_PROVIDER_B_CLIENT_ID` et `MAIL_PROVIDER_B_CLIENT_SECRET` pour les identifiants). Le statut des paramètres reste « en attente de configuration » tant que ces valeurs manquent. La connexion réelle exige ensuite le consentement du titulaire du compte Microsoft.
 
 ## Limites de validation
 
