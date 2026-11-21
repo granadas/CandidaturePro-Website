@@ -6,12 +6,12 @@ on:
     paths:
       - 'app/**'
       - 'tests/**'
-      - 'tests/**'
       - 'supabase/functions/**'
       - '.github/workflows/validate-web-javascript.yml'
   pull_request:
     paths:
       - 'app/**'
+      - 'tests/**'
       - 'supabase/functions/**'
       - '.github/workflows/validate-web-javascript.yml'
 
