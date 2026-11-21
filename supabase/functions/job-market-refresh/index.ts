@@ -274,7 +274,7 @@ Deno.serve(async (req: Request) => {
           const previous = existingByUrl.get(offer.url);
           return {
             ...offer,
-            company_name: offer.company_name.trim() || previous?.company_name || "",
+            company_name: previous?.company_name?.trim() || offer.company_name.trim(),
             location: offer.location === "À vérifier" ? previous?.location || offer.location : offer.location
           };
         });
