@@ -147,7 +147,7 @@ Deno.serve(async (req: Request) => {
       if (offers.length > 0) {
         found += offers.length;
         // Count only URLs that were not already stored, not all upserted search results.
-        const uniqueUrls = [...new Set(offers.map((offer: { url: string }) => offer.url))];
+        const uniqueUrls: string[] = [...new Set<string>(offers.map((offer: { url: string }) => offer.url))];
         const existingResponse = await fetch(
           `${url}/rest/v1/job_market_offers?select=url&url=in.(${uniqueUrls.map((value: string) => `"${encodeURIComponent(value)}"`).join(",")})`,
           { headers }
