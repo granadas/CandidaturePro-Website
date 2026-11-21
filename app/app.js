@@ -2548,6 +2548,10 @@
       const userId = getSession()?.user?.id;
       if (!userId || cvForm.dataset.saving || cvDelete.disabled || !cvForm.reportValidity() || !cvPhotoReady()) return;
       const fields = Object.fromEntries(cvFieldNames.map(name => [name, cvForm.elements.namedItem(name).value.trim()]));
+      if (!hasPremiumCv() && fields.template !== "classic") {
+        cvSaveStatus.textContent = "Le modèle sélectionné nécessite Premium. Choisissez Classique pour enregistrer ce CV.";
+        return;
+      }
       const label = cvLabel.value.trim() || fields.title;
       if (new TextEncoder().encode(JSON.stringify(fields)).length > 150000) {
         cvSaveStatus.textContent = "Le CV est trop volumineux. Réduisez le texte ou retirez la photo avant d’enregistrer."; return;
