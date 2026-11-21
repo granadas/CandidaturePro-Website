@@ -4254,15 +4254,19 @@
     try {
       const checks = await Promise.allSettled([
         supabaseFetch("user_applications?select=id&limit=1"),
-        invokeEdgeFunction("gmail-web", { action: "status" })
+        invokeEdgeFunction("gmail-web", { action: "status" }),
+        invokeEdgeFunction("outlook-web", { action: "status" })
       ]);
       if (getSession()?.user?.id !== userId) return;
-      const [applicationsCheck, gmailCheck] = checks;
+      const [applicationsCheck, gmailCheck, outlookCheck] = checks;
       showChecks([
         applicationsCheck.status === "fulfilled" ? "Accès aux candidatures opérationnel." : "Accès aux candidatures indisponible.",
         gmailCheck.status !== "fulfilled" ? "Service Gmail indisponible." :
           !gmailCheck.value.configured ? "Service Gmail en attente de configuration." :
-          gmailCheck.value.connected ? "Connexion Gmail enregistrée." : "Aucun compte Gmail lié."
+          gmailCheck.value.connected ? "Connexion Gmail enregistrée." : "Aucun compte Gmail lié.",
+        outlookCheck.status !== "fulfilled" ? "Service Outlook indisponible." :
+          !outlookCheck.value.configured ? "Service Outlook en attente de configuration." :
+          outlookCheck.value.connected ? "Connexion Outlook enregistrée." : "Aucun compte Outlook lié."
       ]);
     } finally {
       settingsCheck.disabled = false;
