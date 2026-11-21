@@ -450,7 +450,16 @@
     const session = getSession();
     if (!session) return null;
     if (Number(session.expires_at || 0) > Math.floor(Date.now() / 1000) + 60) return session;
-    try { return await refreshSession(); }
+    try {
+      const refreshed = await refreshSession();
+      // A refresh already running for a previous account must never be reused.
+      const current = getSession();
+      if (refreshed?.user?.id !== session.user?.id ||
+          current?.user?.id !== session.user?.id ||
+          current?.refresh_token !== refreshed.refresh_token)
+        return null;
+      return refreshed;
+    }
     catch (error) {
       // Keep the saved login when the network, rate limit or Auth server fails.
       // Only a definitive invalid/expired refresh token should sign the user out.
