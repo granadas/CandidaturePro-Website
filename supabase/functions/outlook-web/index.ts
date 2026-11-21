@@ -58,6 +58,7 @@ Deno.serve(async (request: Request) => {
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   let clientId = Deno.env.get("OUTLOOK_WEB_CLIENT_ID") || Deno.env.get("MAIL_PROVIDER_B_CLIENT_ID") || "";
+  const clientSecret = Deno.env.get("OUTLOOK_WEB_CLIENT_SECRET") || Deno.env.get("MAIL_PROVIDER_B_CLIENT_SECRET") || "";
   const authorization = request.headers.get("authorization");
   if (!authorization) return json({ message: "Connectez-vous à Candidature Pro." }, 401);
   if (!root || !anonKey || !serviceKey) return json({ message: "Service indisponible." }, 503);
@@ -82,10 +83,10 @@ Deno.serve(async (request: Request) => {
     if (body?.action === "status") {
       const status = await fetch(endpoint + filter + "&select=connected_at", { headers: serviceHeaders });
       if (!status.ok) return json({ message: "Statut Outlook indisponible." }, 503);
-      return json({ configured: Boolean(clientId && redirect), connected: (await status.json()).length > 0 });
+      return json({ configured: Boolean(clientId && clientSecret && redirect), connected: (await status.json()).length > 0 });
     }
     if (body?.action === "start") {
-      if (!clientId || !redirect) return json({ message: "La connexion Outlook web attend la configuration Microsoft." }, 503);
+      if (!clientId || !clientSecret || !redirect) return json({ message: "La connexion Outlook web attend la configuration Microsoft." }, 503);
       if (!/^[A-Za-z0-9_-]{43}$/.test(body.challenge || "") || !/^[A-Za-z0-9_-]{43}$/.test(body.state || "")) {
         return json({ message: "Demande OAuth invalide." }, 400);
       }
@@ -98,12 +99,12 @@ Deno.serve(async (request: Request) => {
       return json({ url: url.href });
     }
     if (body?.action === "exchange") {
-      if (!clientId || !redirect) return json({ message: "La connexion Outlook web attend la configuration Microsoft." }, 503);
+      if (!clientId || !clientSecret || !redirect) return json({ message: "La connexion Outlook web attend la configuration Microsoft." }, 503);
       if (typeof body.code !== "string" || !body.code || body.code.length > 4096 ||
           !/^[A-Za-z0-9_-]{43}$/.test(body.verifier || "")) return json({ message: "Code Outlook invalide." }, 400);
       const response = await fetch(authority + "/token", {
         method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ client_id: clientId, grant_type: "authorization_code", code: body.code,
+        body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, grant_type: "authorization_code", code: body.code,
           redirect_uri: redirect, code_verifier: body.verifier, scope: scopes.join(" ") })
       });
       const token = await response.json().catch(() => null);
@@ -125,7 +126,7 @@ Deno.serve(async (request: Request) => {
     }
 
     if (body?.action === "send") {
-      if (!clientId) return json({ message: "La connexion Outlook web attend la configuration Microsoft." }, 503);
+      if (!clientId || !clientSecret) return json({ message: "La connexion Outlook web attend la configuration Microsoft." }, 503);
       const { applicationId, recipient, subject, message, reviewedAt } = body;
       if (typeof applicationId !== "string" || !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(applicationId) ||
           typeof recipient !== "string" || recipient.length > 254 || !emailPattern.test(recipient) ||
@@ -140,7 +141,7 @@ Deno.serve(async (request: Request) => {
       if (!connection) return json({ message: "Connectez Outlook dans Paramètres avant de poursuivre." }, 409);
       const refreshed = await fetch(authority + "/token", {
         method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ client_id: clientId, grant_type: "refresh_token", refresh_token: connection.refresh_token,
+        body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, grant_type: "refresh_token", refresh_token: connection.refresh_token,
           scope: scopes.join(" ") })
       });
       const token = await refreshed.json().catch(() => null);
@@ -193,14 +194,14 @@ Deno.serve(async (request: Request) => {
     }
 
     if (body?.action === "refresh_replies") {
-      if (!clientId) return json({ message: "La connexion Outlook web attend la configuration Microsoft." }, 503);
+      if (!clientId || !clientSecret) return json({ message: "La connexion Outlook web attend la configuration Microsoft." }, 503);
       const connectionResponse = await fetch(endpoint + filter + "&select=refresh_token", { headers: serviceHeaders });
       if (!connectionResponse.ok) return json({ message: "Connexion Outlook indisponible." }, 503);
       const [connection] = await connectionResponse.json();
       if (!connection) return json({ needsConsent: true });
       const refreshed = await fetch(authority + "/token", {
         method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ client_id: clientId, grant_type: "refresh_token", refresh_token: connection.refresh_token,
+        body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, grant_type: "refresh_token", refresh_token: connection.refresh_token,
           scope: scopes.join(" ") })
       });
       const token = await refreshed.json().catch(() => null);
@@ -268,7 +269,7 @@ Deno.serve(async (request: Request) => {
     }
 
     if (body?.action === "open_reply") {
-      if (!clientId) return json({ message: "La connexion Outlook web attend la configuration Microsoft." }, 503);
+      if (!clientId || !clientSecret) return json({ message: "La connexion Outlook web attend la configuration Microsoft." }, 503);
       const applicationId = body.applicationId;
       if (typeof applicationId !== "string" || !/^[0-9a-f-]{36}$/i.test(applicationId)) return json({ message: "Dossier invalide." }, 400);
       const [deliveryResponse, connectionResponse] = await Promise.all([
@@ -282,7 +283,7 @@ Deno.serve(async (request: Request) => {
       if (!delivery?.message_id || !connection) return json({ message: "Aucune conversation Outlook associée à ce dossier." }, 404);
       const refreshed = await fetch(authority + "/token", {
         method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ client_id: clientId, grant_type: "refresh_token", refresh_token: connection.refresh_token,
+        body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, grant_type: "refresh_token", refresh_token: connection.refresh_token,
           scope: scopes.join(" ") })
       });
       const token = await refreshed.json().catch(() => null);
@@ -329,7 +330,7 @@ Deno.serve(async (request: Request) => {
     }
 
     if (body?.action === "send_reply") {
-      if (!clientId) return json({ message: "La connexion Outlook web attend la configuration Microsoft." }, 503);
+      if (!clientId || !clientSecret) return json({ message: "La connexion Outlook web attend la configuration Microsoft." }, 503);
       const { applicationId, replyId, recipient, requestId, message } = body;
       if (typeof applicationId !== "string" || !/^[0-9a-f-]{36}$/i.test(applicationId) ||
           typeof replyId !== "string" || !replyId || replyId.length > 1024 ||
@@ -349,7 +350,7 @@ Deno.serve(async (request: Request) => {
       if (!delivery?.message_id || !connection) return json({ message: "Aucune conversation Outlook associée à ce dossier." }, 404);
       const refreshed = await fetch(authority + "/token", {
         method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ client_id: clientId, grant_type: "refresh_token", refresh_token: connection.refresh_token,
+        body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, grant_type: "refresh_token", refresh_token: connection.refresh_token,
           scope: scopes.join(" ") })
       });
       const token = await refreshed.json().catch(() => null);
@@ -425,7 +426,7 @@ Deno.serve(async (request: Request) => {
     }
 
     if (body?.action === "send_followup") {
-      if (!clientId) return json({ message: "La connexion Outlook web attend la configuration Microsoft." }, 503);
+      if (!clientId || !clientSecret) return json({ message: "La connexion Outlook web attend la configuration Microsoft." }, 503);
       const { applicationId, recipient, requestId, message } = body;
       if (typeof applicationId !== "string" || !/^[0-9a-f-]{36}$/i.test(applicationId) ||
           typeof recipient !== "string" || !emailPattern.test(recipient) ||
@@ -448,7 +449,7 @@ Deno.serve(async (request: Request) => {
       if (!delivery?.message_id || !connection || !eligible) return json({ message: "Ce dossier a changé ou reçu une réponse humaine. Actualisez le suivi avant la relance." }, 409);
       const refreshed = await fetch(authority + "/token", {
         method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ client_id: clientId, grant_type: "refresh_token", refresh_token: connection.refresh_token,
+        body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, grant_type: "refresh_token", refresh_token: connection.refresh_token,
           scope: scopes.join(" ") })
       });
       const token = await refreshed.json().catch(() => null);
