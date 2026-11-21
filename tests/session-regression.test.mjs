@@ -144,3 +144,10 @@ test("indexed job listings never claim availability was verified", () => {
   assert.match(app, /disponibilité à confirmer/);
   assert.match(app, /Vérifiez leur disponibilité sur le site source/);
 });
+
+test("job search discloses the 1000-row limit instead of implying complete coverage", () => {
+  assert.match(app, /const resultsTruncated = results\.length >= 1000/);
+  assert.match(app, /Seules les 1 000 annonces les plus récemment référencées sont affichées/);
+  assert.match(app, /Connectez-vous pour consulter les annonces référencées/);
+  assert.doesNotMatch(app, /Connectez-vous pour consulter les postes ouverts/);
+});
