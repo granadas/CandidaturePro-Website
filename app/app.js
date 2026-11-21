@@ -16,6 +16,7 @@
   let accountRefreshPromise = null;
   let applications = [];
   let companyResults = [];
+  let companySearchRunning = false;
   let jobResults = [];
   let jobsLoadRequest = 0;
   let refreshPromise = null;
@@ -3177,6 +3178,7 @@
     try {
       await loadJobs();
     } finally {
+      companySearchRunning = false;
       button.disabled = false;
       button.textContent = "Rechercher";
     }
@@ -3206,6 +3208,8 @@
     event.preventDefault();
     const button = document.querySelector("#company-search-submit");
     const message = document.querySelector("#company-search-message");
+    if (companySearchRunning) return;
+    companySearchRunning = true;
     button.disabled = true;
     button.textContent = "Recherche…";
     try {
