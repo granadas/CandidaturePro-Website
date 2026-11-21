@@ -381,12 +381,22 @@
 .cv-sheet-compact .cv-sheet-role{color:var(--cv-soft)}
 .cv-sheet-compact .cv-sheet-section h2{color:var(--cv-accent)}
 .cv-sheet-compact .cv-skill-list{gap:.6cqi}
-.cv-sheet-compact .cv-sheet-skill{background:#eaf1f0;color:var(--cv-deep)}
+.cv-sheet-compact .cv-skill{background:#eaf1f0;color:var(--cv-deep)}
 .cv-sheet-compact .cv-entry-heading{display:block}
 .cv-sheet-compact .cv-entry-dates{display:block;margin-top:.3cqi}
 .cv-sheet-compact .cv-entry-list{gap:2cqi}
 .cv-design-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:end}
 .cv-design-options label{font-weight:700}
 .cv-design-options select{width:100%}
+.cv-entry-builder{border:1px solid #d9d3e6;border-radius:12px;background:#fbfaff;padding:0 16px}
+.cv-entry-builder summary{cursor:pointer;padding:14px 0;color:#5c25a6;font-weight:750;list-style:none}
+.cv-entry-builder summary::-webkit-details-marker{display:none}
+.cv-entry-builder[open] summary{border-bottom:1px solid #e9e3f2}
+.cv-entry-builder-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px;padding:17px 0}
+.cv-entry-builder-grid>.wide{grid-column:1/-1}
+.cv-entry-builder-grid input,.cv-entry-builder-grid textarea{width:100%}
+.cv-entry-builder-grid button{justify-self:start}
+.cv-entry-builder-grid [role=status]{align-self:center;color:#526178;font-size:13px;line-height:1.4}
 @media(max-width:600px){.cv-design-options{grid-template-columns:1fr}}
+@media(max-width:600px){.cv-entry-builder-grid{grid-template-columns:1fr}}
 @media print{#cv-preview .cv-sheet{overflow:visible}.cv-sheet-modern,.cv-sheet-compact{-webkit-print-color-adjust:exact;print-color-adjust:exact}}

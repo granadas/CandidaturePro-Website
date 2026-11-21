@@ -16,6 +16,11 @@
       const entry = node("div", "cv-entry");
       const first = row.shift() || "";
       const matched = first.match(/^(.*?)\s*[·|]\s*((?:19|20)\d{2}.*|.*(?:présent|aujourd'hui).*)$/i);
+      if (/^[•●\-*]/.test(first) || (first.length > 100 && !matched) || (!matched && row.length === 0 && first.includes(" "))) {
+        entry.append(node("p", "cv-sheet-prose", [first, ...row].join("\n")));
+        wrap.append(entry);
+        continue;
+      }
       const heading = node("div", "cv-entry-heading");
       heading.append(node("strong", "", matched ? matched[1] : first));
       if (matched) heading.append(node("span", "cv-entry-dates", matched[2]));
