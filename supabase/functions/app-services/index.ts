@@ -381,7 +381,7 @@ function isRelevantPlace(
    RECHERCHE ENTREPRISES
    ============================================================ */
 
-function officialWebsiteCandidate(value: unknown) {
+function nonDirectoryWebsite(value: unknown) {
   const website = String(value || "").trim();
   if (!website) return "";
   try {
@@ -495,7 +495,7 @@ async function companySearch(p: any, key: string, webKey: string, userId: string
         city
       ),
       sector: profile.label,
-      website: officialWebsiteCandidate(x.website),
+      website: nonDirectoryWebsite(x.website),
       phone: String(
         x["contact:phone"] ||
         x.phone ||
@@ -515,7 +515,7 @@ async function companySearch(p: any, key: string, webKey: string, userId: string
   if (profile.type === "logistics" && webKey) {
     const addCompany = (candidate: any) => {
       const name = String(candidate?.name || "").trim();
-      const website = officialWebsiteCandidate(candidate?.website);
+      const website = nonDirectoryWebsite(candidate?.website);
       const address = String(candidate?.address || "").trim();
       if (!name) return;
 
