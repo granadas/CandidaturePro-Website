@@ -81,3 +81,11 @@ test("Edge Function requests reject stale session responses", () => {
 test("HTML includes a cache-busted application script", () => {
   assert.match(html, /app\.js\?v=[\w-]+/);
 });
+
+test("admin refresh shows remaining credits and disables when budget is exhausted or unknown", () => {
+  const admin = block("function renderAdminJobMarket(", "let adminJobRefreshRunning =");
+  assert.match(admin, /Math\.max\(0, 100 - usedCredits\)/);
+  assert.match(admin, /remainingCredits === null \|\| remainingCredits === 0/);
+  assert.match(admin, /button\.disabled = true/);
+  assert.match(admin, /Budget Serper indisponible/);
+});
