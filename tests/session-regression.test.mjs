@@ -92,8 +92,8 @@ test("admin refresh shows remaining credits and disables when budget is exhauste
 
 test("admin paid refresh rejects submit when budget is blocked and stays disabled", () => {
   const admin = block("function renderAdminJobMarket(", "let adminJobRefreshRunning =");
-  assert.match(admin, /adminJobRefreshRunning \|\|\s*remainingCredits === null \|\| remainingCredits === 0/);
-  assert.match(admin, /button\.disabled = remainingCredits === null \|\| remainingCredits === 0/);
+  assert.match(admin, /adminJobRefreshRunning \|\| refreshBlocked/);
+  assert.match(admin, /button\.disabled = refreshBlocked/);
   assert.doesNotMatch(admin, /adminJobRefreshRunning = button\.disabled = false/);
 });
 
@@ -103,4 +103,12 @@ test("admin budget rejects null or malformed credit statistics", () => {
   assert.match(admin, /Number\.isSafeInteger\(usedCredits\)/);
   assert.match(admin, /usedCredits >= 0/);
   assert.doesNotMatch(admin, /Number\(row\?\.month_credits_used\)/);
+});
+
+test("admin reflects server refresh status and blocks duplicate runs", () => {
+  const admin = block("function renderAdminJobMarket(", "let adminJobRefreshRunning =");
+  assert.match(admin, /row\?\.last_status === "running"/);
+  assert.match(admin, /refreshBlocked = remainingCredits === null \|\| remainingCredits === 0 \|\| serverRefreshRunning/);
+  assert.match(admin, /row\?\.last_status === "failed"/);
+  assert.match(admin, /row\?\.last_status === "completed"/);
 });
