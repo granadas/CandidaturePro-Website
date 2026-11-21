@@ -2022,12 +2022,22 @@
       '<label class="wide">Métier ou mot-clé<input name="query" maxlength="120"></label>' +
       '<div class="wide"><button type="submit" class="primary">Actualiser les postes maintenant</button></div>' +
       '<p class="wide" role="status"></p>';
-    form.querySelector("#job-market-summary").textContent = row
-      ? (row.month_credits_used ?? 0) + "/100 crédits Serper ce mois · " + (row.month_runs ?? 0) + " actualisation(s)" +
+    const usedCredits = Number(row?.month_credits_used);
+    const knownBudget = row && Number.isFinite(usedCredits) && usedCredits >= 0;
+    const remainingCredits = knownBudget ? Math.max(0, 100 - usedCredits) : null;
+    form.querySelector("#job-market-summary").textContent = knownBudget
+      ? usedCredits + "/100 crédits Serper ce mois · " + remainingCredits + " restant(s) · " +
+        (row.month_runs ?? 0) + " actualisation(s)" +
         (row.last_started_at ? " · Dernière exécution le " + trackingDateFormat.format(new Date(row.last_started_at)) : "")
-      : "Aucune statistique d’actualisation disponible.";
+      : "Budget Serper indisponible. Actualisation désactivée par précaution.";
     const button = form.querySelector("button");
     const status = form.querySelector("[role=status]");
+    if (remainingCredits === null || remainingCredits === 0) {
+      button.disabled = true;
+      status.textContent = remainingCredits === 0
+        ? "Plafond mensuel atteint : aucune nouvelle recherche payante."
+        : "Impossible de vérifier les crédits restants.";
+    }
     form.addEventListener("submit", async event => {
       event.preventDefault();
       if (!current() || profile?.is_admin !== true || adminJobRefreshRunning) return;
