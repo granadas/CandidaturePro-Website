@@ -2040,7 +2040,8 @@
     }
     form.addEventListener("submit", async event => {
       event.preventDefault();
-      if (!current() || profile?.is_admin !== true || adminJobRefreshRunning) return;
+      if (!current() || profile?.is_admin !== true || adminJobRefreshRunning ||
+          remainingCredits === null || remainingCredits === 0) return;
       const city = form.elements.city.value.trim();
       if (!city) { status.textContent = "Indiquez une ville suisse."; return; }
       if (!window.confirm("Actualiser les offres pour " + city + " ? Cette recherche utilise des crédits Serper.")) return;
@@ -2059,7 +2060,9 @@
       } catch (error) {
         if (current()) status.textContent = error.message;
       } finally {
-        adminJobRefreshRunning = button.disabled = false;
+        adminJobRefreshRunning = false;
+        // Do not re-enable a budget-blocked action, even after a failed request.
+        button.disabled = remainingCredits === null || remainingCredits === 0;
       }
     });
     adminResults.append(form);
