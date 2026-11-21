@@ -493,8 +493,9 @@
   }
 
   async function supabaseRpc(name, body, retry = true) {
+    const generation = sessionGeneration;
     const session = await ensureSession();
-    if (!session) throw new Error("Connectez-vous pour enregistrer votre profil.");
+    if (!session || generation !== sessionGeneration || getSession()?.user?.id !== session.user?.id) throw new Error("Connectez-vous pour enregistrer votre profil.");
     const response = await fetch(config.supabaseUrl + "/rest/v1/rpc/" + name, {
       method: "POST",
       headers: {
@@ -507,16 +508,21 @@
     });
     if (response.status === 401 && retry) {
       await refreshSession();
+      if (generation !== sessionGeneration || getSession()?.user?.id !== session.user?.id)
+        throw new Error("La session a changé. Reconnectez-vous avant de réessayer.");
       return supabaseRpc(name, body, false);
     }
     const result = await response.json().catch(() => ({}));
+    if (generation !== sessionGeneration || getSession()?.user?.id !== session.user?.id)
+      throw new Error("La session a changé pendant l’opération.");
     if (!response.ok) throw new Error(result.message || "Impossible d’exécuter l’opération.");
     return result;
   }
 
   async function invokeEdgeFunction(name, body, retry = true) {
+    const generation = sessionGeneration;
     const session = await ensureSession();
-    if (!session) throw new Error("Connectez-vous pour continuer.");
+    if (!session || generation !== sessionGeneration || getSession()?.user?.id !== session.user?.id) throw new Error("Connectez-vous pour continuer.");
     const response = await fetch(config.supabaseUrl + "/functions/v1/" + name, {
       method: "POST",
       headers: {
@@ -528,9 +534,13 @@
     });
     if (response.status === 401 && retry) {
       await refreshSession();
+      if (generation !== sessionGeneration || getSession()?.user?.id !== session.user?.id)
+        throw new Error("La session a changé. Reconnectez-vous avant de réessayer.");
       return invokeEdgeFunction(name, body, false);
     }
     const result = await response.json().catch(() => ({}));
+    if (generation !== sessionGeneration || getSession()?.user?.id !== session.user?.id)
+      throw new Error("La session a changé pendant l’opération.");
     if (!response.ok) {
       const error = new Error(result.message || result.error || "Le service est indisponible.");
       error.uncertain = result.uncertain === true;
