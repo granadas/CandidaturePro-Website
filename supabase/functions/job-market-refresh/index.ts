@@ -216,6 +216,7 @@ Deno.serve(async (req: Request) => {
       const offers = organic
         .filter((item): item is { link: string; title: string; snippet?: string } =>
           item !== null && typeof item === "object" &&
+          "link" in item && "title" in item &&
           typeof item.link === "string" && typeof item.title === "string" &&
           (!("snippet" in item) || typeof item.snippet === "string") &&
           item.title.trim().length > 0 &&
