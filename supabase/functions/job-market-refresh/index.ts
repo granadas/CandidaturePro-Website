@@ -68,7 +68,7 @@ Deno.serve(async (req: Request) => {
   // Reject invalid requests before creating a run or spending Serper credits.
   if (requestedCity.length > 120 || requestedQuery.length > 120 ||
       /[\r\n\x00-\x1f\x7f]/.test(requestedCity + requestedQuery) ||
-      !/^[\p{L}\p{M}0-9 .,'’()/-]+$/u.test(requestedCity)) {
+      !/^[\p{L}\p{M}0-9 .,'’()\\/-]+$/u.test(requestedCity)) {
     return json({ message: "Ville ou recherche invalide (120 caractères maximum)." }, 400);
   }
 
