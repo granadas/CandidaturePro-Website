@@ -158,6 +158,18 @@
     renderAccount();
   }
 
+  window.addEventListener("storage", event => {
+    if (event.key !== storageKey) return;
+    let previousUserId = null;
+    try { previousUserId = JSON.parse(event.oldValue || "null")?.user?.id || null; }
+    catch { /* An invalid previous session still requires a fresh account view. */ }
+    const currentUserId = getSession()?.user?.id || null;
+    if (previousUserId !== currentUserId) {
+      sessionGeneration++;
+      location.reload();
+    }
+  });
+
   function normalizeSession(result) {
     return {
       access_token: result.access_token,
