@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#5b21b6">
   <meta name="description" content="Candidature Pro en ligne : recherchez, préparez, envoyez et suivez vos candidatures.">
   <title>Candidature Pro — Espace en ligne</title>
-  <link rel="stylesheet" href="app.css?v=20261121-recent-jobs">
+  <link rel="stylesheet" href="app.css?v=20261121-job-employer-form">
 </head>
 <body>
   <main id="guest-home" class="guest-home">
@@ -589,6 +589,19 @@
     </form>
   </dialog>
 
+  <dialog id="job-company-dialog" aria-labelledby="job-company-heading">
+    <form id="job-company-form">
+      <h2 id="job-company-heading">Compléter l’employeur</h2>
+      <p id="job-company-title"></p>
+      <p>L’annonce ne précise pas clairement l’entreprise. Vérifiez son nom sur la page source avant de créer le dossier.</p>
+      <a id="job-company-source" href="#" target="_blank" rel="noopener noreferrer">Vérifier l’annonce</a>
+      <label>Nom de l’entreprise<input id="job-company-name" type="text" maxlength="200" required autocomplete="organization"></label>
+      <p id="job-company-status" role="status"></p>
+      <div class="batch-actions"><button id="job-company-submit" class="primary" type="submit">Créer le dossier</button>
+        <button id="job-company-cancel" class="secondary" type="button">Annuler</button></div>
+    </form>
+  </dialog>
+
   <dialog id="login-dialog">
     <form id="login-form">
       <button type="button" id="close-login" class="close" aria-label="Fermer">×</button>
@@ -628,6 +641,6 @@
   <script src="admin-tools.js?v=20261118"></script>
   <script src="cv-word.js?v=20261118"></script>
   <script src="account-signup.js?v=20261118"></script>
-  <script src="app.js?v=20261121-employer"></script>
+  <script src="app.js?v=20261121-job-employer-form"></script>
 </body>
 </html>
