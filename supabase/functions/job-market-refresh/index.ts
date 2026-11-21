@@ -118,8 +118,18 @@ Deno.serve(async (req: Request) => {
     { headers }
   );
   if (!usageResponse.ok) return json({ message: "Impossible de vérifier le plafond mensuel." }, 500);
-  const usageRows = await usageResponse.json();
-  const used = usageRows.reduce((sum: number, row: { credits_used?: number }) => sum + (row.credits_used ?? 0), 0);
+  let usageRows: unknown;
+  try {
+    usageRows = await usageResponse.json();
+  } catch {
+    return json({ message: "Réponse invalide du suivi des crédits. Actualisation bloquée." }, 500);
+  }
+  if (!Array.isArray(usageRows) || usageRows.some((row: { credits_used?: unknown } | null) =>
+    !row || !Number.isSafeInteger(row.credits_used) || Number(row.credits_used) < 0))
+    return json({ message: "Comptabilité des crédits invalide. Actualisation bloquée." }, 500);
+  const used = usageRows.reduce((sum: number, row: { credits_used: number }) => sum + row.credits_used, 0);
+  if (!Number.isSafeInteger(used))
+    return json({ message: "Total des crédits invalide. Actualisation bloquée." }, 500);
   const allowed = Math.max(0, 100 - used);
   if (allowed === 0)
     return json({ status: "blocked", credits: 0, added: 0, monthCredits: used, message: "Plafond mensuel de 100 crédits atteint." });
