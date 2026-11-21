@@ -437,8 +437,10 @@
   }
 
   async function supabaseFetch(path, retry = true) {
+    const generation = sessionGeneration;
     const session = await ensureSession();
-    if (!session) throw new Error("Connectez-vous pour afficher vos données.");
+    if (!session || generation !== sessionGeneration || getSession()?.user?.id !== session.user?.id)
+      throw new Error("La session a changé. Reconnectez-vous avant de relancer la recherche.");
     const response = await fetch(config.supabaseUrl + "/rest/v1/" + path, {
       headers: {
         "apikey": config.supabasePublishableKey,
@@ -456,6 +458,8 @@
       return supabaseFetch(path, false);
     }
     const result = await response.json().catch(() => []);
+    if (generation !== sessionGeneration || getSession()?.user?.id !== session.user?.id)
+      throw new Error("La session a changé pendant le chargement des données.");
     if (!response.ok) throw new Error(result.message || "Impossible de charger les données.");
     return result;
   }
