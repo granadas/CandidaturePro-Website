@@ -467,7 +467,8 @@
     catch (error) {
       // Keep the saved login when the network, rate limit or Auth server fails.
       // Only a definitive invalid/expired refresh token should sign the user out.
-      const invalidToken = error?.status === 400 || error?.status === 401;
+      const invalidToken = (error?.status === 400 || error?.status === 401) &&
+        ["refresh_token_not_found", "refresh_token_already_used", "invalid_grant"].includes(error?.code);
       if (invalidToken && getSession()?.refresh_token === session.refresh_token) {
         profile = null;
         setSession(null);
