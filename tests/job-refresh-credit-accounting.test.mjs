@@ -100,3 +100,22 @@ test("canonicalizes and deduplicates JobScout24 URLs before storing", () => {
   assert.match(section, /seenLinks\.has\(item\.link\)/);
   assert.match(section, /seenLinks\.add\(item\.link\)/);
 });
+
+test("rejects malformed Serper JSON instead of silently reporting zero offers", () => {
+  const start = edge.indexOf("const data: unknown = await searchResponse.json()");
+  const end = edge.indexOf("const seenLinks = new Set<string>()", start);
+  assert.ok(start >= 0 && end > start);
+  const section = edge.slice(start, end);
+  assert.match(section, /Array\.isArray/);
+  assert.match(section, /throw new Error\("Réponse Serper invalide/);
+});
+
+test("ignores malformed individual provider entries", () => {
+  const start = edge.indexOf("const offers = organic");
+  const end = edge.indexOf("if (offers.length > 0)", start);
+  assert.ok(start >= 0 && end > start);
+  const section = edge.slice(start, end);
+  assert.match(section, /item !== null/);
+  assert.match(section, /typeof item\.link === "string"/);
+  assert.match(section, /typeof item\.title === "string"/);
+});
