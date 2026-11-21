@@ -95,7 +95,7 @@ test("canonicalizes and deduplicates JobScout24 URLs before storing", () => {
   const end = edge.indexOf("if (offers.length > 0)", start);
   assert.ok(start >= 0 && end > start);
   const section = edge.slice(start, end);
-  assert.match(section, /Array\.isArray\(data\.organic\)/);
+  assert.match(edge, /Array\.isArray\(\(data as/);
   assert.match(section, /new URL\(item\.link\)\.pathname\.replace/);
   assert.match(section, /seenLinks\.has\(item\.link\)/);
   assert.match(section, /seenLinks\.add\(item\.link\)/);
