@@ -130,3 +130,10 @@ test("job search warns when employer names need verification", () => {
   assert.match(section, /employeur\(s\) à vérifier/);
   assert.match(section, /offre\(s\) non revérifiée\(s\)/);
 });
+
+test("job search can show only offers with identified employers without spending search credits", () => {
+  assert.match(html, /id="jobs-known-employer-only"/);
+  assert.match(app, /knownEmployerOnly \? results\.filter\(job => String\(job\.company_name \|\| ""\)\.trim\(\)\) : results/);
+  assert.match(app, /jobs-known-employer-only"\)\.addEventListener\("change"/);
+  assert.match(app, /jobs-known-employer-only"\)\.checked = false/);
+});
