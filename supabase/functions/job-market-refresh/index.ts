@@ -31,7 +31,14 @@ function jobIdentity(title: string, snippet: string) {
   const jobTitle = index < 0 ? title : title.slice(0, index).trim();
   const company = index < 0 ? "" : title.slice(index + marker.length).replace(/\s+-\s+[^-]+$/, "").trim();
   const captionCompany = snippet.match(/\bchez\s+(.+?)\s+-\s+.+?\s+sur\s+JobScout24\b/i)?.[1]?.trim() ?? "";
-  return { title: jobTitle, company: company || captionCompany.slice(0, 120) };
+  // Some JobScout24 results omit "poste chez" but include an explicit
+  // "Employer | City" caption. Do not infer an employer from prose mentioning
+  // clients, partners or a company unrelated to the hiring organization.
+  const employerLocationCaption = snippet.match(/(?:^|[.!?]\\s+)([^|.!?]{2,120}?)\\s+\\|\\s+(?:Genève|Lausanne|Nyon|Morges|Fribourg|Neuchâtel|Sion|Berne|Bâle|Zurich|Lugano)\\b/iu);
+  const employerFromCaption = employerLocationCaption?.[1]?.trim() ?? "";
+  const safeCaptionEmployer = employerFromCaption && !/\\b(?:emploi|poste|offre|recrutement|job|contrat|durée|mission)\\b/i.test(employerFromCaption)
+    ? employerFromCaption : "";
+  return { title: jobTitle, company: (company || captionCompany || safeCaptionEmployer).slice(0, 120) };
 }
 
 Deno.serve(async (req: Request) => {
