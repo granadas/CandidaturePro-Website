@@ -137,6 +137,13 @@ Deno.serve(async (req: Request) => {
       if (!searchResponse.ok) throw new Error(`Serper HTTP ${searchResponse.status}`);
       const data = await searchResponse.json();
       credits++;
+      // Persist every consumed search immediately so an unexpected shutdown cannot
+      // erase usage from the monthly Serper budget calculation.
+      const creditCheckpoint = await fetch(`${url}/rest/v1/job_market_refresh_runs?id=eq.${run.id}`, {
+        method: "PATCH", headers,
+        body: JSON.stringify({ credits_used: credits })
+      });
+      if (!creditCheckpoint.ok) throw new Error(`Enregistrement du crédit HTTP ${creditCheckpoint.status}`);
       const offers = (data.organic ?? [])
         .filter((item: { link?: string; title?: string; snippet?: string }) =>
           item.link && item.title && /^https:\/\/(www\.)?jobscout24\.ch\/fr\/job\/[0-9a-f-]+\/?(?:\?.*)?$/i.test(item.link) &&
