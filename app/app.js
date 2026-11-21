@@ -263,7 +263,7 @@
       body: JSON.stringify(body)
     });
     const result = await response.json().catch(() => ({}));
-    if (!response.ok) { const error = new Error(authErrorMessage(result, "Connexion impossible.")); error.code = result.error_code || result.code; throw error; }
+    if (!response.ok) { const error = new Error(authErrorMessage(result, "Connexion impossible.")); error.code = result.error_code || result.code; error.status = response.status; throw error; }
     return normalizeSession(result);
   }
 
@@ -451,8 +451,11 @@
     if (!session) return null;
     if (Number(session.expires_at || 0) > Math.floor(Date.now() / 1000) + 60) return session;
     try { return await refreshSession(); }
-    catch {
-      if (getSession()?.refresh_token === session.refresh_token) {
+    catch (error) {
+      // Keep the saved login when the network, rate limit or Auth server fails.
+      // Only a definitive invalid/expired refresh token should sign the user out.
+      const invalidToken = error?.status === 400 || error?.status === 401;
+      if (invalidToken && getSession()?.refresh_token === session.refresh_token) {
         profile = null;
         setSession(null);
       }
