@@ -50,7 +50,7 @@
     }
     if (!fields.name.trim() || !fields.title.trim()) throw Error('Complétez le nom et le titre professionnel avant d’exporter le CV.');
     if (!['classic', 'modern', 'compact'].includes(fields.template)) throw Error('Le modèle de CV n’est pas reconnu.');
-    const palettes = { copper: 'A85D3A', jade: '147C75', plum: '754A7D', blue: '305E9C' };
+    const palettes = { copper: 'A85D3A', jade: '147C75', plum: '754A7D', blue: '305E9C', gold: 'F5B800' };
     const color = palettes[fields.accent] || 'A85D3A';
     const compact = fields.template === 'compact', image = imageEntry(fields.photo);
     const fontName = fields.font === 'editorial' ? 'Georgia' : 'Aptos';
