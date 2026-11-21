@@ -144,7 +144,18 @@ Deno.serve(async (req: Request) => {
   });
   if (runResponse.status === 409) return json({ status: "busy", credits: 0, added: 0, monthCredits: used, message: "Une actualisation est déjà en cours. Réessayez après sa fin." }, 409);
   if (!runResponse.ok) return json({ message: "Impossible de démarrer l’actualisation." }, 500);
-  const run = (await runResponse.json())[0];
+  let createdRuns: unknown;
+  try {
+    createdRuns = await runResponse.json();
+  } catch {
+    return json({ message: "Réponse invalide du suivi d’actualisation. Aucun crédit consommé." }, 500);
+  }
+  if (!Array.isArray(createdRuns) || createdRuns.length !== 1 ||
+      typeof createdRuns[0]?.id !== "string" ||
+      !/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(createdRuns[0].id)) {
+    return json({ message: "Identifiant d’actualisation invalide. Aucun appel Serper effectué." }, 500);
+  }
+  const run = createdRuns[0];
 
   let credits = 0;
   let added = 0;

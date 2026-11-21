@@ -67,3 +67,16 @@ test("optional offer count cannot invalidate a completed refresh or fabricate ze
   assert.match(section, /Number\.isSafeInteger\(Number\(count\)\)/);
   assert.match(section, /\} catch \{/);
 });
+
+test("malformed refresh run creation response blocks all paid searches", () => {
+  const start = edge.indexOf("let createdRuns: unknown;");
+  const end = edge.indexOf("let credits = 0;", start);
+  const provider = edge.indexOf('await fetch("https://google.serper.dev/search"');
+  assert.ok(start >= 0 && end > start && provider > end);
+  const section = edge.slice(start, end);
+  assert.match(section, /await runResponse\.json\(\)/);
+  assert.match(section, /!Array\.isArray\(createdRuns\)/);
+  assert.match(section, /createdRuns\.length !== 1/);
+  assert.match(section, /typeof createdRuns\[0\]\?\.id !== "string"/);
+  assert.match(section, /return json\(/);
+});
