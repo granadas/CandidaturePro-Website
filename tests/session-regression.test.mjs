@@ -120,3 +120,13 @@ test("admin can refresh job statistics without triggering paid search", () => {
   assert.match(admin, /statsButton\.addEventListener\("click"/);
   assert.match(admin, /void loadAdmin\(\)/);
 });
+
+test("job search warns when employer names need verification", () => {
+  const start = app.indexOf("async function loadJobs()");
+  const end = app.indexOf("function canEditApplication(", start);
+  assert.ok(start >= 0 && end > start);
+  const section = app.slice(start, end);
+  assert.match(section, /const missingEmployers = jobResults\.filter/);
+  assert.match(section, /employeur\(s\) à vérifier/);
+  assert.match(section, /offre\(s\) non revérifiée\(s\)/);
+});
