@@ -80,3 +80,12 @@ test("malformed refresh run creation response blocks all paid searches", () => {
   assert.match(section, /typeof createdRuns\[0\]\?\.id !== "string"/);
   assert.match(section, /return json\(/);
 });
+
+test("rejects malformed search inputs before creating paid refresh run", () => {
+  const validation = edge.indexOf("if (requestedCity.length > 120");
+  const creation = edge.indexOf('await fetch(`${url}/rest/v1/job_market_refresh_runs`, {');
+  assert.ok(validation >= 0 && creation > validation);
+  const section = edge.slice(validation, creation);
+  assert.match(section, /requestedQuery.length > 120/);
+  assert.match(section, /return json\(\{ message: "Ville ou recherche invalide/);
+});
