@@ -412,6 +412,9 @@
       const session = getSession();
       if (!session?.refresh_token) throw new Error("Session expirée.");
       const refreshed = await authRequest("refresh_token", { refresh_token: session.refresh_token });
+      if (getSession()?.refresh_token !== session.refresh_token) {
+        throw new Error("La session a changé pendant son renouvellement.");
+      }
       setSession(refreshed);
       return refreshed;
     })();
@@ -425,8 +428,10 @@
     if (Number(session.expires_at || 0) > Math.floor(Date.now() / 1000) + 60) return session;
     try { return await refreshSession(); }
     catch {
-      profile = null;
-      setSession(null);
+      if (getSession()?.refresh_token === session.refresh_token) {
+        profile = null;
+        setSession(null);
+      }
       return null;
     }
   }
