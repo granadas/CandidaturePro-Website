@@ -5,6 +5,7 @@ L’espace candidat est servi sur https://candidaturepro.ch/app/. Le domaine `ww
 ## Parcours disponibles
 
 - Inscription web gratuite par e-mail et mot de passe, confirmation PKCE et renvoi du message. Aucun compte n’est considéré connecté avant confirmation lorsque celle-ci est requise. Un lien ouvert dans un autre navigateur invite à se connecter avec ses identifiants. Aucun mot de passe n’est enregistré dans le stockage local.
+- Connexion Microsoft via Azure et Supabase OAuth PKCE, avec retour sur `/app/` ; le même profil et la même formule sont retrouvés lorsque l'adresse est liée au compte existant. Parcours réel validé le 21 novembre 2026.
 - Connexion Supabase, profil candidat et formule avec quota partagé. L’identité (prénom, nom, e-mail) est verrouillée lors de sa première confirmation ; téléphone, ville, métiers, compétences et langues restent modifiables. Une correction d’identité passe par une demande et une décision administrateur journalisée.
 - Entreprises suisses, offres d’emploi, création et préparation des candidatures.
 - CV avec trois modèles, photo facultative JPG/PNG redimensionnée localement, variantes enregistrées et adaptation des compétences à une offre. Les variantes sont chargées individuellement pour éviter de télécharger toutes les photos à l’ouverture du menu. Export Word DOCX modifiable local, avec photo intégrée et styles correspondant au modèle choisi ; le modèle classique reste accessible sans Premium. L’export n’enregistre pas automatiquement la variante.
@@ -24,6 +25,8 @@ L’espace candidat est servi sur https://candidaturepro.ch/app/. Le domaine `ww
 ## Configuration
 
 Configuration Auth vérifiée le 18 novembre 2026 : URL principale `https://candidaturepro.ch/app/` et quatre retours exacts (production et préversion, avec et sans `?recuperation=1`). Pour une nouvelle installation, autoriser `https://candidaturepro.ch/app/?recuperation=1` (et l’URL équivalente de préversion) pour le retour des liens de récupération. La livraison réelle du lien et le changement du mot de passe nécessitent une validation par le titulaire du compte.
+
+L’application Entra « Candidature Pro Web » utilise le client ID `ca57f550-c62d-45e7-aea4-26155c629b44`, les comptes Microsoft personnels et professionnels et une redirection Web vers `https://jmzyomfflghwwrqceopm.supabase.co/auth/v1/callback`. Le fournisseur Azure est activé côté Supabase ; son secret ne doit pas figurer dans ce dépôt. La connexion Microsoft est distincte de l’accès Outlook aux courriels décrit plus bas.
 
 `config.js` contient uniquement l’URL Supabase et une clé publique. Les clés privées, la clé de service et les secrets OAuth restent côté serveur.
 
