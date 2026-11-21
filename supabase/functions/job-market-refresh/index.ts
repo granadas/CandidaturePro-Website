@@ -241,8 +241,11 @@ Deno.serve(async (req: Request) => {
     const countResponse = await fetch(`${url}/rest/v1/job_market_offers?active=eq.true&select=id`, {
       method: "HEAD", headers: { ...headers, Prefer: "count=exact" }
     });
-    const range = countResponse.headers.get("content-range") ?? "*/0";
-    const totalOffers = Number(range.split("/")[1] ?? 0);
+    // Counting is informational: a failed HEAD must not turn a completed
+    // refresh into a failed one or incorrectly report zero available offers.
+    const range = countResponse.ok ? countResponse.headers.get("content-range") : null;
+    const count = range?.split("/")[1];
+    const totalOffers = count && /^\\d+$/.test(count) ? Number(count) : null;
     return json({ status: "completed", credits, added, totalOffers, monthCredits: used + credits, message: "Actualisation terminée avec succès." });
   } catch (error) {
     await fetch(`${url}/rest/v1/job_market_refresh_runs?id=eq.${run.id}`, {
