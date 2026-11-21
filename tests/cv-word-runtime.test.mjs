@@ -68,7 +68,7 @@ test("classic and compact Word CV remain single-column", () => {
 });
 
 test("Word export preserves individual skills separated by semicolons or pipes", () => {
-  const document = generate({ ...fields, skills: "Français; Anglais | Allemand\\nExcel" }).files["word/document.xml"];
+  const document = generate({ ...fields, skills: "Français; Anglais | Allemand\nExcel" }).files["word/document.xml"];
   for (const skill of ["Français", "Anglais", "Allemand", "Excel"]) {
     assert.ok(document.includes('<w:t xml:space="preserve">' + skill + '</w:t>'));
   }
