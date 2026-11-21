@@ -188,11 +188,20 @@ Deno.serve(async (req: Request) => {
         })
       });
       if (!searchResponse.ok) throw new Error(`Serper HTTP ${searchResponse.status}`);
-      const data = await searchResponse.json();
+      const data: unknown = await searchResponse.json();
+      // A successful HTTP response is not proof of a valid provider payload.
+      // Never treat a malformed response as a legitimate zero-offer search.
+      if (!data || typeof data !== "object" || !Array.isArray((data as { organic?: unknown }).organic))
+        throw new Error("Réponse Serper invalide : liste des annonces absente");
+      const organic = (data as { organic: unknown[] }).organic;
       const seenLinks = new Set<string>();
-      const offers = (Array.isArray(data.organic) ? data.organic : [])
-        .filter((item: { link?: string; title?: string; snippet?: string }) =>
-          item.link && item.title && /^https:\/\/(www\.)?jobscout24\.ch\/fr\/job\/[0-9a-f-]+\/?(?:\?.*)?$/i.test(item.link) &&
+      const offers = organic
+        .filter((item): item is { link: string; title: string; snippet?: string } =>
+          item !== null && typeof item === "object" &&
+          typeof item.link === "string" && typeof item.title === "string" &&
+          (!("snippet" in item) || typeof item.snippet === "string") &&
+          item.title.trim().length > 0 &&
+          /^https:\/\/(www\.)?jobscout24\.ch\/fr\/job\/[0-9a-f-]+\/?(?:\?.*)?$/i.test(item.link) &&
           !/Postes et offres d'emploi en Suisse|Sur JobScout24, vous trouverez de nombreuses offres|Emplois similaires/i.test(item.snippet ?? ""))
         .map((item: { title: string; link: string; snippet?: string }) => ({
           ...item,
