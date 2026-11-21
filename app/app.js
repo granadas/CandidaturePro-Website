@@ -203,6 +203,7 @@
       cvTemplateSelect.value = "classic";
       document.querySelector("#cv-save-status").textContent = "Votre formule actuelle donne accès au modèle Classique. Les modèles Contemporain et Compact nécessitent Premium.";
     }
+    syncCvStudio();
     document.querySelector("#current-plan").textContent = planLabel;
     document.querySelector("#settings-account").textContent = email
       ? email + (profile ? " · " + (isPremium ? "Premium" : "Free") : "")
@@ -2269,6 +2270,37 @@
   let savedCvVariants = [];
   let editingCvId = null;
 
+  const cvTemplateNames = { classic: "Classique", modern: "Contemporain", compact: "Compact" };
+  function syncCvStudio() {
+    const form = document.querySelector("#cv-form");
+    if (!form) return;
+    const template = form.elements.template.value || "classic";
+    document.querySelectorAll("[data-cv-template]").forEach(button => {
+      const premiumLocked = button.dataset.cvTemplate !== "classic" && !hasPremiumCv();
+      button.setAttribute("aria-pressed", String(button.dataset.cvTemplate === template));
+      button.classList.toggle("is-selected", button.dataset.cvTemplate === template);
+      button.classList.toggle("is-locked", premiumLocked);
+      button.setAttribute("aria-label", button.querySelector("strong").textContent.trim() + (premiumLocked ? " — nécessite Premium" : ""));
+    });
+    const paper = document.querySelector("#cv-live-paper");
+    paper.dataset.template = template;
+    document.querySelector("#cv-live-style").textContent = cvTemplateNames[template] || "Classique";
+    for (const [field, fallback] of [["name", "Votre nom"], ["title", "Votre métier"], ["contact", ""], ["summary", "Une courte présentation de votre parcours apparaîtra ici."], ["experience", "Vos expériences et réalisations."], ["education", "Vos études et certifications."], ["skills", "Vos points forts."]]) {
+      document.querySelector("#cv-live-" + field).textContent = form.elements.namedItem(field).value.trim() || fallback;
+    }
+  }
+  document.querySelectorAll("[data-cv-template]").forEach(button => button.addEventListener("click", () => {
+    if (button.dataset.cvTemplate !== "classic" && !hasPremiumCv()) {
+      cvSaveStatus.textContent = "Ce modèle nécessite Premium. Vous pouvez continuer avec le modèle Classique.";
+      document.querySelector("#cv-premium-access-status").scrollIntoView({ block: "nearest", behavior: "smooth" });
+      return;
+    }
+    cvForm.elements.template.value = button.dataset.cvTemplate;
+    syncCvStudio();
+  }));
+  cvForm.addEventListener("input", syncCvStudio);
+  cvForm.addEventListener("change", syncCvStudio);
+
   const cvPdfFile = document.querySelector("#cv-pdf-file"), cvPdfStatus = document.querySelector("#cv-pdf-status");
   const cvPdfText = document.querySelector("#cv-pdf-text"), cvPdfReview = document.querySelector("#cv-pdf-review");
   const cvPdfCancel = document.querySelector("#cv-pdf-cancel");
@@ -2317,6 +2349,7 @@
     const value = [field.value.trim(), text].filter(Boolean).join("\n\n");
     if (value.length > field.maxLength) { cvPdfStatus.textContent = "Cette rubrique accepte " + field.maxLength + " caractères. Réduisez le texte à insérer ; votre formulaire a été conservé."; return; }
     field.value = value;
+    syncCvStudio();
     cvPdfStatus.textContent = "Texte ajouté au formulaire. Vérifiez la mise en page, puis enregistrez la variante pour conserver la modification.";
   });
 
@@ -2358,6 +2391,7 @@
       updates.push([field, value]);
     }
     for (const [field, value] of updates) field.value = value;
+    syncCvStudio();
     resetCvImportSections();
     cvPdfStatus.textContent = updates.length + " rubrique(s) ajoutée(s) au formulaire. Relisez le CV puis enregistrez la variante pour conserver ces modifications.";
   });
@@ -2451,6 +2485,7 @@
           filled++;
         }
       }
+      syncCvStudio();
       cvSaveStatus.textContent = filled ? "Champs vides complétés avec le profil." : "Aucun champ vide à compléter avec le profil.";
     } catch (error) {
       if (getSession()?.user?.id === userId) cvSaveStatus.textContent = error.message;
@@ -2494,6 +2529,7 @@
       if (!cvForm.elements.template.value || (!hasPremiumCv() && cvForm.elements.template.value !== "classic")) {
         cvForm.elements.template.value = "classic";
       }
+      syncCvStudio();
       ++cvPhotoRequest; cvPhotoPreparing = false; cvPhotoFile.value = ""; renderCvPhoto();
       cvPhotoStatus.textContent = "La photo affichée appartient à cette variante.";
       cvLabel.value = variant.label;
@@ -2510,6 +2546,7 @@
   document.querySelector("#cv-new").addEventListener("click", () => {
     ++cvLoadRequest; ++cvPhotoRequest; cvPhotoPreparing = false; clearCvPdfImport();
     cvForm.reset(); cvForm.elements.namedItem("photo").value = ""; renderCvPhoto();
+    syncCvStudio();
     cvPhotoStatus.textContent = "La photo sera conservée avec la variante lorsque vous l’enregistrez.";
     editingCvId = null;
     document.querySelector("#cv-target-context").textContent = "";
@@ -2720,6 +2757,7 @@
     const remainder = entries.filter(value => !matches.includes(value));
     skills.value = [...matches, ...remainder].join("\n");
     if (!title.value.trim() && target.value.trim()) title.value = target.value.trim();
+    syncCvStudio();
     status.textContent = matches.length ? matches.length + " compétence(s) de votre CV placée(s) en premier." :
       "Aucune correspondance exacte. Vous pouvez ajuster votre CV avant l’aperçu.";
   });
