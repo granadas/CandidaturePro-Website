@@ -57,20 +57,29 @@
     let body = paragraph(fields.name.trim(), 'CandidateName') + paragraph(fields.title.trim(), 'CandidateTitle');
     if (fields.contact.trim()) body += paragraph(fields.contact.trim(), 'Contact');
     if (image) body += '<w:p><w:pPr><w:jc w:val="right"/></w:pPr><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="' + image.cx + '" cy="' + image.cy + '"/><wp:docPr id="1" name="Photo du candidat"/><wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="1" name="Photo"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="photo"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="' + image.cx + '" cy="' + image.cy + '"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>';
+    let mainSections = '', sideSections = '';
     for (const [key, label] of [['summary', 'Profil'], ['experience', 'Expériences'], ['education', 'Formation'], ['skills', 'Compétences et langues']]) {
       const value = fields[key].trim();
       if (!value) continue;
-      body += paragraph(label, 'SectionHeading');
+      let sectionBody = paragraph(label, 'SectionHeading');
       if (key === 'experience' || key === 'education') {
         for (const block of value.split(/\n\s*\n/)) {
           const lines = block.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
           if (!lines.length) continue;
-          body += paragraph(lines.shift(), 'EntryHeading');
-          for (const line of lines) body += paragraph(line.replace(/^[•●\-*]\s*/, '• '), /^[•●\-*]/.test(line) ? 'EntryBullet' : 'EntryDetail');
+          sectionBody += paragraph(lines.shift(), 'EntryHeading');
+          for (const line of lines) sectionBody += paragraph(line.replace(/^[•●\-*]\s*/, '• '), /^[•●\-*]/.test(line) ? 'EntryBullet' : 'EntryDetail');
         }
       } else if (key === 'skills') {
-        for (const line of value.split(/\r?\n/).map(item => item.trim()).filter(Boolean)) body += paragraph(line, 'EntryDetail');
-      } else body += paragraph(value);
+        for (const line of value.split(/\r?\n/).map(item => item.trim()).filter(Boolean)) sectionBody += paragraph(line, 'EntryDetail');
+      } else sectionBody += paragraph(value);
+      if (fields.template === 'modern') {
+        if (key === 'education' || key === 'skills') sideSections += sectionBody;
+        else mainSections += sectionBody;
+      } else body += sectionBody;
+    }
+    if (fields.template === 'modern' && (mainSections || sideSections)) {
+      const cell = (content, width, shade) => '<w:tc><w:tcPr><w:tcW w:w="' + width + '" w:type="dxa"/><w:shd w:fill="' + shade + '"/><w:tcMar><w:top w:w="140" w:type="dxa"/><w:left w:w="160" w:type="dxa"/><w:bottom w:w="140" w:type="dxa"/><w:right w:w="160" w:type="dxa"/></w:tcMar></w:tcPr>' + (content || paragraph('', 'Normal')) + '</w:tc>';
+      body += '<w:tbl><w:tblPr><w:tblW w:w="9706" w:type="dxa"/><w:tblBorders><w:top w:val="nil"/><w:bottom w:val="nil"/><w:left w:val="nil"/><w:right w:val="nil"/><w:insideH w:val="nil"/><w:insideV w:val="nil"/></w:tblBorders></w:tblPr><w:tblGrid><w:gridCol w:w="6500"/><w:gridCol w:w="3206"/></w:tblGrid><w:tr>' + cell(mainSections, 6500, 'FFFFFF') + cell(sideSections, 3206, 'F1F5F9') + '</w:tr></w:tbl>';
     }
     const section = '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1000" w:right="1100" w:bottom="1000" w:left="1100" w:header="500" w:footer="500" w:gutter="0"/></w:sectPr>';
     const header = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
