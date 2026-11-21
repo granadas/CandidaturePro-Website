@@ -433,6 +433,10 @@
             Number(latest.expires_at || 0) > Math.floor(Date.now() / 1000) + 60) return latest;
         throw error;
       }
+      // Never store a refresh response that identifies a different account.
+      if (!refreshed?.user?.id || refreshed.user.id !== session.user?.id ||
+          !refreshed.access_token || !refreshed.refresh_token)
+        throw new Error("Le renouvellement a renvoyé une session invalide.");
       const latest = getSession();
       if (latest?.refresh_token !== session.refresh_token) {
         if (latest?.user?.id === session.user?.id &&
