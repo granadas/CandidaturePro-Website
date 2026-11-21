@@ -2020,7 +2020,8 @@
       '<label>Ville suisse<input name="city" value="Genève" required maxlength="120"></label>' +
       '<p class="wide">La recherche cible la ville indiquée. Vérifiez la localisation exacte de chaque annonce.</p>' +
       '<label class="wide">Métier ou mot-clé<input name="query" maxlength="120"></label>' +
-      '<div class="wide"><button type="submit" class="primary">Actualiser les postes maintenant</button></div>' +
+      '<div class="wide"><button type="submit" class="primary">Actualiser les postes maintenant</button> ' +
+      '<button type="button" data-action="refresh-job-stats" class="secondary">Rafraîchir les statistiques (gratuit)</button></div>' +
       '<p class="wide" role="status"></p>';
     const usedCredits = row?.month_credits_used;
     // Do not coerce null, missing or malformed statistics to a false zero.
@@ -2034,8 +2035,13 @@
         (row.month_runs ?? 0) + " actualisation(s)" +
         (row.last_started_at ? " · Dernière exécution le " + trackingDateFormat.format(new Date(row.last_started_at)) : "")
       : "Budget Serper indisponible. Actualisation désactivée par précaution.";
-    const button = form.querySelector("button");
+    const button = form.querySelector('button[type="submit"]');
+    const statsButton = form.querySelector('[data-action="refresh-job-stats"]');
     const status = form.querySelector("[role=status]");
+    statsButton.addEventListener("click", () => {
+      if (!current() || profile?.is_admin !== true) return;
+      void loadAdmin();
+    });
     if (refreshBlocked) {
       button.disabled = true;
       status.textContent = serverRefreshRunning

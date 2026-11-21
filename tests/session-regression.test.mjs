@@ -112,3 +112,11 @@ test("admin reflects server refresh status and blocks duplicate runs", () => {
   assert.match(admin, /row\?\.last_status === "failed"/);
   assert.match(admin, /row\?\.last_status === "completed"/);
 });
+
+test("admin can refresh job statistics without triggering paid search", () => {
+  const admin = block("function renderAdminJobMarket(", "let adminJobRefreshRunning =");
+  assert.match(admin, /data-action="refresh-job-stats"/);
+  assert.match(admin, /Rafraîchir les statistiques \(gratuit\)/);
+  assert.match(admin, /statsButton\.addEventListener\("click"/);
+  assert.match(admin, /void loadAdmin\(\)/);
+});
