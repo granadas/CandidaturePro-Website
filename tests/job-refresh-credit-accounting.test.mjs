@@ -128,3 +128,15 @@ test("only infers employer from an explicit company-city caption", () => {
   assert.match(section, /safeCaptionEmployer/);
   assert.match(section, /company \|\| captionCompany \|\| safeCaptionEmployer/);
 });
+
+test("rejects invalid refresh JSON and non-string search inputs before paid calls", () => {
+  const parsing = edge.indexOf("let payload: unknown;");
+  const validation = edge.indexOf("if (requestedCity.length > 120");
+  const paid = edge.indexOf("const runResponse = await fetch(");
+  assert.ok(parsing >= 0 && validation > parsing && paid > validation);
+  const section = edge.slice(parsing, validation);
+  assert.match(section, /Corps JSON invalide/);
+  assert.match(section, /Array\.isArray\(payload\)/);
+  assert.match(section, /typeof fields\.city !== "string"/);
+  assert.match(section, /typeof fields\.query !== "string"/);
+});
