@@ -1,0 +1,32 @@
+import { readFileSync } from "node:fs";
+import assert from "node:assert/strict";
+import test from "node:test";
+
+const edge = readFileSync(new URL("../supabase/functions/job-market-refresh/index.ts", import.meta.url), "utf8");
+
+test("successful Serper responses are counted before JSON parsing", () => {
+  const start = edge.indexOf("if (!searchResponse.ok) throw new Error");
+  const end = edge.indexOf("const offers =", start);
+  assert.ok(start >= 0 && end > start);
+  const section = edge.slice(start, end);
+  const counted = section.indexOf("credits++;");
+  const checkpoint = section.indexOf("const creditCheckpoint = await fetch");
+  const checked = section.indexOf("if (!creditCheckpoint.ok)");
+  const parsed = section.indexOf("await searchResponse.json()");
+  assert.ok(counted >= 0 && checkpoint > counted && checked > checkpoint && parsed > checked);
+});
+
+test("stale refresh recovery retains credit checkpoints", () => {
+  const start = edge.indexOf("const staleBefore =");
+  const end = edge.indexOf("const month = new Date()", start);
+  assert.ok(start >= 0 && end > start);
+  const section = edge.slice(start, end);
+  assert.match(section, /status: "failed"/);
+  assert.doesNotMatch(section, /credits_used\s*:/);
+});
+
+test("monthly budget includes all credit checkpoints", () => {
+  assert.match(edge, /select=credits_used/);
+  assert.match(edge, /usageRows\.reduce/);
+  assert.match(edge, /Math\.max\(0, 100 - used\)/);
+});
