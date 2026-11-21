@@ -126,7 +126,8 @@ test("only infers employer from an explicit company-city caption", () => {
   const section = edge.slice(start, end);
   assert.match(section, /employerLocationCaption/);
   assert.match(section, /safeCaptionEmployer/);
-  assert.match(section, /company \|\| captionCompany \|\| safeCaptionEmployer/);
+  assert.match(section, /jobListingCompany/);
+  assert.match(section, /company.*captionCompany.*jobListingCompany.*safeCaptionEmployer/);
 });
 
 test("rejects invalid refresh JSON and non-string search inputs before paid calls", () => {
