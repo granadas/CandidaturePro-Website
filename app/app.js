@@ -18,6 +18,7 @@
   let companyResults = [];
   let companySearchRunning = false;
   let jobResults = [];
+  let pendingJobCompany = null;
   let jobsLoadRequest = 0;
   let sessionGeneration = 0;
   let refreshPromise = null;
@@ -813,7 +814,7 @@
         '<small>Catégorie de recherche : ' + escapeHtml(job.sector) + ' • ' + escapeHtml(job.source) + '</small>' +
         '<p>' + escapeHtml(job.snippet) + '</p>' + lastSearched + freshnessNote + '</div>' +
         '<div class="job-card-actions">' + sourceLink +
-        '<button class="primary compact" data-action="add-job">Ajouter aux candidatures</button></div></article>';
+        '<button class="primary compact" data-action="add-job">' + (job.company_name?.trim() ? "Ajouter aux candidatures" : "Renseigner l’employeur") + '</button></div></article>';
     }).join("");
   }
 
@@ -3254,6 +3255,19 @@
     const userId = getSession()?.user?.id;
     if (!job || !userId || event.target.disabled) return;
     const button = event.target;
+    if (!job.company_name?.trim()) {
+      pendingJobCompany = { job, button, userId };
+      const dialog = document.querySelector("#job-company-dialog");
+      document.querySelector("#job-company-form").reset();
+      document.querySelector("#job-company-status").textContent = "";
+      document.querySelector("#job-company-title").textContent = job.title;
+      const source = document.querySelector("#job-company-source");
+      source.href = safeExternalUrl(job.url) || "#";
+      source.hidden = source.href.endsWith("#");
+      dialog.showModal();
+      document.querySelector("#job-company-name").focus();
+      return;
+    }
     button.disabled = true;
     button.textContent = "Ajout…";
     try {
@@ -3264,6 +3278,45 @@
       button.disabled = false;
       button.textContent = "Réessayer";
       if (getSession()?.user?.id === userId) document.querySelector("#jobs-message").textContent = error.message;
+    }
+  });
+
+  const jobCompanyDialog = document.querySelector("#job-company-dialog");
+  const jobCompanyForm = document.querySelector("#job-company-form");
+  const jobCompanySubmit = document.querySelector("#job-company-submit");
+  const jobCompanyCancel = document.querySelector("#job-company-cancel");
+  jobCompanyCancel.addEventListener("click", () => jobCompanyDialog.close());
+  jobCompanyDialog.addEventListener("cancel", event => {
+    if (jobCompanySubmit.disabled) event.preventDefault();
+  });
+  jobCompanyDialog.addEventListener("close", () => {
+    pendingJobCompany = null;
+    jobCompanyForm.reset();
+  });
+  jobCompanyForm.addEventListener("submit", async event => {
+    event.preventDefault();
+    const pending = pendingJobCompany;
+    if (!pending || jobCompanySubmit.disabled || !jobCompanyForm.reportValidity()) return;
+    const company = document.querySelector("#job-company-name").value.trim();
+    const status = document.querySelector("#job-company-status");
+    if (!company) { status.textContent = "Indiquez le nom de l’employeur."; return; }
+    jobCompanySubmit.disabled = jobCompanyCancel.disabled = true;
+    status.textContent = "Ajout du dossier…";
+    try {
+      const result = await supabaseRpc("add_web_job_application_with_company", {
+        p_job_id: pending.job.id, p_company_name: company
+      });
+      if (getSession()?.user?.id !== pending.userId || pendingJobCompany !== pending) return;
+      pending.button.textContent = result.created ? "Ajoutée ✓" : result.hidden ? "Déjà dans les dossiers masqués" : "Déjà dans les candidatures";
+      pending.button.disabled = true;
+      jobCompanyDialog.close();
+      document.querySelector("#jobs-message").textContent = result.created
+        ? "Dossier créé avec le nom de l’employeur indiqué. Vérifiez les coordonnées avant tout envoi."
+        : "Cette annonce figure déjà dans vos candidatures.";
+    } catch (error) {
+      if (getSession()?.user?.id === pending.userId && pendingJobCompany === pending) status.textContent = error.message;
+    } finally {
+      jobCompanySubmit.disabled = jobCompanyCancel.disabled = false;
     }
   });
 
