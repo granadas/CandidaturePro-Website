@@ -908,7 +908,7 @@
     }
     if (city) filters.push("location=ilike." + encodeURIComponent("*" + city + "*"));
     if (sector) filters.push("sector=eq." + encodeURIComponent(sector));
-    if (document.querySelector("#jobs-known-employer-only").checked) filters.push("company_name=neq.");
+    const knownEmployerOnly = document.querySelector("#jobs-known-employer-only").checked;
     if (document.querySelector("#jobs-recent-only").checked) {
       filters.push("updated_at=gte." + encodeURIComponent(new Date(Date.now() - 30 * 86400000).toISOString()));
     }
@@ -920,7 +920,7 @@
         filters.join("&") + "&order=updated_at.desc&limit=1000"
       );
       if (!current()) return;
-      jobResults = results;
+      jobResults = knownEmployerOnly ? results.filter(job => String(job.company_name || "").trim()) : results;
       renderJobs();
       const olderThan30Days = jobResults.filter(job => {
         const checkedAt = Date.parse(job.updated_at || "");
