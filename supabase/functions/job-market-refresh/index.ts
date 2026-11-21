@@ -166,13 +166,14 @@ Deno.serve(async (req: Request) => {
     }
 
     if (found === 0) {
-      await fetch(`${url}/rest/v1/job_market_refresh_runs?id=eq.${run.id}`, {
+      const emptyResultResponse = await fetch(`${url}/rest/v1/job_market_refresh_runs?id=eq.${run.id}`, {
         method: "PATCH", headers,
         body: JSON.stringify({
           status: "failed", completed_at: new Date().toISOString(), credits_used: credits,
           offers_added: 0, message: `Aucune annonce directe trouvée pour ${requestedCity} (${requestedRadius})`
         })
       });
+      if (!emptyResultResponse.ok) throw new Error(`Enregistrement de l’échec HTTP ${emptyResultResponse.status}`);
       return json({
         status: "failed", credits, added: 0, monthCredits: used + credits,
         message: `Aucune annonce directe trouvée pour ${requestedCity}. La base existante n’a pas été remplacée.`
@@ -184,10 +185,11 @@ Deno.serve(async (req: Request) => {
         body: JSON.stringify({ active: false, updated_at: new Date().toISOString() })
       });
     }
-    await fetch(`${url}/rest/v1/job_market_refresh_runs?id=eq.${run.id}`, {
+    const completionResponse = await fetch(`${url}/rest/v1/job_market_refresh_runs?id=eq.${run.id}`, {
       method: "PATCH", headers,
       body: JSON.stringify({ status: "completed", completed_at: new Date().toISOString(), credits_used: credits, offers_added: added, message: "Actualisation terminée" })
     });
+    if (!completionResponse.ok) throw new Error(`Enregistrement de fin d’actualisation HTTP ${completionResponse.status}`);
     const countResponse = await fetch(`${url}/rest/v1/job_market_offers?active=eq.true&select=id`, {
       method: "HEAD", headers: { ...headers, Prefer: "count=exact" }
     });
