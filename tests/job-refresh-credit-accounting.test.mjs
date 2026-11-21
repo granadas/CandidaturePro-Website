@@ -30,3 +30,13 @@ test("monthly budget includes all credit checkpoints", () => {
   assert.match(edge, /usageRows\.reduce/);
   assert.match(edge, /Math\.max\(0, 100 - used\)/);
 });
+
+test("legacy offer cleanup errors cannot be reported as successful refreshes", () => {
+  const start = edge.indexOf("if (found > 0) {");
+  const end = edge.indexOf("const completionResponse =", start);
+  assert.ok(start >= 0 && end > start);
+  const cleanup = edge.slice(start, end);
+  assert.match(cleanup, /const legacyDeactivationResponse = await fetch/);
+  assert.match(cleanup, /if \(!legacyDeactivationResponse\.ok\)/);
+  assert.match(cleanup, /throw new Error/);
+});

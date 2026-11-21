@@ -216,10 +216,12 @@ Deno.serve(async (req: Request) => {
       }, 422);
     }
     if (found > 0) {
-      await fetch(`${url}/rest/v1/job_market_offers?source=eq.Recherche%20web`, {
+      const legacyDeactivationResponse = await fetch(`${url}/rest/v1/job_market_offers?source=eq.Recherche%20web`, {
         method: "PATCH", headers,
         body: JSON.stringify({ active: false, updated_at: new Date().toISOString() })
       });
+      if (!legacyDeactivationResponse.ok)
+        throw new Error(`Désactivation des anciennes annonces HTTP ${legacyDeactivationResponse.status}`);
     }
     const completionResponse = await fetch(`${url}/rest/v1/job_market_refresh_runs?id=eq.${run.id}`, {
       method: "PATCH", headers,
