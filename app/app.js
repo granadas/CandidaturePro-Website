@@ -470,7 +470,12 @@
       body: JSON.stringify(body)
     });
     if (response.status === 401 && retry) {
+      const userId = session.user?.id;
+      const generation = sessionGeneration;
       await refreshSession();
+      if (!userId || generation !== sessionGeneration || getSession()?.user?.id !== userId) {
+        throw new Error("La session a changé. Vérifiez votre connexion avant de réessayer.");
+      }
       return supabaseWrite(path, method, body, false);
     }
     const result = await response.json().catch(() => []);
