@@ -96,3 +96,11 @@ test("admin paid refresh rejects submit when budget is blocked and stays disable
   assert.match(admin, /button\.disabled = remainingCredits === null \|\| remainingCredits === 0/);
   assert.doesNotMatch(admin, /adminJobRefreshRunning = button\.disabled = false/);
 });
+
+test("admin budget rejects null or malformed credit statistics", () => {
+  const admin = block("function renderAdminJobMarket(", "let adminJobRefreshRunning =");
+  assert.match(admin, /typeof usedCredits === "number"/);
+  assert.match(admin, /Number\.isSafeInteger\(usedCredits\)/);
+  assert.match(admin, /usedCredits >= 0/);
+  assert.doesNotMatch(admin, /Number\(row\?\.month_credits_used\)/);
+});
