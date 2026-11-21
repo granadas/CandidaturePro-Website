@@ -53,6 +53,7 @@
     const palettes = { copper: 'A85D3A', jade: '147C75', plum: '754A7D', blue: '305E9C' };
     const color = palettes[fields.accent] || 'A85D3A';
     const compact = fields.template === 'compact', image = imageEntry(fields.photo);
+    const fontName = fields.font === 'editorial' ? 'Georgia' : 'Aptos';
     let body = paragraph(fields.name.trim(), 'CandidateName') + paragraph(fields.title.trim(), 'CandidateTitle');
     if (fields.contact.trim()) body += paragraph(fields.contact.trim(), 'Contact');
     if (image) body += '<w:p><w:pPr><w:jc w:val="right"/></w:pPr><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="' + image.cx + '" cy="' + image.cy + '"/><wp:docPr id="1" name="Photo du candidat"/><wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="1" name="Photo"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="photo"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="' + image.cx + '" cy="' + image.cy + '"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>';
@@ -73,7 +74,7 @@
     }
     const section = '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1000" w:right="1100" w:bottom="1000" w:left="1100" w:header="500" w:footer="500" w:gutter="0"/></w:sectPr>';
     const header = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
-    const styles = header + '<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/><w:sz w:val="' + (compact ? '20' : '22') + '"/><w:lang w:val="fr-CH"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="' + (compact ? '80' : '140') + '" w:line="260" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style>' +
+    const styles = header + '<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="' + fontName + '" w:hAnsi="' + fontName + '"/><w:sz w:val="' + (compact ? '20' : '22') + '"/><w:lang w:val="fr-CH"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="' + (compact ? '80' : '140') + '" w:line="260" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style>' +
       '<w:style w:type="paragraph" w:styleId="CandidateName"><w:name w:val="Nom du candidat"/><w:basedOn w:val="Normal"/><w:pPr><w:keepNext/></w:pPr><w:rPr><w:b/><w:color w:val="' + color + '"/><w:sz w:val="40"/></w:rPr></w:style>' +
       '<w:style w:type="paragraph" w:styleId="CandidateTitle"><w:name w:val="Titre professionnel"/><w:basedOn w:val="Normal"/><w:pPr><w:keepNext/></w:pPr><w:rPr><w:b/><w:sz w:val="26"/></w:rPr></w:style>' +
       '<w:style w:type="paragraph" w:styleId="Contact"><w:name w:val="Coordonnées"/><w:basedOn w:val="Normal"/><w:rPr><w:color w:val="52617A"/><w:sz w:val="20"/></w:rPr></w:style>' +
