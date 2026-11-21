@@ -1970,7 +1970,7 @@
     form.className = "profile-form";
     form.innerHTML = '<p id="job-market-summary" class="wide"></p>' +
       '<label>Ville suisse<input name="city" value="Genève" required maxlength="120"></label>' +
-      '<label>Rayon<select name="radius"><option>10 km</option><option selected>30 km</option><option>50 km</option><option>100 km</option></select></label>' +
+      '<p class="wide">La recherche cible la ville indiquée. Vérifiez la localisation exacte de chaque annonce.</p>' +
       '<label class="wide">Métier ou mot-clé<input name="query" maxlength="120"></label>' +
       '<div class="wide"><button type="submit" class="primary">Actualiser les postes maintenant</button></div>' +
       '<p class="wide" role="status"></p>';
@@ -1990,7 +1990,7 @@
       status.textContent = "Actualisation en cours…";
       try {
         const result = await invokeEdgeFunction("job-market-refresh", {
-          city, radius: form.elements.radius.value, query: form.elements.query.value.trim()
+          city, query: form.elements.query.value.trim()
         }, false);
         if (!current()) return;
         const outcome = result.status === "completed"
