@@ -105,6 +105,7 @@ Deno.serve(async (req: Request) => {
       message: `${caller === "admin" ? "Actualisation manuelle Admin" : "Actualisation hebdomadaire"} • ${requestedCity} • ${requestedRadius}`
     })
   });
+  if (runResponse.status === 409) return json({ status: "busy", credits: 0, added: 0, monthCredits: used, message: "Une actualisation est déjà en cours. Réessayez après sa fin." }, 409);
   if (!runResponse.ok) return json({ message: "Impossible de démarrer l’actualisation." }, 500);
   const run = (await runResponse.json())[0];
 
