@@ -807,7 +807,7 @@
       return '<article class="job-card" data-job-index="' + index + '">' +
         '<div class="job-card-main"><strong>' + escapeHtml(job.title) + '</strong>' +
         '<span>' + escapeHtml(job.company_name) + ' • ' + escapeHtml(job.location) + '</span>' +
-        '<small>' + escapeHtml(job.sector) + ' • ' + escapeHtml(job.source) + '</small>' +
+        '<small>Catégorie de recherche : ' + escapeHtml(job.sector) + ' • ' + escapeHtml(job.source) + '</small>' +
         '<p>' + escapeHtml(job.snippet) + '</p>' + freshnessNote + '</div>' +
         '<div class="job-card-actions">' + sourceLink +
         '<button class="primary compact" data-action="add-job">Ajouter aux candidatures</button></div></article>';
