@@ -424,8 +424,19 @@
     refreshPromise = (async () => {
       const session = getSession();
       if (!session?.refresh_token) throw new Error("Session expirée.");
-      const refreshed = await authRequest("refresh_token", { refresh_token: session.refresh_token });
-      if (getSession()?.refresh_token !== session.refresh_token) {
+      let refreshed;
+      try {
+        refreshed = await authRequest("refresh_token", { refresh_token: session.refresh_token });
+      } catch (error) {
+        const latest = getSession();
+        if (latest?.user?.id === session.user?.id && latest.refresh_token !== session.refresh_token &&
+            Number(latest.expires_at || 0) > Math.floor(Date.now() / 1000) + 60) return latest;
+        throw error;
+      }
+      const latest = getSession();
+      if (latest?.refresh_token !== session.refresh_token) {
+        if (latest?.user?.id === session.user?.id &&
+            Number(latest.expires_at || 0) > Math.floor(Date.now() / 1000) + 60) return latest;
         throw new Error("La session a changé pendant son renouvellement.");
       }
       setSession(refreshed);
