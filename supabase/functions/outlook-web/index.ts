@@ -1,5 +1,5 @@
 const authority = "https://login.microsoftonline.com/common/oauth2/v2.0";
-const scopes = ["offline_access", "Mail.Read", "Mail.Send"];
+const scopes = ["offline_access", "Mail.ReadWrite", "Mail.Send"];
 
 async function saveRotatedRefreshToken(root: string, key: string, userId: string, refreshToken: unknown) {
   if (typeof refreshToken !== "string" || !refreshToken) return;
@@ -109,7 +109,7 @@ Deno.serve(async (request: Request) => {
       });
       const token = await response.json().catch(() => null);
       const granted = typeof token?.scope === "string" ? token.scope.split(" ") : [];
-      if (!response.ok || !token?.refresh_token || !granted.includes("Mail.Read") || !granted.includes("Mail.Send")) {
+      if (!response.ok || !token?.refresh_token || !granted.includes("Mail.ReadWrite") || !granted.includes("Mail.Send")) {
         return json({ message: "Microsoft n’a pas accordé l’accès nécessaire à Outlook. Relancez la connexion." }, 422);
       }
       const saved = await fetch(endpoint + "?on_conflict=user_id&select=user_id", {
