@@ -38,3 +38,13 @@ test("rejects generic job labels as employers", () => {
   const result = jobIdentity("Préparateur", "Offre de recrutement | Genève.");
   assert.equal(result.company, "");
 });
+
+test("extracts employer from explicit Emploi chez listing without JobScout24 suffix", () => {
+  const result = jobIdentity("Dessinateur / Chef de Projet", "Emploi Dessinateur / Chef de Projet chez Alpia Recrutement SA - Genève ...");
+  assert.equal(result.company, "Alpia Recrutement SA");
+});
+
+test("does not infer employer from unrelated hiring prose", () => {
+  const result = jobIdentity("Logisticien", "Nous recherchons pour notre client un logisticien à Genève.");
+  assert.equal(result.company, "");
+});

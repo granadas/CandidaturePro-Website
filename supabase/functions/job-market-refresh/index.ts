@@ -31,6 +31,9 @@ function jobIdentity(title: string, snippet: string) {
   const jobTitle = index < 0 ? title : title.slice(0, index).trim();
   const company = index < 0 ? "" : title.slice(index + marker.length).replace(/\s+-\s+[^-]+$/, "").trim();
   const captionCompany = snippet.match(/\bchez\s+(.+?)\s+-\s+.+?\s+sur\s+JobScout24\b/i)?.[1]?.trim() ?? "";
+  // JobScout24 also exposes explicit "Emploi <role> chez <employer> - <place>"
+  // snippets without a trailing "sur JobScout24" caption.
+  const jobListingCompany = snippet.match(/^Emploi\s+.{3,180}?\s+chez\s+(.{2,120}?)\s+-\s+[^.]{2,120}(?:\s*\.\.\.|\s*[.!?]|$)/iu)?.[1]?.trim() ?? "";
   // Some JobScout24 results omit "poste chez" but include an explicit
   // "Employer | City" caption. Do not infer an employer from prose mentioning
   // clients, partners or a company unrelated to the hiring organization.
@@ -38,7 +41,7 @@ function jobIdentity(title: string, snippet: string) {
   const employerFromCaption = employerLocationCaption?.[1]?.trim() ?? "";
   const safeCaptionEmployer = employerFromCaption && !/\b(?:emploi|poste|offre|recrutement|job|contrat|durée|mission)\b/i.test(employerFromCaption)
     ? employerFromCaption : "";
-  return { title: jobTitle, company: (company || captionCompany || safeCaptionEmployer).slice(0, 120) };
+  return { title: jobTitle, company: (company || captionCompany || jobListingCompany || safeCaptionEmployer).slice(0, 120) };
 }
 
 Deno.serve(async (req: Request) => {
