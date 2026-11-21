@@ -65,11 +65,22 @@ Deno.serve(async (req: Request) => {
   const authorization = req.headers.get("Authorization") ?? "";
   let requestedCity = "Genève";
   let requestedQuery = "";
+  // The scheduled cron sends {}, but invalid JSON or non-string inputs must
+  // never silently become a paid search using default values.
+  let payload: unknown;
   try {
-    const payload = await req.json();
-    requestedCity = String(payload?.city ?? "Genève").trim() || "Genève";
-    requestedQuery = String(payload?.query ?? "").trim();
-  } catch { /* Le cron hebdomadaire utilise les valeurs par défaut. */ }
+    payload = await req.json();
+  } catch {
+    return json({ message: "Corps JSON invalide." }, 400);
+  }
+  if (!payload || typeof payload !== "object" || Array.isArray(payload))
+    return json({ message: "Paramètres de recherche invalides." }, 400);
+  const fields = payload as Record<string, unknown>;
+  if ((fields.city !== undefined && typeof fields.city !== "string") ||
+      (fields.query !== undefined && typeof fields.query !== "string"))
+    return json({ message: "La ville et le métier doivent être du texte." }, 400);
+  requestedCity = (fields.city as string | undefined)?.trim() || "Genève";
+  requestedQuery = (fields.query as string | undefined)?.trim() || "";
 
   // Validate server-side: direct API callers bypass the browser's input limits.
   // Reject invalid requests before creating a run or spending Serper credits.
