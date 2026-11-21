@@ -167,7 +167,7 @@
       if (syncReplies) syncGmailRepliesAutomatically();
     }
     if (isDocuments) { loadDocuments(); loadCvVariants(); loadCvAnalysisHistory(); }
-    if (name === "settings") loadGmail();
+    if (name === "settings") { loadGmail(); loadOutlook(); }
     sidebar.classList.remove("open");
   }
 
@@ -4103,6 +4103,72 @@
   const gmailConnect = document.querySelector("#gmail-connect");
   const gmailDisconnect = document.querySelector("#gmail-disconnect");
   const gmailFlowKey = "candidature-pro-gmail-flow";
+  const outlookFlowKey = "candidature-pro-outlook-flow";
+  const outlookStatus = document.querySelector("#outlook-status");
+  const outlookConnect = document.querySelector("#outlook-connect");
+  const outlookDisconnect = document.querySelector("#outlook-disconnect");
+
+  async function loadOutlook() {
+    const userId = getSession()?.user?.id;
+    outlookConnect.hidden = outlookDisconnect.hidden = true;
+    outlookStatus.textContent = userId ? "Vérification de la connexion Outlook…" : "Connectez-vous à Candidature Pro pour lier Outlook.";
+    if (!userId) return;
+    try {
+      const result = await invokeEdgeFunction("outlook-web", { action: "status" });
+      if (getSession()?.user?.id !== userId) return;
+      outlookConnect.hidden = !result.configured || result.connected;
+      outlookDisconnect.hidden = !result.connected;
+      outlookStatus.textContent = result.connected ? "Compte Outlook connecté." :
+        result.configured ? "Aucun compte Outlook connecté." : "La connexion Outlook attend la configuration Microsoft.";
+    } catch (error) {
+      if (getSession()?.user?.id === userId) outlookStatus.textContent = error.message;
+    }
+  }
+
+  outlookConnect.addEventListener("click", async () => {
+    const userId = getSession()?.user?.id;
+    if (!userId) return;
+    outlookConnect.disabled = true;
+    try {
+      const verifier = gmailEncode(crypto.getRandomValues(new Uint8Array(32)));
+      const state = gmailEncode(crypto.getRandomValues(new Uint8Array(32)));
+      const challenge = gmailEncode(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))));
+      const result = await invokeEdgeFunction("outlook-web", { action: "start", challenge, state });
+      if (getSession()?.user?.id !== userId) return;
+      const url = new URL(result.url);
+      if (url.origin !== "https://login.microsoftonline.com" || !url.pathname.endsWith("/oauth2/v2.0/authorize"))
+        throw new Error("Adresse Microsoft inattendue.");
+      sessionStorage.setItem(outlookFlowKey, JSON.stringify({ verifier, state, userId, startedAt: Date.now() }));
+      location.assign(url.href);
+    } catch (error) { outlookStatus.textContent = error.message; }
+    finally { outlookConnect.disabled = false; }
+  });
+
+  outlookDisconnect.addEventListener("click", async () => {
+    outlookDisconnect.disabled = true;
+    try { await invokeEdgeFunction("outlook-web", { action: "disconnect" }); await loadOutlook(); }
+    catch (error) { outlookStatus.textContent = error.message; }
+    finally { outlookDisconnect.disabled = false; }
+  });
+
+  async function finishOutlookConnection() {
+    const url = new URL(location.href);
+    if (!url.searchParams.has("state") || !(url.searchParams.has("code") || url.searchParams.has("error"))) return false;
+    const stored = sessionStorage.getItem(outlookFlowKey);
+    if (!stored) return false;
+    sessionStorage.removeItem(outlookFlowKey);
+    history.replaceState(null, "", url.pathname);
+    showView("settings", false);
+    try {
+      const flow = JSON.parse(stored);
+      if (flow.state !== url.searchParams.get("state") || Date.now() - flow.startedAt > 10 * 60 * 1000 ||
+          flow.userId !== getSession()?.user?.id || !url.searchParams.get("code"))
+        throw new Error(url.searchParams.has("error") ? "L’autorisation Outlook a été refusée." : "La demande Outlook a expiré. Réessayez.");
+      await invokeEdgeFunction("outlook-web", { action: "exchange", code: url.searchParams.get("code"), verifier: flow.verifier });
+      await loadOutlook();
+    } catch (error) { await loadOutlook(); outlookStatus.textContent = error.message; }
+    return true;
+  }
 
   function gmailEncode(bytes) {
     return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -4300,7 +4366,7 @@
     await ensureSession();
     renderAccount();
     showView("dashboard", false);
-    await finishGmailConnection();
+    if (!await finishOutlookConnection()) await finishGmailConnection();
     syncGmailRepliesAutomatically();
     const url = new URL(location.href);
     const signupRequested = url.searchParams.has("inscription"), signinRequested = url.searchParams.has("connexion");

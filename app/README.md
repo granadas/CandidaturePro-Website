@@ -11,6 +11,7 @@ L’espace candidat est servi sur https://candidaturepro.ch/app/. Le domaine `ww
 - Analyse indicative des CV du formulaire et historique privé des 30 derniers scores affichés ; Premium requis pour créer une analyse. Le calcul local ne consomme pas de crédit IA.
 - Bibliothèque PDF privée : CV, lettres, certificats, attestations, diplômes et autres justificatifs. Aperçu, téléchargement et suppression. Retrait individuel des PDF sélectionnés depuis la bibliothèque avant le contrôle final.
 - Génération de lettres, contrôle final et envoi Gmail individuel ou groupé. Au maximum huit PDF et 10 Mo cumulés par message ; validation identique dans le navigateur et sur le serveur.
+- Connexion et déconnexion Outlook depuis les paramètres avec retour OAuth PKCE. L'envoi des candidatures depuis le navigateur utilise encore Gmail ; Outlook n'est pas proposé comme expéditeur dans ce parcours.
 - Synchronisation des réponses, lecture des fils Gmail avec expéditeur/objet/date, rédaction et proposition IA de réponses. Les brouillons de réponse restent dans le même onglet après fermeture du message ; les demandes d’envoi interrompues gardent leur identifiant et leur texte. La déconnexion efface ces brouillons.
 - Suivi des statuts, notes, réponses non lues et dates de relance.
 - Relances sélectionnées avec proposition IA à insérer après relecture ; brouillons et identifiants d’envoi conservés dans l’onglet jusqu’à l’envoi ou la déconnexion.
