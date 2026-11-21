@@ -34,6 +34,7 @@ test("temporary refresh failures do not delete the saved login", () => {
   assert.match(auth, /error\.status\s*=\s*response\.status/);
   assert.match(ensure, /error\?\.status\s*===\s*400/);
   assert.match(ensure, /error\?\.status\s*===\s*401/);
+  assert.match(ensure, /\["refresh_token_not_found", "refresh_token_already_used", "invalid_grant"\]\.includes\(error\?\.code\)/);
   assert.match(ensure, /if\s*\(invalidToken\s*&&\s*getSession\(\)\?\.refresh_token\s*===\s*session\.refresh_token\)/);
 });
 
