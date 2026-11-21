@@ -8,7 +8,8 @@ const start = source.indexOf("function jobLocation(");
 const end = source.indexOf("\n}\n\nfunction jobIdentity(", start);
 assert.ok(start >= 0 && end > start, "production jobLocation must be found");
 const functionSource = source.slice(start, end + 2)
-  .replace("title: string, snippet: string", "title, snippet");
+  .replace("title: string, snippet: string", "title, snippet")
+  .replace("text: string", "text");
 const jobLocation = runInNewContext(`(${functionSource})`);
 
 test("prefers city in job title over unrelated snippet", () => {
