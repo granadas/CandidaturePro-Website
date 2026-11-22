@@ -847,7 +847,7 @@
         ? '<small>Retrouvée dans une recherche le ' + escapeHtml(new Date(checkedAt).toLocaleDateString("fr-CH", { day: "numeric", month: "long", year: "numeric" })) + '</small>'
         : "";
       const freshnessNote = daysSinceCheck > 30
-        ? '<small>Annonce non revérifiée depuis plus de 30 jours — vérifiez sa disponibilité sur le site source.</small>'
+        ? '<small>Annonce ancienne : non retrouvée depuis plus de 30 jours — disponibilité à confirmer sur le site source.</small>'
         : "";
       return '<article class="job-card" data-job-index="' + index + '">' +
         '<div class="job-card-main"><strong>' + escapeHtml(job.title) + '</strong>' +
