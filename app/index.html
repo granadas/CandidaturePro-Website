@@ -314,6 +314,8 @@
         </nav>
         <article class="panel cv-studio-panel">
           <div class="cv-studio-section-head"><span class="cv-studio-section-icon" aria-hidden="true">✦</span><div><h2>Créer votre CV</h2><p>Commencez avec votre profil ou importez un document existant.</p></div></div>
+          <p class="cv-start-hint">Vous partez de zéro ? Remplissez simplement les champs ci-dessous. Vous avez déjà un CV ? Ouvrez l’option d’importation.</p>
+          <details class="cv-import-collapsible"><summary>J’ai déjà un CV — importer un fichier PDF, Word ou TXT</summary>
           <fieldset class="cv-pdf-import"><legend>Importer un CV PDF, Word ou TXT</legend>
             <p>La lecture s’effectue dans votre navigateur. Le fichier reste sur votre appareil pendant cette lecture. La bibliothèque de pièces jointes accepte les PDF. Les scans sans texte sélectionnable nécessitent une saisie manuelle.</p>
             <label>CV PDF, DOCX ou TXT (10 Mo maximum ; 20 pages pour un PDF)<input id="cv-pdf-file" type="file" accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"></label>
@@ -336,6 +338,7 @@
               <button id="cv-pdf-insert" type="button" class="secondary">Ajouter le texte à cette rubrique</button>
             </div>
           </fieldset>
+          </details>
           <div class="cv-studio-layout"><form id="cv-form" class="profile-form cv-studio-form">
             <div class="wide cv-studio-heading" id="cv-models"><span>01 · PRÉSENTATION</span><h3>Choisissez votre modèle</h3><p>Le contenu reste le même : vous pouvez changer de style à tout moment.</p></div>
             <label>CV enregistrés<select id="cv-variants"><option value="">Choisir un CV</option></select></label>
