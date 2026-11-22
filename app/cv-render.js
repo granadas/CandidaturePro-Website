@@ -1,7 +1,7 @@
 (() => {
   "use strict";
   const sections = { summary: "Profil", experience: "Expérience professionnelle", education: "Formation", skills: "Compétences" };
-  const accents = { copper: ["#a85d3a", "#152f40", "#d9aa88"], jade: ["#147c75", "#103d43", "#a8d9d1"], plum: ["#754a7d", "#302942", "#d7bddb"], blue: ["#305e9c", "#1b3453", "#b7cde8"] };
+  const accents = { copper: ["#a85d3a", "#152f40", "#d9aa88"], jade: ["#147c75", "#103d43", "#a8d9d1"], plum: ["#754a7d", "#302942", "#d7bddb"], blue: ["#305e9c", "#1b3453", "#b7cde8"], gold: ["#f5b800", "#191919", "#fff0a6"] };
   function node(tag, className, value) {
     const element = document.createElement(tag);
     if (className) element.className = className;
