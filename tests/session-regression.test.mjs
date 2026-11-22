@@ -135,7 +135,8 @@ test("job search can show only offers with identified employers without spending
   assert.match(html, /id="jobs-known-employer-only"/);
   assert.match(app, /knownEmployerOnly \? results\.filter\(job => String\(job\.company_name \|\| ""\)\.trim\(\)\) : results/);
   assert.match(app, /jobs-known-employer-only"\)\.addEventListener\("change"/);
-  assert.match(app, /jobs-known-employer-only"\)\.checked = false/);
+  assert.match(html, /id="jobs-known-employer-only" type="checkbox" checked/);
+  assert.doesNotMatch(app, /jobs-known-employer-only"\)\.checked = false/);
 });
 
 test("indexed job listings never claim availability was verified", () => {
