@@ -3841,6 +3841,52 @@
     if (getSession()) showView("settings");
     else { setAuthMode("signin"); dialog.showModal(); }
   });
+  const deleteAccountDialog = document.querySelector("#account-delete-dialog");
+  const deleteAccountInput = document.querySelector("#account-delete-confirmation");
+  const deleteAccountSubmit = document.querySelector("#account-delete-submit");
+  const deleteAccountStatus = document.querySelector("#account-delete-dialog-status");
+  const deleteAccountOpen = document.querySelector("#account-delete-open");
+  let deleteAccountBusy = false;
+  deleteAccountOpen.addEventListener("click", () => {
+    if (!getSession()?.user?.id || deleteAccountBusy) return;
+    deleteAccountInput.value = "";
+    deleteAccountStatus.textContent = "";
+    deleteAccountSubmit.disabled = true;
+    deleteAccountDialog.showModal();
+  });
+  deleteAccountInput.addEventListener("input", () => {
+    deleteAccountSubmit.disabled = deleteAccountBusy || deleteAccountInput.value !== "SUPPRIMER";
+  });
+  document.querySelector("#account-delete-cancel").addEventListener("click", () => {
+    if (!deleteAccountBusy) deleteAccountDialog.close();
+  });
+  deleteAccountDialog.addEventListener("cancel", event => {
+    if (deleteAccountBusy) event.preventDefault();
+  });
+  document.querySelector("#account-delete-form").addEventListener("submit", async event => {
+    event.preventDefault();
+    if (deleteAccountBusy || deleteAccountInput.value !== "SUPPRIMER") return;
+    deleteAccountBusy = true;
+    deleteAccountSubmit.disabled = true;
+    deleteAccountOpen.disabled = true;
+    deleteAccountStatus.textContent = "Suppression du compte en cours…";
+    try {
+      const result = await invokeEdgeFunction("delete-my-account", { confirmation: "SUPPRIMER" });
+      if (!result?.deleted) throw new Error("La suppression n'a pas été confirmée par le serveur.");
+      // The deleted account must not remain authenticated in this browser.
+      setSession(null);
+      localStorage.removeItem("candidature-pro-web-signup");
+      deleteAccountDialog.close();
+      location.replace("../");
+    } catch (error) {
+      deleteAccountStatus.textContent = error.message || "Impossible de supprimer le compte.";
+    } finally {
+      deleteAccountBusy = false;
+      deleteAccountOpen.disabled = false;
+      deleteAccountSubmit.disabled = deleteAccountInput.value !== "SUPPRIMER";
+    }
+  });
+
   signOutButton.addEventListener("click", () => {
     profile = null; passwordRecoveryStatus.textContent = "";
     ++backupRequest; backupCandidate = null; backupFile.value = ""; backupPreview.textContent = backupStatus.textContent = "";
