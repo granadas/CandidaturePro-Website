@@ -350,15 +350,20 @@
             <div><button type="button" class="secondary" id="cv-load">Ouvrir</button>
             <button type="button" class="secondary" id="cv-delete">Supprimer la variante sélectionnée</button>
               <button type="button" class="secondary" id="cv-new">Nouveau</button></div>
-            <label class="wide cv-template-native">Modèle<select name="template"><option value="classic">Classique</option>
-              <option value="modern">Contemporain</option><option value="compact">Compact</option></select></label>
-            <a class="wide cv-template-demo-link" href="cv-modeles.html" target="_blank" rel="noopener">Voir les trois modèles en grand avec un exemple</a>
-            <div class="wide cv-template-grid" role="group" aria-label="Modèle du CV">
+            <div class="wide cv-simple-template-picker">
+              <label for="cv-template-select"><strong>Choisir le modèle</strong><span>Le style du CV, sans modifier son contenu</span></label>
+              <select name="template" id="cv-template-select"><option value="classic">Classique</option>
+              <option value="modern">Contemporain</option><option value="compact">Compact</option></select>
+              <a class="cv-template-demo-link" href="cv-modeles.html" target="_blank" rel="noopener">Voir les modèles en exemple</a>
+            </div>
+            <details class="wide cv-customize-panel"><summary><span aria-hidden="true">⚙</span> Personnaliser les couleurs et la typographie <small>Facultatif</small></summary>
+              <div class="wide cv-design-options"><label>Palette de couleurs<select name="accent"><option value="copper">Bleu nuit et cuivre</option><option value="jade">Jade et bleu profond</option><option value="plum">Prune et lilas</option><option value="gold">Noir et jaune graphique</option><option value="blue">Bleu classique</option></select></label><label>Typographie<select name="font"><option value="editorial">Éditoriale</option><option value="sans">Moderne sans empattement</option></select></label></div>
+            </details>
+            <div class="wide cv-template-grid" hidden aria-hidden="true" role="group" aria-label="Modèle du CV">
               <button class="cv-template-card is-selected" type="button" data-cv-template="classic" aria-pressed="true"><span class="cv-template-sheet cv-template-sheet-classic" aria-hidden="true"><i></i><b></b><em></em><em></em><b></b><em></em></span><strong>Classique</strong><small>Sobre et lisible</small></button>
               <button class="cv-template-card" type="button" data-cv-template="modern" aria-pressed="false"><span class="cv-template-sheet cv-template-sheet-modern" aria-hidden="true"><i></i><b></b><em></em><em></em><b></b><em></em></span><strong>Contemporain <span class="cv-template-premium">Premium</span></strong><small>Colonne éditoriale élégante</small></button>
               <button class="cv-template-card" type="button" data-cv-template="compact" aria-pressed="false"><span class="cv-template-sheet cv-template-sheet-compact" aria-hidden="true"><i></i><b></b><em></em><em></em><b></b><em></em></span><strong>Compact <span class="cv-template-premium">Premium</span></strong><small>En-tête fort et sections équilibrées</small></button>
             </div>
-            <div class="wide cv-design-options"><label>Palette de couleurs<select name="accent"><option value="copper">Bleu nuit et cuivre</option><option value="jade">Jade et bleu profond</option><option value="plum">Prune et lilas</option><option value="gold">Noir et jaune graphique</option><option value="blue">Bleu classique</option></select></label><label>Typographie<select name="font"><option value="editorial">Éditoriale</option><option value="sans">Moderne sans empattement</option></select></label></div>
             <div class="wide cv-premium-banner"><p id="cv-premium-access-status" role="status">Vérification des droits du compte…</p><button type="button" class="secondary compact" data-view-link="premium">Voir la formule Premium</button></div>
             <div class="wide cv-studio-heading" id="cv-identity"><span>02 · IDENTITÉ</span><h3>Présentez-vous</h3><p>Une première impression claire, avec les informations essentielles.</p></div>
             <label class="wide">Nom de la variante<input id="cv-label" maxlength="120"></label>
