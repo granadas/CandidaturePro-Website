@@ -2667,23 +2667,39 @@
     const normalize = value => value.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
     const corpus = normalize(text);
     const tokens = [...new Set(normalize(target).split(/[^\p{L}\p{N}+#]+/u).filter(value => value.length >= 3))];
-    const structure = 80 + (fields.title.trim() ? 10 : 0) + (skills.length >= 5 ? 10 : 0);
-    const content = text.trim() ? Math.min(100, 70 + (text.length >= 800 ? 20 : 10)) : 55;
-    const keywords = tokens.length ? Math.round(tokens.filter(word => corpus.includes(word)).length * 100 / tokens.length) : 50;
-    const readability = fields.template === "modern" ? 90 : fields.template === "classic" ? 95 : 85;
-    const ats = fields.template === "modern" ? 88 : fields.template === "classic" ? 95 : 84;
-    const overall = Math.round(structure * .25 + content * .25 + keywords * .20 + readability * .15 + ats * .15);
+    const structure = (fields.title.trim() ? 15 : 0) + (fields.contact.trim() ? 10 : 0) +
+      (fields.summary.trim() ? 15 : 0) + (fields.experience.trim() ? 30 : 0) +
+      (fields.education.trim() ? 15 : 0) + (skills.length ? 15 : 0);
+    const bullets = fields.experience.split("\n").filter(line => /^\s*[•●\-*]/.test(line)).length;
+    const dates = /(?:19[89]\d|20\d\d)/.test(fields.experience + fields.education);
+    const content = (fields.summary.trim().length >= 80 ? 20 : fields.summary.trim() ? 10 : 0) +
+      (fields.experience.trim().length >= 150 ? 25 : fields.experience.trim() ? 10 : 0) +
+      (bullets >= 2 ? 20 : bullets ? 10 : 0) + (dates ? 15 : 0) +
+      (fields.education.trim() ? 10 : 0) + (skills.length >= 5 ? 10 : skills.length ? 5 : 0);
+    const words = new Set(corpus.split(/[^\p{L}\p{N}+#]+/u));
+    const keywords = tokens.length ? Math.round(tokens.filter(word => words.has(word)).length * 100 / tokens.length) : 0;
+    const paragraphs = text.split(/\n\s*\n/).filter(Boolean);
+    const longLines = text.split("\n").filter(line => line.length > 180).length;
+    const readability = Math.max(0, 100 - Math.min(45, longLines * 15) -
+      Math.min(30, paragraphs.filter(block => block.length > 700).length * 15) -
+      (fields.summary.trim().split(/\s+/).length > 110 ? 15 : 0));
+    const ats = (fields.title.trim() ? 20 : 0) + (fields.contact.includes("@") ? 20 : 0) +
+      (fields.experience.trim() ? 25 : 0) + (dates ? 20 : 0) + (skills.length ? 15 : 0);
+    const weighted = structure * .25 + content * .25 + readability * .15 + ats * .15 +
+      (tokens.length ? keywords * .20 : 0);
+    const overall = Math.round(weighted / (tokens.length ? 1 : .8));
     const findings = [];
     if (!fields.title.trim()) findings.push("Ajoutez un titre professionnel clair.");
     if (!fields.summary.trim()) findings.push("Ajoutez un court profil professionnel.");
     if (skills.length < 5) findings.push("Complétez les compétences avec vos savoir-faire réels, une compétence par ligne.");
     if (!fields.experience.trim()) findings.push("Renseignez les expériences et les réalisations pertinentes.");
-    if (!/(?:19[89]\d|20\d\d)/.test(fields.experience + fields.education)) findings.push("Précisez les dates des expériences et des formations.");
+    if (!dates) findings.push("Précisez les dates des expériences et des formations.");
     if (!target.trim()) findings.push("Indiquez un métier cible pour préciser l’analyse des mots-clés.");
     else if (keywords < 70) findings.push("Le métier cible apparaît peu dans le CV. Ajoutez uniquement les termes correspondant à votre expérience.");
-    if (fields.experience.split("\n").some(line => line.length > 180)) findings.push("Raccourcissez les paragraphes les plus longs pour faciliter la lecture.");
+    if (longLines) findings.push("Raccourcissez les lignes les plus longues pour faciliter la lecture.");
+    if (bullets < 2 && fields.experience.trim()) findings.push("Ajoutez des réalisations concrètes sous vos expériences, idéalement avec des résultats vérifiables.");
     if (!findings.length) findings.push("Les rubriques essentielles sont présentes. Vérifiez les faits, les coordonnées et la présentation du PDF avant l’envoi.");
-    return { overall, structure, content, keywords, readability, ats, findings };
+    return { overall, structure, content, keywords, readability, ats, hasTarget: tokens.length > 0, findings };
   }
 
   function renderCvAnalysis(report) {
@@ -2692,12 +2708,15 @@
     score.className = "cv-analysis-score";
     score.textContent = report.overall + "/100";
     cvAnalysisResults.append(score);
-    for (const [key, label] of [["structure", "Structure"], ["content", "Contenu"], ["keywords", "Mots-clés"], ["readability", "Lisibilité"], ["ats", "Compatibilité ATS"]]) {
+    for (const [key, label] of [["structure", "Rubriques remplies"], ["content", "Détails du parcours"], ["keywords", "Métier cible"], ["readability", "Longueur du texte"], ["ats", "Repères du CV"]]) {
       const line = document.createElement("label");
       line.className = "cv-analysis-metric";
-      const caption = document.createElement("span"); caption.textContent = label + " · " + report[key] + "/100";
-      const bar = document.createElement("progress"); bar.max = 100; bar.value = report[key];
-      line.append(caption, bar); cvAnalysisResults.append(line);
+      const caption = document.createElement("span"); caption.textContent = label + " · " + (key === "keywords" && !report.hasTarget ? "non évalué" : report[key] + "/100");
+      line.append(caption);
+      if (key !== "keywords" || report.hasTarget) {
+        const bar = document.createElement("progress"); bar.max = 100; bar.value = report[key]; line.append(bar);
+      }
+      cvAnalysisResults.append(line);
     }
     const list = document.createElement("ul");
     for (const finding of report.findings) { const item = document.createElement("li"); item.textContent = finding; list.append(item); }
@@ -2713,20 +2732,14 @@
     try {
       const reports = await supabaseFetch("web_cv_analysis_reports?select=id,created_at,cv_name,target_role,overall&order=created_at.desc,id.desc&limit=30");
       if (request !== cvAnalysisRequest || getSession()?.user?.id !== userId) return;
-      cvAnalysisHistoryStatus.textContent = reports.length ? "Les 30 dernières analyses au maximum." : "Aucune analyse enregistrée.";
-      for (const [index, report] of reports.entries()) {
+      cvAnalysisHistoryStatus.textContent = reports.length ? "Les 30 dernières analyses au maximum. Les anciens scores peuvent provenir d’une autre méthode de calcul." : "Aucune analyse enregistrée.";
+      for (const report of reports) {
         const card = document.createElement("article"); card.className = "application-row";
         const body = document.createElement("div"); body.className = "application-main";
         const title = document.createElement("strong"); title.textContent = report.cv_name + " · " + report.overall + "/100";
         const caption = document.createElement("span");
         caption.textContent = new Intl.DateTimeFormat("fr-CH", { dateStyle: "medium", timeStyle: "short" }).format(new Date(report.created_at)) + (report.target_role ? " · " + report.target_role : "");
         body.append(title, caption);
-        const previous = reports.slice(index + 1).find(item => item.cv_name === report.cv_name && item.target_role === report.target_role);
-        if (previous) {
-          const delta = report.overall - previous.overall;
-          const change = document.createElement("small"); change.textContent = (delta > 0 ? "+" : "") + delta + " point(s) depuis l’analyse précédente du même CV et du même métier.";
-          body.append(change);
-        }
         card.append(body); cvAnalysisHistory.append(card);
       }
     } catch (error) {
@@ -2737,7 +2750,7 @@
   cvAnalyze.addEventListener("click", async () => {
     const userId = getSession()?.user?.id;
     if (!userId || cvAnalyze.disabled || cvAnalysisClear.disabled) return;
-    if (!hasPremiumCv()) { cvAnalysisStatus.textContent = "L’analyse CV / ATS est disponible avec Premium."; return; }
+    if (!hasPremiumCv()) { cvAnalysisStatus.textContent = "Le diagnostic du CV est disponible avec Premium."; return; }
     const fields = Object.fromEntries(cvFieldNames.map(name => [name, cvForm.elements.namedItem(name).value.trim()]));
     if (!fields.name || !fields.title || ![fields.summary, fields.experience, fields.education, fields.skills].some(Boolean)) {
       cvAnalysisStatus.textContent = "Complétez le nom, le titre et le contenu du CV dans le formulaire."; return;
