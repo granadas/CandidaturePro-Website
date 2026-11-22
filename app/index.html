@@ -298,6 +298,13 @@
       </section>
 
       <section id="documents-view" class="view">
+        <div class="documents-switcher" role="group" aria-label="Choisir une activité dans Documents">
+          <button type="button" class="documents-switch active" data-documents-tab="cv" aria-pressed="true"><strong>1. Créer mon CV</strong><span>Modèle, contenu et aperçu</span></button>
+          <button type="button" class="documents-switch" data-documents-tab="analysis" aria-pressed="false"><strong>2. Améliorer mon CV</strong><span>Analyse et conseils Premium</span></button>
+          <button type="button" class="documents-switch" data-documents-tab="files" aria-pressed="false"><strong>3. Mes fichiers</strong><span>CV, lettres et certificats PDF</span></button>
+        </div>
+        <p class="documents-switch-hint" id="documents-switch-hint" role="status">Étape 1 : créez votre CV ou importez un CV existant.</p>
+        <div data-documents-panel="cv">
         <header class="cv-studio-hero">
           <div><span class="cv-studio-kicker">ATELIER CV · CANDIDATURE PRO</span><h1>Un CV qui vous ressemble.</h1><p>Rassemblez vos expériences, choisissez une présentation et voyez le résultat avant de l’envoyer.</p></div>
           <span class="cv-studio-hero-mark" aria-hidden="true">CV</span>
@@ -393,6 +400,8 @@
           </form><aside class="cv-live-aside" aria-label="Aperçu instantané du CV"><div class="cv-live-top"><span>APERÇU EN DIRECT</span><span id="cv-live-style">Classique</span></div><div id="cv-live-paper" class="cv-live-paper"></div><p id="cv-live-length" class="cv-live-note" role="status" aria-live="polite"></p><p class="cv-live-note">Le même modèle est utilisé pour l’aperçu et l’impression PDF. Vérifiez les éventuels sauts de page avant l’envoi.</p></aside></div>
         </article>
 
+        </div>
+        <div data-documents-panel="analysis" hidden>
         <article class="panel" aria-labelledby="cv-analysis-title">
           <div class="panel-head"><div><small>OPTIMISATION DU CV · PREMIUM</small><h2 id="cv-analysis-title">Analyse CV / ATS</h2></div></div>
           <p>Analysez le CV affiché dans le formulaire pour identifier les améliorations possibles avant de l’envoyer.</p>
@@ -406,6 +415,8 @@
           <div id="cv-analysis-history" class="applications-list"></div>
         </article>
 
+        </div>
+        <div data-documents-panel="files" hidden>
         <article class="panel">
           <div class="panel-head"><h2>Mes documents</h2></div>
           <form id="document-form" class="profile-form" hidden>
@@ -416,6 +427,7 @@
           <p id="documents-message" role="status"></p>
           <div id="documents-list" class="applications-list"></div>
         </article>
+        </div>
       </section>
 
       <section id="premium-view" class="view">
@@ -683,5 +695,23 @@
   <script src="cv-render.js?v=20261121-gallery"></script>
   <script src="account-signup.js?v=20261118"></script>
   <script src="app.js?v=20261121-gallery"></script>
+<script>
+  // Documents navigation is presentation-only: existing forms and handlers remain mounted.
+  document.querySelectorAll("[data-documents-tab]").forEach(button => {
+    button.addEventListener("click", () => {
+      const selected = button.dataset.documentsTab;
+      document.querySelectorAll("[data-documents-tab]").forEach(tab => {
+        const active = tab === button;
+        tab.classList.toggle("active", active);
+        tab.setAttribute("aria-pressed", String(active));
+      });
+      document.querySelectorAll("[data-documents-panel]").forEach(panel => {
+        panel.hidden = panel.dataset.documentsPanel !== selected;
+      });
+      const descriptions = {cv:"Étape 1 : créez votre CV ou importez un CV existant.",analysis:"Étape 2 : consultez l’analyse et les conseils pour votre CV.",files:"Étape 3 : retrouvez vos documents PDF enregistrés."};
+      document.querySelector("#documents-switch-hint").textContent = descriptions[selected];
+    });
+  });
+</script>
 </body>
 </html>
