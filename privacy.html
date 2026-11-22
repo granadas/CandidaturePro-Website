@@ -24,19 +24,19 @@
 <main>
   <header>
     <h1>Politique de confidentialité</h1>
-    <p class="date">Candidature Pro · Mise à jour : 9 septembre 2026</p>
+    <p class="date">Candidature Pro · Mise à jour : 22 novembre 2026</p>
   </header>
 
-  <p class="notice">Candidature Pro est une application Windows d’aide à la recherche d’emploi. Elle permet notamment de gérer des candidatures, préparer des documents, envoyer des candidatures avec la messagerie choisie par l’utilisateur et suivre les réponses.</p>
+  <p class="notice">Candidature Pro est un site et une application Windows d’aide à la recherche d’emploi. Ils permettent de gérer des candidatures, préparer des documents, envoyer des messages depuis un compte de messagerie connecté et suivre les réponses.</p>
 
-  <h2>1. Données conservées localement</h2>
-  <p>L’application conserve principalement sur l’ordinateur de l’utilisateur son profil, ses candidatures, ses paramètres, ses CV, leurs variantes et les documents associés. Les jetons de connexion Gmail ou Outlook sont protégés par le coffre d’identifiants Windows.</p>
+  <h2>1. Données conservées sur l’appareil</h2>
+  <p>L’application Windows conserve des données sur l’ordinateur, notamment des éléments du profil, des candidatures, des CV et des documents. Ses jetons de connexion à la messagerie sont protégés par le stockage sécurisé de Windows. Le site peut conserver dans le navigateur la session de Candidature Pro et, si l’utilisateur choisit cette option, un brouillon de candidature sur cet appareil.</p>
 
   <h2>2. Données traitées par nos services</h2>
-  <p>Les comptes, sessions, licences, quotas d’utilisation, demandes de support et informations nécessaires au fonctionnement des services en ligne sont traités par le backend Supabase de Candidature Pro.</p>
+  <p>Les comptes, sessions, licences, quotas d’utilisation, demandes de support et informations nécessaires au fonctionnement des services en ligne sont traités par le backend Supabase de Candidature Pro. Sur le site, les candidatures, variantes de CV et documents enregistrés sont liés au compte et conservés en ligne. Si Gmail ou Outlook est connecté depuis le site, les jetons nécessaires à cette connexion sont conservés côté serveur afin d’assurer les fonctions autorisées.</p>
 
   <h2>3. Utilisation des données Google</h2>
-  <p>Lorsque l’utilisateur connecte Gmail, Candidature Pro accède uniquement aux données nécessaires aux fonctions qu’il active :</p>
+  <p>Lorsque l’utilisateur connecte Gmail, Candidature Pro demande l’autorisation d’envoyer des messages. La fonction de suivi demande aussi une autorisation de lecture de Gmail. Cette dernière autorisation donne techniquement accès à la boîte aux lettres ; le site recherche les conversations associées aux candidatures envoyées afin d’afficher les réponses et de mettre à jour leur suivi. Les utilisations proposées comprennent :</p>
   <ul>
     <li>l’adresse du compte Google afin d’identifier le compte connecté ;</li>
     <li>l’envoi d’e-mails et de pièces jointes déclenché par l’utilisateur ;</li>
@@ -51,7 +51,7 @@
   <p>Candidature Pro applique des mesures techniques et organisationnelles destinées à protéger les données personnelles et les informations provenant de Google :</p>
   <ul>
     <li>les communications entre l’application, Google et les services en ligne utilisent des connexions HTTPS/TLS chiffrées ;</li>
-    <li>les jetons OAuth sont conservés localement au moyen du stockage sécurisé de Windows et ne sont jamais affichés à l’utilisateur ni intégrés aux journaux de l’application ;</li>
+    <li>sur Windows, les jetons OAuth sont conservés dans le stockage sécurisé du système ; sur le site, ils sont conservés côté serveur et ne sont pas placés dans le code public du site ;</li>
     <li>Candidature Pro ne demande, ne reçoit et ne conserve jamais le mot de passe Gmail de l’utilisateur ;</li>
     <li>l’accès aux données en ligne est limité aux utilisateurs authentifiés et aux opérations nécessaires au fonctionnement de leur compte ;</li>
     <li>les autorisations Google demandées sont limitées aux fonctions Gmail proposées par l’application : lecture des messages nécessaires au suivi et envoi déclenché par l’utilisateur ;</li>
@@ -63,7 +63,7 @@
   <p>Les données sont conservées uniquement pendant la durée nécessaire à la fourniture des fonctionnalités, au respect des obligations légales et à la résolution des demandes de support. Les messages Gmail consultés pour le suivi ne sont pas utilisés pour constituer une base publicitaire ou un profil commercial. La déconnexion de Gmail révoque l’utilisation des jetons enregistrés par l’application.</p>
 
   <h2>7. Contrôle et suppression</h2>
-  <p>L’utilisateur peut déconnecter Gmail ou Outlook depuis l’application et révoquer l’accès depuis les paramètres de sécurité de son fournisseur. Il peut supprimer ses données locales en désinstallant l’application puis en supprimant le dossier CandidaturePro dans les données locales de Windows. Pour demander la suppression du compte ou des données conservées en ligne, il peut contacter le support.</p>
+  <p>L’utilisateur peut déconnecter Gmail ou Outlook depuis les paramètres du site ou de l’application et révoquer l’accès depuis les paramètres de sécurité de son fournisseur. Il peut supprimer les données locales de Windows en désinstallant l’application puis en supprimant le dossier CandidaturePro dans les données locales. Les documents enregistrés sur le site peuvent être supprimés dans la bibliothèque. Pour demander la suppression du compte ou des autres données conservées en ligne, il peut contacter le support.</p>
 
   <h2>8. Contact</h2>
   <p>Pour toute question ou demande relative aux données personnelles : <a href="mailto:jobrufali@gmail.com">jobrufali@gmail.com</a>.</p>
