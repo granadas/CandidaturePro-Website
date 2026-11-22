@@ -904,7 +904,7 @@
     document.querySelector("#jobs-sector").value = "";
     document.querySelector("#jobs-city").value = "";
     document.querySelector("#jobs-recent-only").checked = false;
-    document.querySelector("#jobs-known-employer-only").checked = false;
+    document.querySelector("#jobs-known-employer-only").checked = true;
     showView("jobs");
   });
 
