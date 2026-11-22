@@ -3543,6 +3543,48 @@
     }
   });
 
+  // Local-only draft recovery, opt-in because contact details are personal data.
+  const applicationDraftKey = "cp-application-form-draft-v1";
+  const applicationDraftFields = ["company", "job", "city", "email", "status"];
+  const applicationDraftForm = document.querySelector("#application-form");
+  const applicationDraftConsent = document.querySelector("#application-draft-opt-in");
+  const applicationDraftMessage = document.querySelector("#application-local-draft-message");
+  function clearLocalApplicationDraft() {
+    try { localStorage.removeItem(applicationDraftKey); } catch { /* storage unavailable */ }
+  }
+  applicationDraftConsent.addEventListener("change", () => {
+    if (!applicationDraftConsent.checked) {
+      clearLocalApplicationDraft();
+      applicationDraftMessage.textContent = "Sauvegarde locale désactivée et brouillon local effacé.";
+    } else {
+      applicationDraftForm.dispatchEvent(new Event("input", { bubbles: true }));
+      applicationDraftMessage.textContent = "Sauvegarde locale activée sur cet appareil.";
+    }
+  });
+  applicationDraftForm.addEventListener("input", () => {
+    if (!applicationDraftConsent.checked) return;
+    try {
+      const values = Object.fromEntries(applicationDraftFields.map(key => [key, document.querySelector("#application-" + key).value]));
+      localStorage.setItem(applicationDraftKey, JSON.stringify(values));
+    } catch { applicationDraftMessage.textContent = "Impossible de sauvegarder ce brouillon sur cet appareil."; }
+  });
+  document.querySelector("#application-clear-local-draft").addEventListener("click", () => {
+    clearLocalApplicationDraft();
+    applicationDraftConsent.checked = false;
+    applicationDraftMessage.textContent = "Brouillon local effacé. Les champs affichés restent inchangés.";
+  });
+  try {
+    const saved = JSON.parse(localStorage.getItem(applicationDraftKey) || "null");
+    if (saved && typeof saved === "object") {
+      applicationDraftFields.forEach(key => {
+        const input = document.querySelector("#application-" + key);
+        if (typeof saved[key] === "string" && (input.tagName !== "SELECT" || [...input.options].some(option => option.value === saved[key]))) input.value = saved[key];
+      });
+      applicationDraftConsent.checked = true;
+      applicationDraftMessage.textContent = "Brouillon local restauré sur cet appareil.";
+    }
+  } catch { applicationDraftMessage.textContent = "Le brouillon local ne peut pas être restauré."; }
+
   document.querySelector("#application-form").addEventListener("submit", async event => {
     const form = event.currentTarget;
     event.preventDefault();
@@ -3562,6 +3604,9 @@
         sent_at: status === "sent" ? new Date().toISOString() : null
       });
       form.reset();
+      clearLocalApplicationDraft();
+      applicationDraftConsent.checked = false;
+      applicationDraftMessage.textContent = "Brouillon local effacé après enregistrement.";
       message.textContent = "Candidature ajoutée.";
       await loadApplications();
     } catch (error) {
