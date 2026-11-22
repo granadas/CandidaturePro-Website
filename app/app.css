@@ -465,3 +465,10 @@
 .view .panel p{line-height:1.6}
 .view :is(button,a,input,select,textarea):focus-visible{outline:3px solid #7e43ce;outline-offset:2px}
 @media(max-width:600px){.view-intro{padding:20px;margin-bottom:18px}.view-intro p{font-size:14px}.sidebar .nav-item:hover{transform:none}}
+
+/* Mobile navigation stays dismissible and clearly separated from the page. */
+.sidebar-scrim[hidden]{display:none}
+@media(max-width:980px){
+  .sidebar-scrim:not([hidden]){position:fixed;inset:0;z-index:19;display:block;width:100%;height:100%;border:0;background:rgba(20,18,38,.45);cursor:pointer}
+  .sidebar{max-height:100dvh;overflow-y:auto}
+}

@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#5b21b6">
   <meta name="description" content="Candidature Pro en ligne : recherchez, préparez, envoyez et suivez vos candidatures.">
   <title>Candidature Pro — Espace en ligne</title>
-  <link rel="stylesheet" href="app.css?v=20261122-premium-menus">
+  <link rel="stylesheet" href="app.css?v=20261122-mobile-menu">
 </head>
 <body>
   <main id="guest-home" class="guest-home">
@@ -23,7 +23,7 @@
   </main>
 
   <div class="app-shell" hidden>
-    <aside class="sidebar" aria-label="Navigation principale">
+    <aside id="main-sidebar" class="sidebar" aria-label="Navigation principale">
       <a class="brand" href="../"><span class="logo">CP</span><span>Candidature Pro</span></a>
       <nav>
         <button class="nav-item active" data-view="dashboard"><span>⌂</span>Accueil</button>
@@ -44,10 +44,11 @@
         <button id="sign-out" class="nav-item danger" hidden><span>↪</span>Déconnexion</button>
       </div>
     </aside>
+    <button class="sidebar-scrim" type="button" aria-label="Fermer le menu" hidden></button>
 
     <main>
       <header class="topbar">
-        <button id="menu-toggle" class="menu-toggle" aria-label="Ouvrir le menu">☰</button>
+        <button id="menu-toggle" class="menu-toggle" aria-label="Ouvrir le menu" aria-controls="main-sidebar" aria-expanded="false">☰</button>
         <div><strong id="page-title">Tableau de bord</strong><small id="account-label">Espace candidat</small></div>
         <button id="open-login" class="primary">Se connecter</button>
       </header>
@@ -708,7 +709,7 @@
   <script src="cv-word.js?v=20261121-gallery"></script>
   <script src="cv-render.js?v=20261121-gallery"></script>
   <script src="account-signup.js?v=20261118"></script>
-  <script src="app.js?v=20261122-word-count"></script>
+  <script src="app.js?v=20261122-mobile-menu"></script>
 <script src="documents-navigation.js?v=20261122"></script>
 </body>
 </html>

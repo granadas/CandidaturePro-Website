@@ -257,7 +257,7 @@
     }
     if (isDocuments) { loadDocuments(); loadCvVariants(); loadCvAnalysisHistory(); }
     if (name === "settings") { loadGmail(); loadOutlook(); }
-    sidebar.classList.remove("open");
+    setMobileMenuOpen(false);
   }
 
   async function authRequest(grantType, body) {
@@ -3812,7 +3812,22 @@
   document.querySelectorAll("[data-view], [data-view-link]").forEach(el => {
     el.addEventListener("click", () => showView(el.dataset.view || el.dataset.viewLink));
   });
-  document.querySelector("#menu-toggle").addEventListener("click", () => sidebar.classList.toggle("open"));
+  const menuToggle = document.querySelector("#menu-toggle");
+  const sidebarScrim = document.querySelector(".sidebar-scrim");
+  function setMobileMenuOpen(open) {
+    sidebar.classList.toggle("open", open);
+    sidebarScrim.hidden = !open;
+    menuToggle.setAttribute("aria-expanded", String(open));
+    menuToggle.setAttribute("aria-label", open ? "Fermer le menu" : "Ouvrir le menu");
+  }
+  menuToggle.addEventListener("click", () => setMobileMenuOpen(!sidebar.classList.contains("open")));
+  sidebarScrim.addEventListener("click", () => setMobileMenuOpen(false));
+  document.addEventListener("keydown", event => {
+    if (event.key === "Escape" && sidebar.classList.contains("open")) {
+      setMobileMenuOpen(false);
+      menuToggle.focus();
+    }
+  });
   guestLogin.addEventListener("click", () => { setAuthMode("signin"); dialog.showModal(); });
   document.querySelector("#guest-signup").addEventListener("click", () => { setAuthMode("signup"); dialog.showModal(); });
   document.querySelector("#close-login").addEventListener("click", () => { if (!authBusy && !document.querySelector("#login-submit").disabled) dialog.close(); });
