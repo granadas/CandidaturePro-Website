@@ -414,3 +414,10 @@
 .documents-switch-hint{margin:0 0 18px;font-size:14px;color:var(--muted,#687386)}
 [data-documents-panel][hidden]{display:none!important}
 @media(max-width:700px){.documents-switcher{grid-template-columns:1fr;gap:8px}.documents-switch{padding:12px 14px}}
+
+/* Keep optional CV import out of the primary editing flow */
+.cv-start-hint{margin:10px 0 12px;line-height:1.5}
+.cv-import-collapsible{margin:0 0 20px;border:1px solid var(--border,#d7deea);border-radius:12px;padding:12px 16px}
+.cv-import-collapsible>summary{cursor:pointer;font-weight:650;line-height:1.5}
+.cv-import-collapsible>summary:focus-visible{outline:3px solid #5b21b6;outline-offset:3px}
+.cv-import-collapsible[open]>summary{margin-bottom:14px}
