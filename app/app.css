@@ -451,3 +451,19 @@
 .documents-panel-enter{animation:documentsPanelReveal .3s cubic-bezier(.2,.75,.2,1) both}
 @keyframes documentsPanelReveal{from{opacity:.35;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 @media(prefers-reduced-motion:reduce){.documents-switch,.documents-switch::after,.documents-switch-icon,.documents-switch-arrow{transition:none!important}.documents-panel-enter{animation:none!important}.documents-switch:hover{transform:none}}
+
+/* CV studio: compact first, advanced controls on demand */
+.cv-simple-template-picker{display:flex;flex-direction:column;gap:10px;padding:16px 18px;border:1px solid #dfe4ef;border-radius:16px;background:#fff}
+.cv-simple-template-picker label{display:flex;flex-direction:column;gap:5px}
+.cv-simple-template-picker label strong{font-size:16px}
+.cv-simple-template-picker label span{font-size:13px;color:#64748b}
+.cv-simple-template-picker select{width:100%;min-height:46px;border-radius:10px}
+.cv-simple-template-picker .cv-template-demo-link{font-size:13px;align-self:flex-start}
+.cv-customize-panel{border:1px solid #dfe4ef;border-radius:14px;background:#f8f9fc;padding:14px 16px}
+.cv-customize-panel>summary{cursor:pointer;font-weight:700;line-height:1.5;list-style-position:inside}
+.cv-customize-panel>summary small{font-size:11px;font-weight:500;color:#64748b;margin-left:8px}
+.cv-customize-panel[open]>summary{margin-bottom:16px}
+.cv-customize-panel .cv-design-options{margin:0}
+.cv-customize-panel>summary:focus-visible{outline:3px solid #6d42c1;outline-offset:3px}
+.cv-template-grid[hidden]{display:none!important}
+@media(max-width:700px){.cv-simple-template-picker{padding:14px}.cv-customize-panel{padding:12px}}
