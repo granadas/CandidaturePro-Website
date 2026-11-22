@@ -421,3 +421,21 @@
 .cv-import-collapsible>summary{cursor:pointer;font-weight:650;line-height:1.5}
 .cv-import-collapsible>summary:focus-visible{outline:3px solid #5b21b6;outline-offset:3px}
 .cv-import-collapsible[open]>summary{margin-bottom:14px}
+
+/* Documents visual navigation — tasks, not mandatory steps */
+.documents-home-head{margin:0 0 18px}
+.documents-home-eyebrow{display:block;font-size:11px;font-weight:800;letter-spacing:.14em;color:#6d45b5;margin-bottom:8px}
+.documents-home-head h1{font-size:clamp(24px,3vw,34px);line-height:1.2;margin:0 0 8px}
+.documents-home-head p{margin:0;color:var(--muted,#64748b);line-height:1.55}
+.documents-switcher{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:12px}
+.documents-switch{display:flex;align-items:flex-start;gap:12px;position:relative;text-align:left;min-height:124px;padding:18px 16px;border:1px solid #dbe2ee;border-radius:18px;background:#fff;color:#17213a;box-shadow:0 4px 16px #18213b0b;transition:border-color .15s,box-shadow .15s,transform .15s}
+.documents-switch:hover{transform:translateY(-2px);border-color:#a18ad5;box-shadow:0 8px 22px #24124c16}
+.documents-switch.active{background:linear-gradient(135deg,#f7f3ff,#fff);border:2px solid #6d42c1;box-shadow:0 7px 22px #5429a51c;color:#25134d;padding:17px 15px}
+.documents-switch-icon{display:grid;place-items:center;flex:none;width:42px;height:42px;border-radius:12px;background:#eee8fc;color:#5b21b6;font-size:25px;font-weight:750}
+.documents-switch-copy{display:flex;flex-direction:column;gap:7px;min-width:0}
+.documents-switch-copy strong{font-size:15px;line-height:1.3}
+.documents-switch-copy>span{font-size:12px;line-height:1.45;color:#617087;opacity:1}
+.documents-switch-arrow{margin-left:auto;font-size:26px;line-height:1;color:#8467bc}
+.documents-switch:focus-visible{outline:3px solid #6d42c1;outline-offset:3px}
+.documents-switch-hint{padding:10px 14px;background:#f6f7fb;border-radius:10px;margin:0 0 18px;font-size:13px;color:#475569}
+@media(max-width:900px){.documents-switcher{grid-template-columns:1fr;gap:10px}.documents-switch{min-height:0;align-items:center;padding:14px}.documents-switch.active{padding:13px}.documents-switch-icon{width:40px;height:40px}}
