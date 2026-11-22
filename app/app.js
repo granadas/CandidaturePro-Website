@@ -3892,7 +3892,7 @@
     authBusy = busy;
     for (const node of [document.querySelector("#login-submit"), passwordForgot, signupResend, authModeSignin, authModeSignup, document.querySelector("#close-login"), microsoftSignin]) node.disabled = busy;
   }
-  const signupConfirmationMessage = "Si cette adresse peut être utilisée, un message de confirmation a été envoyé. Ouvrez-le dans ce même navigateur, puis connectez-vous. Si vous avez déjà un compte, utilisez la connexion ou « Mot de passe oublié ». Vérifiez aussi les courriers indésirables.";
+  const signupConfirmationMessage = "Si cette adresse peut être utilisée, cherchez l’e-mail « Confirmez votre adresse e-mail | Candidature Pro » envoyé par notifications@transactional.candidaturepro.ch. Ouvrez son lien dans ce même navigateur, puis connectez-vous. S’il n’arrive pas, vérifiez les courriers indésirables ou renvoyez le message. Si vous avez déjà un compte, utilisez la connexion ou « Mot de passe oublié ».";
   loginForm.addEventListener("submit", async event => {
     event.preventDefault();
     const submit = document.querySelector("#login-submit");
