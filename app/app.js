@@ -2271,17 +2271,12 @@
   let editingCvId = null;
 
   const cvTemplateNames = { classic: "Classique", modern: "Contemporain", compact: "Compact" };
+  const cvTemplateDescriptions = { classic: "Sobre et facile à lire.", modern: "Une présentation éditoriale avec une colonne distinctive.", compact: "Une mise en page structurée pour un parcours détaillé." };
   function syncCvStudio() {
     const form = document.querySelector("#cv-form");
     if (!form) return;
     const template = form.elements.template.value || "classic";
-    document.querySelectorAll("[data-cv-template]").forEach(button => {
-      const premiumLocked = button.dataset.cvTemplate !== "classic" && !hasPremiumCv();
-      button.setAttribute("aria-pressed", String(button.dataset.cvTemplate === template));
-      button.classList.toggle("is-selected", button.dataset.cvTemplate === template);
-      button.classList.toggle("is-locked", premiumLocked);
-      button.setAttribute("aria-label", button.querySelector("strong").textContent.trim() + (premiumLocked ? " — nécessite Premium" : ""));
-    });
+    document.querySelector("#cv-template-description").textContent = cvTemplateDescriptions[template] || cvTemplateDescriptions.classic;
     document.querySelector("#cv-live-style").textContent = cvTemplateNames[template] || "Classique";
     const fields = Object.fromEntries(cvFieldNames.map(name => [name, form.elements.namedItem(name).value]));
     window.CP_CV_RENDER.render(document.querySelector("#cv-live-paper"), fields, { placeholder: true });
@@ -2290,15 +2285,14 @@
     const lengthLabel = document.querySelector("#cv-live-length");
     lengthLabel.textContent = wordCount + " mots de contenu · " + (wordCount > 650 ? "CV long : contrôlez les sauts de page et envisagez deux pages." : wordCount > 400 ? "CV détaillé : vérifiez la lisibilité et la pagination avant l'export." : "Vérifiez le rendu final avant l'export PDF.");
   }
-  document.querySelectorAll("[data-cv-template]").forEach(button => button.addEventListener("click", () => {
-    if (button.dataset.cvTemplate !== "classic" && !hasPremiumCv()) {
+  cvForm.elements.template.addEventListener("change", () => {
+    if (cvForm.elements.template.value !== "classic" && !hasPremiumCv()) {
+      cvForm.elements.template.value = "classic";
       cvSaveStatus.textContent = "Ce modèle nécessite Premium. Vous pouvez continuer avec le modèle Classique.";
       document.querySelector("#cv-premium-access-status").scrollIntoView({ block: "nearest", behavior: "smooth" });
-      return;
     }
-    cvForm.elements.template.value = button.dataset.cvTemplate;
     syncCvStudio();
-  }));
+  });
   cvForm.addEventListener("input", syncCvStudio);
   cvForm.addEventListener("change", syncCvStudio);
 
