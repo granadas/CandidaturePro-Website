@@ -7,7 +7,7 @@ const sectors = [
 ];
 
 function jobLocation(title: string, snippet: string) {
-  const cities = ["Genève", "Lausanne", "Nyon", "Morges", "Montreux", "Vevey", "Fribourg", "Neuchâtel", "Sion", "Martigny", "Delémont", "Berne", "Bâle", "Zurich", "Lugano"];
+  const cities = ["Genève", "Lausanne", "Nyon", "Morges", "Montreux", "Vevey", "Fribourg", "Neuchâtel", "Sion", "Martigny", "Delémont", "Berne", "Bâle", "Zurich", "Lugano", "Oetwil am See", "Cornaux", "Thônex", "Carouge", "Meyrin", "Vernier", "Plan-les-Ouates", "Versoix"];
   const findCity = (text: string) => {
     const normalized = text.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
     return cities.find(city => {
