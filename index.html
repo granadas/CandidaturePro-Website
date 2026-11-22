@@ -36,7 +36,8 @@
       <figure class="product-preview">
         <div class="preview-header"><span>Candidature Pro</span><span>Aperçu du suivi</span></div>
         <div class="preview-body">
-          <h2>Mes candidatures</h2>
+          <h2>Mes candidatures <small class="demo-tag">Démonstration · données fictives</small></h2>
+          <div class="demo-filters" role="group" aria-label="Filtrer les candidatures de démonstration"><button type="button" class="demo-filter active" data-demo-filter="all" aria-pressed="true">Toutes</button><button type="button" class="demo-filter" data-demo-filter="sent" aria-pressed="false">Envoyées</button><button type="button" class="demo-filter" data-demo-filter="reply" aria-pressed="false">Réponses</button><button type="button" class="demo-filter" data-demo-filter="interview" aria-pressed="false">Entretiens</button></div>
           <div class="preview-row"><div><strong>Assistant logistique</strong><small>Genève</small></div><span class="preview-status sent">Envoyée</span></div>
           <div class="preview-row"><div><strong>Employé administratif</strong><small>Lausanne</small></div><span class="preview-status reply">Réponse reçue</span></div>
           <div class="preview-row"><div><strong>Conseiller clientèle</strong><small>Nyon</small></div><span class="preview-status interview">Entretien</span></div>
@@ -75,5 +76,20 @@
 
   <footer><div class="shell footer-grid"><div><a class="brand" href="#top"><span class="brand-mark"><img src="assets/logo.png" alt=""></span><span>Candidature Pro</span></a><p>Un espace en ligne pour organiser, envoyer et suivre vos candidatures, avec une application Windows facultative.</p></div><div><b>Produit</b><a href="#product">Fonctionnalités</a><a href="#premium">Free & Premium</a></div><div><b>Aide</b><a href="#faq">FAQ</a><a href="mailto:jobrufali@gmail.com?subject=Support%20Candidature%20Pro">Support</a></div></div><div class="shell footer-bottom"><span>© 2026 Candidature Pro</span><span>Site et application Windows · Suisse</span></div></footer>
   <script src="script.js"></script>
+<script>
+  document.querySelectorAll("[data-demo-filter]").forEach(button => {
+    button.addEventListener("click", () => {
+      const status = button.dataset.demoFilter;
+      document.querySelectorAll("[data-demo-filter]").forEach(item => {
+        const active = item === button;
+        item.classList.toggle("active", active);
+        item.setAttribute("aria-pressed", String(active));
+      });
+      document.querySelectorAll("[data-demo-status]").forEach(row => {
+        row.hidden = status !== "all" && row.dataset.demoStatus !== status;
+      });
+    });
+  });
+</script>
 </body>
 </html>
