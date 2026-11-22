@@ -735,6 +735,19 @@
     }
   }
 
+  function trustedJobSourceUrl(job) {
+    const safeUrl = safeExternalUrl(job?.url);
+    if (!safeUrl) return "";
+    try {
+      const parsed = new URL(safeUrl);
+      if (parsed.protocol !== "https:") return "";
+      if (job.source === "JobScout24" &&
+          !["jobscout24.ch", "www.jobscout24.ch"].includes(parsed.hostname.toLowerCase())) return "";
+      if (job.source === "JobScout24" && !parsed.pathname.startsWith("/fr/job/")) return "";
+      return safeUrl;
+    } catch { return ""; }
+  }
+
   function normalizeCompany(company) {
     return {
       id: company.company_id ?? company.id ?? "",
@@ -837,18 +850,7 @@
     }
 
     container.innerHTML = jobResults.map((job, index) => {
-      const safeUrl = safeExternalUrl(job.url);
-      const trustedJobLink = (() => {
-        if (!safeUrl) return "";
-        try {
-          const parsed = new URL(safeUrl);
-          if (parsed.protocol !== "https:") return "";
-          if (job.source === "JobScout24" &&
-              !["jobscout24.ch", "www.jobscout24.ch"].includes(parsed.hostname.toLowerCase())) return "";
-          if (job.source === "JobScout24" && !parsed.pathname.startsWith("/fr/job/")) return "";
-          return safeUrl;
-        } catch { return ""; }
-      })();
+      const trustedJobLink = trustedJobSourceUrl(job);
       const sourceLink = trustedJobLink
         ? '<a class="secondary compact" href="' + escapeHtml(trustedJobLink) + '" target="_blank" rel="noopener noreferrer">Voir l’annonce</a>'
         : "";
@@ -3450,7 +3452,7 @@
       document.querySelector("#job-company-status").textContent = "";
       document.querySelector("#job-company-title").textContent = job.title;
       const source = document.querySelector("#job-company-source");
-      source.href = safeExternalUrl(job.url) || "#";
+      source.href = trustedJobSourceUrl(job) || "#";
       source.hidden = source.href.endsWith("#");
       dialog.showModal();
       document.querySelector("#job-company-name").focus();
