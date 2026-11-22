@@ -33,3 +33,12 @@ test("keywords are scored on whole words and omitted from the overall score with
   assert.equal(analyze(fields, "logisticien").keywords, 0);
   assert.equal(analyze(fields, "").hasTarget, false);
 });
+
+test("the live CV word counter separates spaces and line breaks", () => {
+  const start = source.indexOf('    const written = ["summary", "experience", "education", "skills"]');
+  const end = source.indexOf('    const lengthLabel =', start);
+  assert.ok(start > 0 && end > start);
+  const count = runInNewContext(`(fields) => { ${source.slice(start, end)} return wordCount; }`, {});
+  assert.equal(count({ summary: "Deux mots", experience: "Une\nautre ligne", education: "", skills: "" }), 5);
+  assert.equal(count({ summary: "", experience: "", education: "", skills: "" }), 0);
+});
