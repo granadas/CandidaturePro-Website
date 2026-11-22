@@ -298,12 +298,17 @@
       </section>
 
       <section id="documents-view" class="view">
-        <div class="documents-switcher" role="group" aria-label="Choisir une activité dans Documents">
-          <button type="button" class="documents-switch active" data-documents-tab="cv" aria-pressed="true"><strong>1. Créer mon CV</strong><span>Modèle, contenu et aperçu</span></button>
-          <button type="button" class="documents-switch" data-documents-tab="analysis" aria-pressed="false"><strong>2. Améliorer mon CV</strong><span>Analyse et conseils Premium</span></button>
-          <button type="button" class="documents-switch" data-documents-tab="files" aria-pressed="false"><strong>3. Mes fichiers</strong><span>CV, lettres et certificats PDF</span></button>
+        <header class="documents-home-head">
+          <span class="documents-home-eyebrow">MON ESPACE DOCUMENTS</span>
+          <h1>Que souhaitez-vous faire ?</h1>
+          <p>Choisissez une action. Les autres outils restent disponibles à tout moment.</p>
+        </header>
+        <div class="documents-switcher" role="group" aria-label="Que souhaitez-vous faire dans Documents ?">
+          <button type="button" class="documents-switch active" data-documents-tab="cv" aria-pressed="true"><span class="documents-switch-icon" aria-hidden="true">✎</span><span class="documents-switch-copy"><strong>Créer ou modifier un CV</strong><span>Choisir un modèle, écrire et enregistrer</span></span><span class="documents-switch-arrow" aria-hidden="true">›</span></button>
+          <button type="button" class="documents-switch" data-documents-tab="files" aria-pressed="false"><span class="documents-switch-icon" aria-hidden="true">▤</span><span class="documents-switch-copy"><strong>Retrouver mes fichiers</strong><span>CV, lettres, diplômes et certificats</span></span><span class="documents-switch-arrow" aria-hidden="true">›</span></button>
+          <button type="button" class="documents-switch" data-documents-tab="analysis" aria-pressed="false"><span class="documents-switch-icon" aria-hidden="true">✦</span><span class="documents-switch-copy"><strong>Vérifier et améliorer mon CV</strong><span>Conseils et analyse du contenu</span></span><span class="documents-switch-arrow" aria-hidden="true">›</span></button>
         </div>
-        <p class="documents-switch-hint" id="documents-switch-hint" role="status">Étape 1 : créez votre CV ou importez un CV existant.</p>
+        <p class="documents-switch-hint" id="documents-switch-hint" role="status">Créez un CV ou modifiez un CV déjà enregistré.</p>
         <div data-documents-panel="cv">
         <header class="cv-studio-hero">
           <div><span class="cv-studio-kicker">ATELIER CV · CANDIDATURE PRO</span><h1>Un CV qui vous ressemble.</h1><p>Rassemblez vos expériences, choisissez une présentation et voyez le résultat avant de l’envoyer.</p></div>
@@ -711,7 +716,7 @@
       document.querySelectorAll("[data-documents-panel]").forEach(panel => {
         panel.hidden = panel.dataset.documentsPanel !== selected;
       });
-      const descriptions = {cv:"Étape 1 : créez votre CV ou importez un CV existant.",analysis:"Étape 2 : consultez l’analyse et les conseils pour votre CV.",files:"Étape 3 : retrouvez vos documents PDF enregistrés."};
+      const descriptions = {cv:"Créez un CV ou modifiez un CV déjà enregistré.",analysis:"Consultez les conseils pour améliorer votre CV.",files:"Retrouvez vos documents PDF enregistrés."};
       document.querySelector("#documents-switch-hint").textContent = descriptions[selected];
     });
   });
