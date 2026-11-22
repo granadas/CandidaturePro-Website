@@ -445,3 +445,23 @@
 .documents-panel-enter{animation:documentsPanelReveal .3s cubic-bezier(.2,.75,.2,1) both}
 @keyframes documentsPanelReveal{from{opacity:.35;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 @media(prefers-reduced-motion:reduce){.documents-switch,.documents-switch::after,.documents-switch-icon,.documents-switch-arrow{transition:none!important}.documents-panel-enter{animation:none!important}.documents-switch:hover{transform:none}}
+
+/* A calm, readable hierarchy across every application menu. */
+.app-shell{background:#f6f7fb}
+.sidebar{background:#fff;box-shadow:5px 0 34px rgba(25,28,56,.025)}
+.sidebar nav{gap:4px}
+.sidebar .nav-item{min-height:43px;position:relative;transition:background-color .16s,color .16s,transform .16s}
+.sidebar .nav-item:hover{transform:translateX(2px)}
+.sidebar .nav-item.active{background:#f2ecfb;color:#482087;font-weight:800}
+.sidebar .nav-item.active::before{content:"";position:absolute;left:0;top:9px;bottom:9px;width:3px;border-radius:3px;background:#6d28d9}
+.view{padding:clamp(20px,3vw,42px);max-width:1440px}
+.view-intro{position:relative;max-width:100%;margin:0 0 25px;padding:25px clamp(22px,3vw,34px);border:1px solid #e2e4ee;border-radius:20px;background:linear-gradient(120deg,#fff 58%,#f7f2ff);box-shadow:0 12px 34px rgba(31,29,62,.035)}
+.view-intro::before{content:"";position:absolute;left:0;top:25px;bottom:25px;width:3px;border-radius:3px;background:#8b5bd2}
+.view-intro-eyebrow{display:block;margin-bottom:8px;color:#6740a0;font-size:11px;font-weight:850;letter-spacing:.15em}
+.view-intro h1{margin:0;color:#201a31;font-size:clamp(26px,2.4vw,34px);font-weight:800;letter-spacing:-.035em;line-height:1.15}
+.view-intro p{max-width:70ch;margin:9px 0 0;color:#596277;font-size:15px;line-height:1.55}
+.view>.panel,.view>.applications-layout>.panel,.view .panel{box-shadow:0 9px 28px rgba(31,29,62,.025)}
+.view .panel h2{font-size:clamp(19px,1.7vw,23px);letter-spacing:-.02em;line-height:1.25}
+.view .panel p{line-height:1.6}
+.view :is(button,a,input,select,textarea):focus-visible{outline:3px solid #7e43ce;outline-offset:2px}
+@media(max-width:600px){.view-intro{padding:20px;margin-bottom:18px}.view-intro p{font-size:14px}.sidebar .nav-item:hover{transform:none}}
