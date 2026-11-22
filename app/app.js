@@ -3366,6 +3366,36 @@
     }
   });
 
+  // User-initiated device-only search preferences; no background alerts or server writes.
+  const jobSearchPrefsKey = "cp-job-search-preferences-v1";
+  const jobSearchInputs = [["query", "#jobs-query"], ["city", "#jobs-city"], ["sector", "#jobs-sector"], ["recent", "#jobs-recent-only"], ["employer", "#jobs-known-employer-only"]];
+  document.querySelector("#jobs-save-search").addEventListener("click", () => {
+    const status = document.querySelector("#jobs-saved-search-status");
+    try {
+      const values = Object.fromEntries(jobSearchInputs.map(([key, selector]) => {
+        const input = document.querySelector(selector);
+        return [key, input.type === "checkbox" ? input.checked : input.value];
+      }));
+      localStorage.setItem(jobSearchPrefsKey, JSON.stringify(values));
+      status.textContent = "Filtres mémorisés sur cet appareil. Aucune alerte automatique n'est activée.";
+    } catch { status.textContent = "Impossible de mémoriser les filtres sur cet appareil."; }
+  });
+  document.querySelector("#jobs-load-search").addEventListener("click", () => {
+    const status = document.querySelector("#jobs-saved-search-status");
+    try {
+      const saved = JSON.parse(localStorage.getItem(jobSearchPrefsKey) || "null");
+      if (!saved || typeof saved !== "object") { status.textContent = "Aucun filtre mémorisé sur cet appareil."; return; }
+      for (const [key, selector] of jobSearchInputs) {
+        const input = document.querySelector(selector);
+        if (typeof saved[key] === (input.type === "checkbox" ? "boolean" : "string")) {
+          if (input.type === "checkbox") input.checked = saved[key];
+          else if (input.tagName !== "SELECT" || [...input.options].some(option => option.value === saved[key])) input.value = saved[key];
+        }
+      }
+      status.textContent = "Filtres rétablis. Cliquez sur Rechercher pour actualiser les offres.";
+    } catch { status.textContent = "Les filtres enregistrés ne peuvent pas être relus."; }
+  });
+
   document.querySelector("#jobs-search-form").addEventListener("submit", async event => {
     event.preventDefault();
     const button = document.querySelector("#jobs-search-submit");
