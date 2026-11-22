@@ -4815,7 +4815,7 @@
     }
     if (signupConfirmation?.error) {
       if (appShell.hidden) { setAuthMode("signin"); loginMessage.textContent = signupConfirmation.error; if (!dialog.open) dialog.showModal(); }
-      else { showView("settings"); passwordRecoveryStatus.textContent = signupConfirmation.error; }
+      // A confirmation link may be revisited after successful verification. Never show an error to an authenticated user.
     }
     try { await loadDashboard(); }
     catch (error) {

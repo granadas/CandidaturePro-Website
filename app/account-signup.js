@@ -13,9 +13,9 @@
       over_request_rate_limit: 'Trop de demandes rapprochées. Patientez avant de réessayer.',
       email_exists: 'Essayez de vous connecter ou utilisez « Mot de passe oublié ».',
       user_already_exists: 'Essayez de vous connecter ou utilisez « Mot de passe oublié ».',
-      otp_expired: 'Ce lien a expiré. Renvoyez le message de confirmation ou essayez de vous connecter.',
-      flow_state_expired: 'Ce lien a expiré. Essayez de vous connecter avec votre e-mail et votre mot de passe.',
-      flow_state_not_found: 'Ce lien n’est plus utilisable ici. Essayez de vous connecter avec votre e-mail et votre mot de passe.'
+      otp_expired: 'Ce lien est déjà utilisé ou a expiré. Si vous avez confirmé votre adresse, connectez-vous avec votre mot de passe. Sinon, demandez un nouveau message.',
+      flow_state_expired: 'Ce lien ne peut plus être utilisé. Essayez d’abord de vous connecter avec votre e-mail et votre mot de passe.',
+      flow_state_not_found: 'Ce lien ne peut plus être utilisé ici. Si votre adresse est déjà confirmée, connectez-vous avec votre mot de passe.'
     };
     const error = new Error(messages[code] || fallback); error.code = code; error.definitive = true; return error;
   }
