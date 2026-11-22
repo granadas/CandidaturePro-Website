@@ -2285,6 +2285,10 @@
     document.querySelector("#cv-live-style").textContent = cvTemplateNames[template] || "Classique";
     const fields = Object.fromEntries(cvFieldNames.map(name => [name, form.elements.namedItem(name).value]));
     window.CP_CV_RENDER.render(document.querySelector("#cv-live-paper"), fields, { placeholder: true });
+    const written = ["summary", "experience", "education", "skills"].map(key => fields[key] || "").join(" ").trim();
+    const wordCount = written ? written.split(/\\s+/).length : 0;
+    const lengthLabel = document.querySelector("#cv-live-length");
+    lengthLabel.textContent = wordCount + " mots de contenu · " + (wordCount > 650 ? "CV long : contrôlez les sauts de page et envisagez deux pages." : wordCount > 400 ? "CV détaillé : vérifiez la lisibilité et la pagination avant l'export." : "Vérifiez le rendu final avant l'export PDF.");
   }
   document.querySelectorAll("[data-cv-template]").forEach(button => button.addEventListener("click", () => {
     if (button.dataset.cvTemplate !== "classic" && !hasPremiumCv()) {
