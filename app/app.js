@@ -857,16 +857,18 @@
       const checkedAt = Date.parse(job.updated_at || "");
       const daysSinceCheck = Number.isFinite(checkedAt) ? Math.floor((Date.now() - checkedAt) / 86400000) : Infinity;
       const lastSearched = Number.isFinite(checkedAt)
-        ? '<small>Retrouvée dans une recherche le ' + escapeHtml(new Date(checkedAt).toLocaleDateString("fr-CH", { day: "numeric", month: "long", year: "numeric" })) + '</small>'
+        ? '<small>Fiche mise à jour le ' + escapeHtml(new Date(checkedAt).toLocaleDateString("fr-CH", { day: "numeric", month: "long", year: "numeric" })) + '</small>'
         : "";
-      const freshnessNote = daysSinceCheck > 30
-        ? '<small>Annonce ancienne : non retrouvée depuis plus de 30 jours — disponibilité à confirmer sur le site source.</small>'
-        : '<small>Annonce retrouvée récemment — disponibilité à confirmer sur le site source.</small>';
+      const availabilityNote = job.availability_status === "accessible" && job.availability_checked_at
+        ? '<small>Lien accessible lors du contrôle du ' + escapeHtml(new Date(job.availability_checked_at).toLocaleDateString("fr-CH")) + ' — disponibilité du poste à confirmer.</small>'
+        : job.availability_status === "suspected_expired"
+          ? '<small>Attention : lien potentiellement expiré — vérifiez sur le site source.</small>'
+          : '<small>Disponibilité du poste non vérifiée — consultez le site source.</small>';
       return '<article class="job-card" data-job-index="' + index + '">' +
         '<div class="job-card-main"><strong>' + escapeHtml(job.title) + '</strong>' +
         '<span>' + escapeHtml(job.company_name || "Employeur à vérifier") + ' • ' + escapeHtml(job.location) + '</span>' +
         '<small>Catégorie de recherche : ' + escapeHtml(job.sector) + ' • ' + escapeHtml(job.source) + '</small>' +
-        '<p>' + escapeHtml(job.snippet) + '</p>' + lastSearched + freshnessNote + '</div>' +
+        '<p>' + escapeHtml(job.snippet) + '</p>' + lastSearched + availabilityNote + '</div>' +
         '<div class="job-card-actions">' + sourceLink +
         '<button class="primary compact" data-action="add-job">' + (job.company_name?.trim() ? "Ajouter aux candidatures" : "Renseigner l’employeur") + '</button></div></article>';
     }).join("");
