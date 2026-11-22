@@ -33,7 +33,7 @@ function jobIdentity(title: string, snippet: string) {
   const captionCompany = snippet.match(/\bchez\s+(.+?)\s+-\s+.+?\s+sur\s+JobScout24\b/i)?.[1]?.trim() ?? "";
   // JobScout24 also exposes explicit "Emploi <role> chez <employer> - <place>"
   // snippets without a trailing "sur JobScout24" caption.
-  const jobListingCompany = snippet.match(/^Emploi\s+.{3,180}?\s+chez\s+(.{2,120}?)\s+-\s+[^.]{2,120}(?:\s*\.\.\.|\s*[.!?]|$)/iu)?.[1]?.trim() ?? "";
+  const jobListingCompany = snippet.match(/^(?:Emploi|Offre d[’\x27]emploi|Poste)\s+.{3,180}?\s+chez\s+(.{2,120}?)\s+-\s+[^.]{2,120}(?:\s*\.\.\.|\s*[.!?]|$)/iu)?.[1]?.trim() ?? "";
   // Some JobScout24 results omit "poste chez" but include an explicit
   // "Employer | City" caption. Do not infer an employer from prose mentioning
   // clients, partners or a company unrelated to the hiring organization.
