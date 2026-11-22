@@ -33,3 +33,11 @@
 @media(max-width:850px){.hero-electric .product-preview{transform:none;margin-bottom:14px}.hero-electric .product-preview::after{right:-5px}}
 
 @media(max-width:720px){.nav-actions a[href*="inscription"]{display:none}.nav{justify-content:space-between;gap:12px}.nav .brand{font-size:15px}.nav-actions .btn{padding:10px 12px;font-size:13px}}
+
+/* Interactive landing-page demo: fictional examples only */
+.demo-tag{display:inline-block;font-size:11px;font-weight:500;color:#a7d7ff;vertical-align:middle}
+.demo-filters{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0}
+.demo-filter{border:1px solid #456489;background:#152e50;color:#d7eaff;padding:6px 10px;border-radius:999px;font:inherit;font-size:12px;cursor:pointer}
+.demo-filter.active,.demo-filter[aria-pressed="true"]{background:#1468d8;color:#fff;border-color:#68b9ff}
+.demo-filter:focus-visible{outline:3px solid #8bd9ff;outline-offset:2px}
+.preview-row[hidden]{display:none!important}
