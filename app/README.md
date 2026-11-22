@@ -24,6 +24,9 @@ L’espace candidat est servi sur https://candidaturepro.ch/app/. Le domaine `ww
 
 ## Configuration
 
+Le modèle de confirmation Supabase est conservé dans `supabase/auth/confirm-sign-up.html` (objet « Confirmez votre adresse e-mail | Candidature Pro »). Il est appliqué dans Authentication → Emails → Confirm sign up. L'expéditeur SMTP Brevo est `notifications@transactional.candidaturepro.ch` ; ce sous-domaine est authentifié. L'authentification du domaine racine est distincte et n'est pas nécessaire pour cet expéditeur. Vérifier le placement réel des prochains messages côté destinataire : le statut « Delivered » de Brevo ne garantit pas la boîte de réception. Le suivi des clics Brevo réécrit actuellement le lien de confirmation ; ne pas modifier le format du lien Supabase sans tester le parcours PKCE complet.
+
+
 Configuration Auth vérifiée le 18 novembre 2026 : URL principale `https://candidaturepro.ch/app/` et quatre retours exacts (production et préversion, avec et sans `?recuperation=1`). Pour une nouvelle installation, autoriser `https://candidaturepro.ch/app/?recuperation=1` (et l’URL équivalente de préversion) pour le retour des liens de récupération. La livraison réelle du lien et le changement du mot de passe nécessitent une validation par le titulaire du compte.
 
 L’application Entra « Candidature Pro Web » utilise le client ID `ca57f550-c62d-45e7-aea4-26155c629b44`, les comptes Microsoft personnels et professionnels et une redirection Web vers `https://jmzyomfflghwwrqceopm.supabase.co/auth/v1/callback`. Le fournisseur Azure est activé côté Supabase ; son secret ne doit pas figurer dans ce dépôt. La connexion Microsoft est distincte de l’accès Outlook aux courriels décrit plus bas.
