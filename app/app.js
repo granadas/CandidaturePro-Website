@@ -838,8 +838,19 @@
 
     container.innerHTML = jobResults.map((job, index) => {
       const safeUrl = safeExternalUrl(job.url);
-      const sourceLink = safeUrl
-        ? '<a class="secondary compact" href="' + escapeHtml(safeUrl) + '" target="_blank" rel="noopener noreferrer">Voir l’annonce</a>'
+      const trustedJobLink = (() => {
+        if (!safeUrl) return "";
+        try {
+          const parsed = new URL(safeUrl);
+          if (parsed.protocol !== "https:") return "";
+          if (job.source === "JobScout24" &&
+              !["jobscout24.ch", "www.jobscout24.ch"].includes(parsed.hostname.toLowerCase())) return "";
+          if (job.source === "JobScout24" && !parsed.pathname.startsWith("/fr/job/")) return "";
+          return safeUrl;
+        } catch { return ""; }
+      })();
+      const sourceLink = trustedJobLink
+        ? '<a class="secondary compact" href="' + escapeHtml(trustedJobLink) + '" target="_blank" rel="noopener noreferrer">Voir l’annonce</a>'
         : "";
       const checkedAt = Date.parse(job.updated_at || "");
       const daysSinceCheck = Number.isFinite(checkedAt) ? Math.floor((Date.now() - checkedAt) / 86400000) : Infinity;
