@@ -703,23 +703,6 @@
   <script src="cv-render.js?v=20261121-gallery"></script>
   <script src="account-signup.js?v=20261118"></script>
   <script src="app.js?v=20261121-gallery"></script>
-<script>
-  // Documents navigation is presentation-only: existing forms and handlers remain mounted.
-  document.querySelectorAll("[data-documents-tab]").forEach(button => {
-    button.addEventListener("click", () => {
-      const selected = button.dataset.documentsTab;
-      document.querySelectorAll("[data-documents-tab]").forEach(tab => {
-        const active = tab === button;
-        tab.classList.toggle("active", active);
-        tab.setAttribute("aria-pressed", String(active));
-      });
-      document.querySelectorAll("[data-documents-panel]").forEach(panel => {
-        panel.hidden = panel.dataset.documentsPanel !== selected;
-      });
-      const descriptions = {cv:"Créez un CV ou modifiez un CV déjà enregistré.",analysis:"Consultez les conseils pour améliorer votre CV.",files:"Retrouvez vos documents PDF enregistrés."};
-      document.querySelector("#documents-switch-hint").textContent = descriptions[selected];
-    });
-  });
-</script>
+<script src="documents-navigation.js?v=20261122"></script>
 </body>
 </html>
