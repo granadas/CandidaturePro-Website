@@ -234,7 +234,12 @@
     document.querySelector("#admin-view").classList.toggle("active", name === "admin");
     if (name === "admin") loadAdmin();
     document.querySelector("#settings-view").classList.toggle("active", name === "settings");
-    document.querySelectorAll(".nav-item[data-view]").forEach(item => item.classList.toggle("active", item.dataset.view === name));
+    document.querySelectorAll(".nav-item[data-view]").forEach(item => {
+      const active = item.dataset.view === name;
+      item.classList.toggle("active", active);
+      if (active) item.setAttribute("aria-current", "page");
+      else item.removeAttribute("aria-current");
+    });
 
     const [title, subtitle] = titles[name] || ["Candidature Pro", "Espace en ligne"];
     document.querySelector("#page-title").textContent = title;
@@ -258,6 +263,7 @@
     if (isDocuments) { loadDocuments(); loadCvVariants(); loadCvAnalysisHistory(); }
     if (name === "settings") { loadGmail(); loadOutlook(); }
     setMobileMenuOpen(false);
+    window.scrollTo(0, 0);
   }
 
   async function authRequest(grantType, body) {
