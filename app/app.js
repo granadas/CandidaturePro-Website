@@ -842,7 +842,7 @@
   function renderJobs() {
     const container = document.querySelector("#jobs-results");
     document.querySelector("#jobs-results-count").textContent =
-      jobResults.length + " offre" + (jobResults.length > 1 ? "s" : "");
+      jobResults.length + " offre" + (jobResults.length === 1 ? "" : "s");
 
     if (!jobResults.length) {
       container.innerHTML = '<div class="empty-list"><strong>Aucune offre trouvée</strong><span>Modifiez le métier, la ville ou le secteur.</span></div>';
@@ -927,7 +927,7 @@
     const city = cleanSearchTerm(document.querySelector("#jobs-city").value);
     const sector = document.querySelector("#jobs-sector").value;
     renderJobPlatforms(query, city);
-    const filters = ["active=eq.true"];
+    const filters = ["active=eq.true", "availability_status=neq.confirmed_expired"];
     if (query) {
       const pattern = encodeURIComponent("*" + query + "*");
       filters.push("or=(title.ilike." + pattern + ",company_name.ilike." + pattern + ",snippet.ilike." + pattern + ")");
@@ -942,7 +942,7 @@
     message.textContent = "Chargement…";
     try {
       const results = await supabaseFetch(
-        "job_market_offers?select=id,title,company_name,location,sector,source,url,snippet,discovered_at,updated_at&" +
+        "job_market_offers?select=id,title,company_name,location,sector,source,url,snippet,discovered_at,updated_at,availability_status,availability_checked_at&" +
         filters.join("&") + "&order=updated_at.desc&limit=1000"
       );
       if (!current()) return;
