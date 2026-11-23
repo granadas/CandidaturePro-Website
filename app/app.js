@@ -839,7 +839,8 @@
       companyResults = usableCachedCompanies;
       renderCompanies();
       source.textContent = "Résultats récents";
-      message.textContent = companyResults.length + " entreprise" + (companyResults.length > 1 ? "s trouvées." : " trouvée.");
+      message.textContent = companyResults.length + " entreprise" + (companyResults.length > 1 ? "s trouvées." : " trouvée.") +
+        (cachedCompanies.length >= 100 ? " Au moins 100 fiches ont été récupérées : la liste peut être incomplète. Affinez la ville ou le rayon." : "");
       await supabaseRpc("record_company_search_event", { p_sector: sector || "Tous les secteurs", p_city: city });
       return;
     }
@@ -869,9 +870,12 @@
     companyResults = uniqueSearchableCompanies((Array.isArray(verified) ? verified : []).map(normalizeCompany));
     renderCompanies();
     source.textContent = quota.premium ? "Recherche Internet • Premium" : "Recherche Internet • " + (quota.used ?? "—") + "/" + (quota.limit ?? 5);
-    message.textContent = companyResults.length
+    message.textContent = (companyResults.length
       ? companyResults.length + " entreprise" + (companyResults.length > 1 ? "s trouvées." : " trouvée.")
-      : "Aucune entreprise trouvée pour ces critères.";
+      : "Aucune entreprise trouvée pour ces critères.") +
+      (rawCompanies.length >= 100 || (Array.isArray(verified) && verified.length >= 100)
+        ? " Au moins 100 fiches ont été récupérées : la liste peut être incomplète. Affinez la ville ou le rayon."
+        : "");
     if (companyResults.some(company => company.email)) {
       await supabaseRpc("review_discovered_company_emails", { p_companies: companyResults });
     }
