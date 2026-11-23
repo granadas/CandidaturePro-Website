@@ -37,7 +37,7 @@
     elements[elements.length - 1].after(bar);
     return bar;
   });
-  function show(index) {
+  function show(index, scroll = true) {
     if (index < 0 || index >= sections.length) return;
     active = index;
     sections.forEach((elements, step) => {
@@ -49,7 +49,7 @@
       button.classList.toggle("active", step === index);
       button.textContent = (step + 1) + ". " + labels[step];
     });
-    headings[index].scrollIntoView({ behavior: "smooth", block: "start" });
+    if (scroll) headings[index].scrollIntoView({ behavior: "smooth", block: "start" });
   }
   buttons.forEach((button, index) => button.addEventListener("click", event => {
     event.preventDefault();
@@ -59,5 +59,5 @@
     const step = sections.findIndex(elements => elements.some(element => element === event.target || element.contains(event.target)));
     if (step >= 0 && step !== active) show(step);
   }, true);
-  show(0);
+  show(0, false);
 })();
