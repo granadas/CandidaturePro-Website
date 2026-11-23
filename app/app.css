@@ -552,3 +552,13 @@
   .cv-studio-layout[data-cv-step]:not([data-cv-step="4"]):not(.cv-preview-expanded) .cv-live-aside{display:none!important}
   .cv-studio-layout[data-cv-step="4"] .cv-mobile-preview-toggle{display:none}
 }
+
+/* Put the preview switch above the mobile form, and reveal the preview there when requested. */
+@media(max-width:700px){
+  .cv-studio-layout .cv-mobile-preview-toggle{order:0;margin:0 0 4px}
+  .cv-studio-layout .cv-studio-form{order:1}
+  .cv-studio-layout .cv-live-aside{order:2}
+  .cv-studio-layout.cv-preview-expanded .cv-live-aside{order:0}
+  .cv-studio-layout.cv-preview-expanded .cv-mobile-preview-toggle{order:1}
+  .cv-studio-layout.cv-preview-expanded .cv-studio-form{order:2}
+}
