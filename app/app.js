@@ -2354,6 +2354,38 @@
       ["#cv-degree", "#cv-school", "#cv-degree-dates"]);
   });
 
+  document.querySelector("#cv-add-skill").addEventListener("click", () => {
+    const kind = document.querySelector("#cv-skill-kind").value;
+    const nameField = document.querySelector("#cv-skill-name");
+    const levelField = document.querySelector("#cv-skill-level");
+    const feedback = document.querySelector("#cv-skill-feedback");
+    const target = cvForm.elements.skills;
+    const name = nameField.value.trim().replace(/\s+/g, " ");
+    const level = levelField.value.trim().replace(/\s+/g, " ");
+    if (!name) {
+      feedback.textContent = "Indiquez une compétence ou une langue.";
+      nameField.focus();
+      return;
+    }
+    const entry = (kind === "language" ? "Langue : " : "") + name + (level ? " · " + level : "");
+    const lines = target.value.split(/\r?\n/).map(line => line.trim().toLocaleLowerCase("fr"));
+    if (lines.includes(entry.toLocaleLowerCase("fr"))) {
+      feedback.textContent = "Cette entrée figure déjà dans votre CV.";
+      return;
+    }
+    const updated = [target.value.trim(), entry].filter(Boolean).join("\n");
+    if (updated.length > target.maxLength) {
+      feedback.textContent = "La rubrique est pleine. Raccourcissez une entrée.";
+      return;
+    }
+    target.value = updated;
+    nameField.value = "";
+    levelField.value = "";
+    feedback.textContent = "Ajouté au CV.";
+    syncCvStudio();
+    nameField.focus();
+  });
+
   const cvPdfFile = document.querySelector("#cv-pdf-file"), cvPdfStatus = document.querySelector("#cv-pdf-status");
   const cvPdfText = document.querySelector("#cv-pdf-text"), cvPdfReview = document.querySelector("#cv-pdf-review");
   const cvPdfCancel = document.querySelector("#cv-pdf-cancel");
