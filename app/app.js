@@ -782,14 +782,9 @@
       // City alone is not a unique location: several branches may share it.
       // Without an address, only deduplicate when a stronger identifier exists.
       const contact = canonical(company.phone || company.email);
-      const website = canonical(company.website);
       const key = address
         ? name + "|address|" + address
-        : contact
-          ? name + "|contact|" + contact
-          : website
-            ? name + "|website|" + website + "|city|" + canonical(company.city)
-            : "";
+        : contact ? name + "|contact|" + contact : "";
       if (!key) return true;
       if (seen.has(key)) return false;
       seen.add(key);
