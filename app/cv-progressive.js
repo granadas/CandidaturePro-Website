@@ -91,6 +91,22 @@
     event.preventDefault();
     show(index);
   }));
+  // Reveal the first invalid step before the browser tries to focus a hidden field.
+  // This also covers users who jump directly to Finaliser using the step navigation.
+  form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach(submit => {
+    submit.addEventListener("click", event => {
+      const invalid = Array.from(form.elements).find(field =>
+        field.willValidate && !field.checkValidity()
+      );
+      if (!invalid) return;
+      event.preventDefault();
+      const step = sections.findIndex(elements =>
+        elements.some(element => element === invalid || element.contains(invalid))
+      );
+      if (step >= 0) show(step);
+      invalid.reportValidity();
+    });
+  });
   form.addEventListener("invalid", event => {
     const step = sections.findIndex(elements => elements.some(element => element === event.target || element.contains(event.target)));
     if (step >= 0 && step !== active) show(step);
