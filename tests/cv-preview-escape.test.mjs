@@ -6,6 +6,7 @@ const wizard = readFileSync(new URL("../app/cv-progressive.js", import.meta.url)
 test("Escape closes expanded CV preview and returns keyboard focus", () => {
   assert.match(wizard, /document\.addEventListener\("keydown", event => \{/);
   assert.match(wizard, /event\.key !== "Escape"/);
+  assert.match(wizard, /!layout\.contains\(document\.activeElement\)/);
   assert.match(wizard, /layout\.classList\.remove\("cv-preview-expanded"\)/);
   assert.match(wizard, /previewToggle\.focus\(\{ preventScroll: true \}\)/);
 });
