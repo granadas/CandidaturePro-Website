@@ -25,7 +25,7 @@
   if (preview) {
     preview.id ||= "cv-live-preview";
     previewToggle.setAttribute("aria-controls", preview.id);
-    preview.before(previewToggle);
+    form.before(previewToggle);
     previewToggle.addEventListener("click", () => {
       const expanded = previewToggle.getAttribute("aria-expanded") !== "true";
       previewToggle.setAttribute("aria-expanded", String(expanded));
