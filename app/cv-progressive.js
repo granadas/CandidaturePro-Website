@@ -47,7 +47,16 @@
       const next = document.createElement("button");
       next.type = "button"; next.className = "primary";
       next.textContent = "Continuer : " + labels[index + 1] + " →";
-      next.addEventListener("click", () => show(index + 1));
+      next.addEventListener("click", () => {
+        const required = sections[index]
+          .flatMap(element => Array.from(element.matches("input, select, textarea") ? [element] : element.querySelectorAll("input, select, textarea")))
+          .filter(input => input.willValidate && input.required && !input.checkValidity());
+        if (required.length) {
+          required[0].reportValidity();
+          return;
+        }
+        show(index + 1);
+      });
       bar.append(next);
     }
     elements[elements.length - 1].after(bar);
