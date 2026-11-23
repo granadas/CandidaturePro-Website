@@ -1741,7 +1741,7 @@
           (row.hidden_at ? "Réafficher" : "Masquer du suivi") + '</button></div>' +
           (showReminder ? '<form class="application-form tracking-form" data-id="' + escapeHtml(row.id) + '">' +
           '<label>Date de relance<input name="follow-up" type="date" value="' + localDate + '"></label>' +
-          '<label>Délai entre les relances (jours)<input name="follow-up-delay" type="number" required min="1" max="365" value="' + row.follow_up_delay_days + '"></label>' +
+          '<label>Délai entre les relances (jours)<input name="follow-up-delay" type="number" required min="1" max="365" value="' + escapeHtml(Number.isInteger(Number(row.follow_up_delay_days)) && Number(row.follow_up_delay_days) >= 1 && Number(row.follow_up_delay_days) <= 365 ? Number(row.follow_up_delay_days) : 30) + '"></label>' +
           '<button type="submit" class="secondary compact">Enregistrer</button></form>' : "") + '</article>';
       }).join("");
       applyTrackingFilters();
