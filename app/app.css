@@ -533,3 +533,14 @@
   .cv-step-controls button{flex:1 1 100%}
 }
 @media(prefers-reduced-motion:reduce){.cv-wizard-progress-fill,.cv-studio-nav a{transition:none}}
+
+/* Final CV step: saving and exporting are separate, scannable decisions. */
+.cv-studio-form .cv-final-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:stretch}
+.cv-final-action-card{min-width:0;padding:21px;border:1px solid #e8e3f0;border-radius:17px;background:linear-gradient(145deg,#fff,#fbfaff);box-shadow:0 7px 22px rgba(35,22,65,.035)}
+.cv-final-action-index{font-size:10px;letter-spacing:.13em;font-weight:850;color:#7545ac}
+.cv-final-action-card h4{font-size:18px;letter-spacing:-.025em;margin:9px 0 6px;color:#2b2140}
+.cv-final-action-card>p{font-size:13px;color:#686078;line-height:1.55;margin:0 0 15px}
+.cv-final-action-buttons{display:flex;flex-wrap:wrap;gap:9px;margin-top:auto}
+.cv-final-action-buttons button{min-height:43px;border-radius:10px;flex:1 1 170px}
+.cv-final-action-card #cv-save-status{margin:12px 0 0}
+@media(max-width:800px){.cv-studio-form .cv-final-actions{grid-template-columns:1fr}.cv-final-action-card{padding:17px}}

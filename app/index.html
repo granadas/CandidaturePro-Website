@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#5b21b6">
   <meta name="description" content="Candidature Pro en ligne : recherchez, préparez, envoyez et suivez vos candidatures.">
   <title>Candidature Pro — Espace en ligne</title>
-  <link rel="stylesheet" href="app.css?v=20261123-cv-wizard-polish">
+  <link rel="stylesheet" href="app.css?v=20261123-cv-final-actions">
 </head>
 <body>
   <main id="guest-home" class="guest-home">
@@ -402,12 +402,28 @@
               <button class="secondary" type="button" id="cv-adapt">Prioriser les compétences pertinentes</button>
               <p id="cv-adapt-status" role="status"></p>
             </details>
-            <div class="wide cv-studio-heading" id="cv-finish"><span>04 · FINALISER</span><h3>Prêt à partager</h3><p>Relisez l’aperçu puis enregistrez votre variante pour la retrouver sur vos appareils.</p></div>
-            <div class="wide cv-studio-actions"><button type="submit" class="primary">Aperçu et impression PDF</button>
-            <button type="button" class="secondary" id="cv-word-export">Exporter en Word (.docx)</button>
-            <button type="button" class="secondary" id="cv-save">Enregistrer la variante</button>
-            <button type="button" class="secondary" id="cv-save-copy">Enregistrer une copie</button>
-            <p id="cv-save-status" role="status"></p></div>
+            <div class="wide cv-studio-heading" id="cv-finish"><span>04 · FINALISER</span><h3>Votre CV est presque prêt</h3><p>Vérifiez le résultat, enregistrez votre travail, puis choisissez le format de téléchargement.</p></div>
+            <div class="wide cv-studio-actions cv-final-actions">
+              <section class="cv-final-action-card" aria-labelledby="cv-save-heading">
+                <span class="cv-final-action-index">01 · CONSERVER</span>
+                <h4 id="cv-save-heading">Enregistrer mon CV</h4>
+                <p>Retrouvez ce CV plus tard et modifiez-le quand vous le souhaitez.</p>
+                <div class="cv-final-action-buttons">
+                  <button type="button" class="primary" id="cv-save">Enregistrer mon CV</button>
+                  <button type="button" class="secondary" id="cv-save-copy">Créer une copie</button>
+                </div>
+                <p id="cv-save-status" role="status" aria-live="polite"></p>
+              </section>
+              <section class="cv-final-action-card" aria-labelledby="cv-export-heading">
+                <span class="cv-final-action-index">02 · TÉLÉCHARGER</span>
+                <h4 id="cv-export-heading">Exporter mon CV</h4>
+                <p>Pour obtenir un PDF, ouvrez l’aperçu puis utilisez l’impression PDF de votre appareil.</p>
+                <div class="cv-final-action-buttons">
+                  <button type="submit" class="primary">Ouvrir l’aperçu PDF</button>
+                  <button type="button" class="secondary" id="cv-word-export">Télécharger en Word (.docx)</button>
+                </div>
+              </section>
+            </div>
           </form><aside class="cv-live-aside" aria-label="Aperçu instantané du CV"><div class="cv-live-top"><span>APERÇU EN DIRECT</span><span id="cv-live-style">Classique</span></div><div id="cv-live-paper" class="cv-live-paper"></div><p id="cv-live-length" class="cv-live-note" role="status" aria-live="polite"></p><p class="cv-live-note">Le même modèle est utilisé pour l’aperçu et l’impression PDF. Vérifiez les éventuels sauts de page avant l’envoi.</p></aside></div>
         </article>
 
