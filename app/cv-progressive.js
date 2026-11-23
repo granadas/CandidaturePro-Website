@@ -126,7 +126,16 @@
       name.textContent = labels[step];
       button.append(number, name);
     });
-    if (scroll) headings[index].scrollIntoView({ behavior: "smooth", block: "start" });
+    if (scroll) {
+      // Announce the new section to keyboard and screen-reader users.
+      // preventScroll keeps focus from fighting the intended scroll position.
+      headings[index].setAttribute("tabindex", "-1");
+      headings[index].focus({ preventScroll: true });
+      headings[index].scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+        block: "start"
+      });
+    }
   }
   buttons.forEach((button, index) => button.addEventListener("click", event => {
     event.preventDefault();
