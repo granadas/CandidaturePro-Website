@@ -544,3 +544,11 @@
 .cv-final-action-buttons button{min-height:43px;border-radius:10px;flex:1 1 170px}
 .cv-final-action-card #cv-save-status{margin:12px 0 0}
 @media(max-width:800px){.cv-studio-form .cv-final-actions{grid-template-columns:1fr}.cv-final-action-card{padding:17px}}
+
+/* On phones, keep the live CV preview available without overwhelming the form. */
+.cv-mobile-preview-toggle{display:none}
+@media(max-width:700px){
+  .cv-studio-layout .cv-mobile-preview-toggle{display:block;width:100%;min-height:46px;margin:12px 0;border:1px solid #d9c9ec;border-radius:12px;font-weight:750}
+  .cv-studio-layout[data-cv-step]:not([data-cv-step="4"]):not(.cv-preview-expanded) .cv-live-aside{display:none!important}
+  .cv-studio-layout[data-cv-step="4"] .cv-mobile-preview-toggle{display:none}
+}
