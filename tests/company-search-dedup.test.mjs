@@ -10,7 +10,10 @@ test("company search deduplicates cached and Internet results without merging di
   const fn = js.slice(start, end);
   assert.match(fn, /isSearchableCompany\(company\)/);
   assert.match(fn, /normalize\("NFKC"\)/);
-  assert.match(fn, /company\.address \|\| company\.city/);
+  assert.match(fn, /canonical\(company\.address\)/);
+  assert.match(fn, /canonical\(company\.id\)/);
+  assert.match(fn, /if \(!key\) return true/);
+  assert.doesNotMatch(fn, /canonical\(company\.address \|\| company\.city\)/);
   assert.match(fn, /seen\.has\(key\)/);
   assert.match(js, /companyResults = uniqueSearchableCompanies\(cachedCompanies\)/);
   assert.match(js, /companyResults = uniqueSearchableCompanies\(\(Array\.isArray\(verified\)/);
