@@ -28,7 +28,7 @@
     form.before(previewToggle);
     // Escape closes the mobile/tablet preview even when focus remains on the form.
     document.addEventListener("keydown", event => {
-      if (event.key !== "Escape" || !layout?.classList.contains("cv-preview-expanded")) return;
+      if (event.key !== "Escape" || !layout?.classList.contains("cv-preview-expanded") || !layout.contains(document.activeElement)) return;
       event.preventDefault();
       layout.classList.remove("cv-preview-expanded");
       previewToggle.setAttribute("aria-expanded", "false");
