@@ -2354,6 +2354,25 @@
       ["#cv-degree", "#cv-school", "#cv-degree-dates"]);
   });
 
+  // Guided career inputs: Enter adds an item instead of submitting the entire CV.
+  // Keep multiline achievements as a textarea, where Enter must create a new line.
+  [
+    { fields: ["#cv-job-role", "#cv-job-company", "#cv-job-dates"], action: "#cv-add-job", feedback: "#cv-job-feedback" },
+    { fields: ["#cv-degree", "#cv-school", "#cv-degree-dates"], action: "#cv-add-degree", feedback: "#cv-degree-feedback" }
+  ].forEach(group => {
+    const button = document.querySelector(group.action);
+    const feedback = document.querySelector(group.feedback);
+    group.fields.forEach(selector => {
+      const field = document.querySelector(selector);
+      field.addEventListener("input", () => { feedback.textContent = ""; });
+      field.addEventListener("keydown", event => {
+        if (event.key !== "Enter" || event.isComposing) return;
+        event.preventDefault();
+        button.click();
+      });
+    });
+  });
+
   const cvSkillKind = document.querySelector("#cv-skill-kind");
   const cvSkillName = document.querySelector("#cv-skill-name");
   const cvSkillLevel = document.querySelector("#cv-skill-level");
