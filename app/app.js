@@ -2321,11 +2321,12 @@
     const target = cvForm.elements.namedItem(targetName);
     const feedback = document.querySelector(feedbackId);
     const block = values.join("\n").trim();
-    if (target.value.trim().length + block.length + 2 > target.maxLength) {
+    const updated = [target.value.trim(), block].filter(Boolean).join("\n\n");
+    if (updated.length > target.maxLength) {
       feedback.textContent = "Ce champ est plein. Raccourcissez une entrée avant d’en ajouter une autre.";
       return;
     }
-    target.value = [target.value.trim(), block].filter(Boolean).join("\n\n");
+    target.value = updated;
     clearIds.forEach(id => { document.querySelector(id).value = ""; });
     feedback.textContent = "Ajouté au CV. Vous pouvez modifier le texte directement dans la rubrique ci-dessus.";
     syncCvStudio();
