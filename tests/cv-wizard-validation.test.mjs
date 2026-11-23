@@ -5,9 +5,9 @@ import { readFileSync } from "node:fs";
 const wizard = readFileSync(new URL("../app/cv-progressive.js", import.meta.url), "utf8");
 
 test("next step checks required fields before advancing", () => {
-  assert.match(wizard, /input\.willValidate && input\.required && !input\.checkValidity\(\)/);
-  assert.match(wizard, /required\[0\]\.reportValidity\(\)/);
-  assert.match(wizard, /if \(required\.length\) \{/);
+  assert.match(wizard, /field\.willValidate && !field\.checkValidity\(\)/);
+  assert.match(wizard, /invalid\.reportValidity\(\)/);
+  assert.match(wizard, /if \(!canNavigateTo\(index \+ 1\)\) return/);
   assert.match(wizard, /show\(index \+ 1\)/);
 });
 
