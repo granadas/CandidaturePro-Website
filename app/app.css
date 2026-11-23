@@ -493,3 +493,11 @@
   .topbar>.primary{padding:8px}
   .stats{grid-template-columns:1fr}
 }
+
+/* Progressive CV wizard: keep only the current step visible. */
+#cv-form > [hidden], #cv-form > .cv-step-controls[hidden] { display: none !important; }
+.cv-step-controls { display: flex; flex-wrap: wrap; gap: .75rem; margin: 1rem 0 1.5rem; }
+.cv-studio-nav a[aria-current="step"] { background: #ede9fe; color: #4c1d95; font-weight: 700; }
+@media (max-width: 640px) {
+  .cv-step-controls button { flex: 1 1 100%; }
+}

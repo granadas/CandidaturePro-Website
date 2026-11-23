@@ -324,9 +324,9 @@
           <a href="#cv-models">Présentation</a><a href="#cv-identity">Identité</a><a href="#cv-story">Parcours</a><a href="#cv-finish">Finaliser</a>
         </nav>
         <article class="panel cv-studio-panel">
-          <div class="cv-studio-section-head"><span class="cv-studio-section-icon" aria-hidden="true">✦</span><div><h2>Créer votre CV</h2><p>Commencez avec votre profil ou importez un document existant.</p></div></div>
-          <p class="cv-start-hint">Vous partez de zéro ? Remplissez simplement les champs ci-dessous. Vous avez déjà un CV ? Ouvrez l’option d’importation.</p>
-          <details class="cv-import-collapsible"><summary>J’ai déjà un CV — importer un fichier PDF, Word ou TXT</summary>
+          <div class="cv-studio-section-head"><span class="cv-studio-section-icon" aria-hidden="true">✦</span><div><h2>Créer votre CV étape par étape</h2><p>Choisissez un modèle, remplissez vos informations, puis téléchargez votre CV en PDF.</p></div></div>
+          <p class="cv-start-hint">Nouveau CV ? Commencez par choisir un modèle, puis renseignez votre identité et votre parcours. Vous pourrez voir le résultat à droite.</p>
+          <details class="cv-import-collapsible"><summary>J’ai déjà un CV : récupérer son contenu depuis un PDF, Word ou TXT</summary>
           <fieldset class="cv-pdf-import"><legend>Importer un CV PDF, Word ou TXT</legend>
             <p>La lecture s’effectue dans votre navigateur. Le fichier reste sur votre appareil pendant cette lecture. La bibliothèque de pièces jointes accepte les PDF. Les scans sans texte sélectionnable nécessitent une saisie manuelle.</p>
             <label>CV PDF, DOCX ou TXT (10 Mo maximum ; 20 pages pour un PDF)<input id="cv-pdf-file" type="file" accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"></label>
@@ -351,11 +351,11 @@
           </fieldset>
           </details>
           <div class="cv-studio-layout"><form id="cv-form" class="profile-form cv-studio-form">
-            <div class="wide cv-studio-heading" id="cv-models"><span>01 · PRÉSENTATION</span><h3>Choisissez votre modèle</h3><p>Le contenu reste le même : vous pouvez changer de style à tout moment.</p></div>
-            <label>CV enregistrés<select id="cv-variants"><option value="">Choisir un CV</option></select></label>
-            <div><button type="button" class="secondary" id="cv-load">Ouvrir</button>
-            <button type="button" class="secondary" id="cv-delete">Supprimer la variante sélectionnée</button>
-              <button type="button" class="secondary" id="cv-new">Nouveau</button></div>
+            <div class="wide cv-studio-heading" id="cv-models"><span>ÉTAPE 1 SUR 4 · APPARENCE</span><h3>1. Choisissez le style de votre CV</h3><p>Sélectionnez un modèle ci-dessous. Vous pourrez changer son apparence plus tard sans perdre vos informations.</p></div>
+            <label>Reprendre un CV déjà enregistré (facultatif)<select id="cv-variants"><option value="">Choisir un CV</option></select></label>
+            <div><button type="button" class="secondary" id="cv-load">Reprendre ce CV</button>
+            <button type="button" class="secondary" id="cv-delete">Supprimer ce CV</button>
+              <button type="button" class="secondary" id="cv-new">Créer un nouveau CV</button></div>
             <div class="wide cv-model-choice"><label for="cv-template-select">Modèle de CV</label><select id="cv-template-select" name="template"><option value="classic">Classique · inclus</option>
               <option value="modern">Contemporain · Premium</option><option value="compact">Compact · Premium</option></select>
               <p id="cv-template-description">Sobre et facile à lire.</p>
@@ -363,8 +363,8 @@
             </div>
             <details class="wide cv-customize"><summary>Personnaliser les couleurs et la typographie</summary><div class="cv-design-options"><label>Palette de couleurs<select name="accent"><option value="copper">Bleu nuit et cuivre</option><option value="jade">Jade et bleu profond</option><option value="plum">Prune et lilas</option><option value="gold">Noir et jaune graphique</option><option value="blue">Bleu classique</option></select></label><label>Typographie<select name="font"><option value="editorial">Éditoriale</option><option value="sans">Moderne sans empattement</option></select></label></div></details>
             <div class="wide cv-premium-banner"><p id="cv-premium-access-status" role="status">Vérification des droits du compte…</p><button type="button" class="secondary compact" data-view-link="premium">Voir la formule Premium</button></div>
-            <div class="wide cv-studio-heading" id="cv-identity"><span>02 · IDENTITÉ</span><h3>Présentez-vous</h3><p>Une première impression claire, avec les informations essentielles.</p></div>
-            <label class="wide">Nom de la variante<input id="cv-label" maxlength="120"></label>
+            <div class="wide cv-studio-heading" id="cv-identity"><span>ÉTAPE 2 SUR 4 · INFORMATIONS</span><h3>2. Vos informations personnelles</h3><p>Indiquez votre nom, votre métier et vos coordonnées. La photo est facultative.</p></div>
+            <label class="wide">Nom pour retrouver ce CV dans vos documents<input id="cv-label" maxlength="120" placeholder="Ex. CV assistant administratif"></label>
             <fieldset class="wide cv-photo-field"><legend>Photo du CV (facultative)</legend>
               <label>Image JPG ou PNG (5 Mo maximum)<input id="cv-photo-file" type="file" accept="image/jpeg,image/png"></label>
               <textarea name="photo" maxlength="100000" hidden></textarea>
@@ -730,6 +730,6 @@
   <script src="cv-render.js?v=20261121-gallery"></script>
   <script src="account-signup.js?v=20261118"></script>
   <script src="app.js?v=20261122-delete-account"></script>
-<script src="documents-navigation.js?v=20261122"></script>
+<script src="documents-navigation.js?v=20261122"></script>\n<script src="cv-progressive.js?v=20261123"></script>
 </body>
 </html>
