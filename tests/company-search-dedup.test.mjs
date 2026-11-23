@@ -17,6 +17,7 @@ test("company search deduplicates cached and Internet results without merging di
   assert.match(fn, /if \(!key\) return true/);
   assert.doesNotMatch(fn, /canonical\(company\.address \|\| company\.city\)/);
   assert.match(fn, /seen\.has\(key\)/);
-  assert.match(js, /companyResults = uniqueSearchableCompanies\(cachedCompanies\)/);
+  assert.match(js, /companyResults = usableCachedCompanies/);
+  assert.match(js, /const usableCachedCompanies = uniqueSearchableCompanies\(cachedCompanies\)/);
   assert.match(js, /companyResults = uniqueSearchableCompanies\(\(Array\.isArray\(verified\)/);
 });
