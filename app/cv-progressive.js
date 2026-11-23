@@ -52,6 +52,27 @@
   const progressCount = progress.querySelector(".cv-wizard-progress-top span");
   const progressFill = progress.querySelector(".cv-wizard-progress-fill");
   const progressDescription = progress.querySelector(".cv-wizard-progress-description");
+  function firstInvalidInStep(index) {
+    for (const element of sections[index]) {
+      const fields = element.matches("input, select, textarea")
+        ? [element] : Array.from(element.querySelectorAll("input, select, textarea"));
+      const invalid = fields.find(field => field.willValidate && !field.checkValidity());
+      if (invalid) return invalid;
+    }
+    return null;
+  }
+  function canNavigateTo(target) {
+    if (target <= active) return true;
+    for (let step = 0; step < target; step++) {
+      const invalid = firstInvalidInStep(step);
+      if (invalid) {
+        show(step);
+        invalid.reportValidity();
+        return false;
+      }
+    }
+    return true;
+  }
   const controls = sections.map((elements, index) => {
     const bar = document.createElement("div");
     bar.className = "wide cv-step-controls";
@@ -67,13 +88,7 @@
       next.type = "button"; next.className = "primary";
       next.textContent = "Continuer : " + labels[index + 1] + " →";
       next.addEventListener("click", () => {
-        const required = sections[index]
-          .flatMap(element => Array.from(element.matches("input, select, textarea") ? [element] : element.querySelectorAll("input, select, textarea")))
-          .filter(input => input.willValidate && input.required && !input.checkValidity());
-        if (required.length) {
-          required[0].reportValidity();
-          return;
-        }
+        if (!canNavigateTo(index + 1)) return;
         show(index + 1);
       });
       bar.append(next);
@@ -114,7 +129,7 @@
   }
   buttons.forEach((button, index) => button.addEventListener("click", event => {
     event.preventDefault();
-    show(index);
+    if (canNavigateTo(index)) show(index);
   }));
   // Reveal the first invalid step before the browser tries to focus a hidden field.
   // This also covers users who jump directly to Finaliser using the step navigation.
