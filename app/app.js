@@ -2354,7 +2354,26 @@
       ["#cv-degree", "#cv-school", "#cv-degree-dates"]);
   });
 
-  document.querySelector("#cv-add-skill").addEventListener("click", () => {
+  const cvSkillKind = document.querySelector("#cv-skill-kind");
+  const cvSkillName = document.querySelector("#cv-skill-name");
+  const cvSkillLevel = document.querySelector("#cv-skill-level");
+  const cvSkillFeedback = document.querySelector("#cv-skill-feedback");
+  const cvAddSkill = document.querySelector("#cv-add-skill");
+  cvSkillKind.addEventListener("change", () => {
+    const language = cvSkillKind.value === "language";
+    cvSkillName.placeholder = language ? "Ex. français, anglais" : "Ex. Excel, gestion de projet";
+    cvSkillLevel.placeholder = language ? "Ex. B2, langue maternelle" : "Ex. avancé, 5 ans";
+    cvSkillFeedback.textContent = "";
+  });
+  [cvSkillName, cvSkillLevel].forEach(field => {
+    field.addEventListener("input", () => { cvSkillFeedback.textContent = ""; });
+    field.addEventListener("keydown", event => {
+      if (event.key !== "Enter" || event.isComposing) return;
+      event.preventDefault();
+      cvAddSkill.click();
+    });
+  });
+  cvAddSkill.addEventListener("click", () => {
     const kind = document.querySelector("#cv-skill-kind").value;
     const nameField = document.querySelector("#cv-skill-name");
     const levelField = document.querySelector("#cv-skill-level");
