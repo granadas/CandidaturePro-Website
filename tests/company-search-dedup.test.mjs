@@ -11,6 +11,8 @@ test("company search deduplicates cached and Internet results without merging di
   assert.match(fn, /isSearchableCompany\(company\)/);
   assert.match(fn, /normalize\("NFKC"\)/);
   assert.match(fn, /canonical\(company\.address\)/);
+  assert.match(fn, /canonical\(company\.city\)/);
+  assert.match(fn, /name \+ "\\|city\\|" \+ city \+ "\\|address\\|" \+ address/);
   assert.match(fn, /canonical\(company\.id\)/);
   assert.match(fn, /if \(!key\) return true/);
   assert.doesNotMatch(fn, /canonical\(company\.address \|\| company\.city\)/);
