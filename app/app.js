@@ -762,6 +762,14 @@
     };
   }
 
+  function isSearchableCompany(company) {
+    const name = String(company.name || "").trim();
+    // A geocoded street or building address is not the name of an employer.
+    if (/^(?:rue|route|avenue|chemin|boulevard|passage|place|quai|sentier|impasse)\s+/i.test(name)) return false;
+    if (company.sector === "Immobilier" && /^(?:gare de |metro shopping$)/i.test(name)) return false;
+    return Boolean(name);
+  }
+
   function renderCompanies() {
     const container = document.querySelector("#company-results");
     document.querySelector("#company-results-count").textContent =
@@ -775,7 +783,7 @@
     container.innerHTML = companyResults.map((company, index) => {
       const safeWebsite = safeExternalUrl(company.website);
       const website = safeWebsite
-        ? '<a href="' + escapeHtml(safeWebsite) + '" target="_blank" rel="noopener noreferrer">Voir le site</a>'
+        ? '<a href="' + escapeHtml(safeWebsite) + '" target="_blank" rel="noopener noreferrer">Site indiqué</a>'
         : "";
       return '<article class="company-card" data-company-index="' + index + '">' +
         '<div class="company-card-main"><strong>' + escapeHtml(company.name) + '</strong>' +
@@ -803,7 +811,7 @@
     });
     const cachedCompanies = Array.isArray(cached) ? cached.map(normalizeCompany) : [];
     if (cachedCompanies.length && cachedCompanies.some(company => company.isFresh)) {
-      companyResults = cachedCompanies;
+      companyResults = cachedCompanies.filter(isSearchableCompany);
       renderCompanies();
       source.textContent = "Résultats récents";
       message.textContent = companyResults.length + " entreprise" + (companyResults.length > 1 ? "s trouvées." : " trouvée.");
@@ -818,13 +826,8 @@
     });
     const quota = result.quota || {};
     const rawCompanies = Array.isArray(result.companies) ? result.companies : [];
-    companyResults = rawCompanies.map(normalizeCompany);
-    renderCompanies();
-    source.textContent = quota.premium ? "Recherche Internet • Premium" : "Recherche Internet • " + (quota.used ?? "—") + "/" + (quota.limit ?? 5);
-    message.textContent = companyResults.length
-      ? companyResults.length + " entreprise" + (companyResults.length > 1 ? "s trouvées." : " trouvée.")
-      : "Aucune entreprise trouvée pour ces critères.";
-
+    // The shared cache enforces admin-inactive exclusions and canonical contact
+    // rules. Read it back before showing Internet results so both views agree.
     if (rawCompanies.length) {
       await supabaseRpc("remember_company_search", {
         p_sector: sector,
@@ -832,9 +835,20 @@
         p_radius: radius,
         p_companies: rawCompanies
       });
-      if (rawCompanies.some(company => company.email)) {
-        await supabaseRpc("review_discovered_company_emails", { p_companies: rawCompanies });
-      }
+    }
+    const verified = rawCompanies.length ? await supabaseRpc("get_cached_company_search", {
+      p_sector: sector,
+      p_city: city,
+      p_radius: radius
+    }) : [];
+    companyResults = (Array.isArray(verified) ? verified : []).map(normalizeCompany).filter(isSearchableCompany);
+    renderCompanies();
+    source.textContent = quota.premium ? "Recherche Internet • Premium" : "Recherche Internet • " + (quota.used ?? "—") + "/" + (quota.limit ?? 5);
+    message.textContent = companyResults.length
+      ? companyResults.length + " entreprise" + (companyResults.length > 1 ? "s trouvées." : " trouvée.")
+      : "Aucune entreprise trouvée pour ces critères.";
+    if (companyResults.some(company => company.email)) {
+      await supabaseRpc("review_discovered_company_emails", { p_companies: companyResults });
     }
     await supabaseRpc("record_company_search_event", { p_sector: sector || "Tous les secteurs", p_city: city });
   }
