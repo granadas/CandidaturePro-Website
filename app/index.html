@@ -394,6 +394,12 @@
               <button id="cv-add-degree" class="secondary compact" type="button">Ajouter au CV</button><span id="cv-degree-feedback" role="status"></span>
             </div></details>
             <label class="wide">Compétences et langues<textarea name="skills" maxlength="3000" rows="4" placeholder="Gestion de projet&#10;Coordination d’équipes&#10;Français · langue maternelle"></textarea><small>Une compétence ou une langue par ligne.</small></label>
+            <details class="wide cv-entry-builder"><summary>+ Ajouter une compétence ou une langue facilement</summary><div class="cv-entry-builder-grid">
+              <label>Catégorie<select id="cv-skill-kind"><option value="skill">Compétence</option><option value="language">Langue</option></select></label>
+              <label>Compétence ou langue<input id="cv-skill-name" maxlength="120" placeholder="Ex. Excel, français"></label>
+              <label>Précision (facultatif)<input id="cv-skill-level" maxlength="80" placeholder="Ex. avancé, B2"></label>
+              <button id="cv-add-skill" class="secondary compact" type="button">Ajouter au CV</button><span id="cv-skill-feedback" role="status" aria-live="polite"></span>
+            </div></details>
             <details id="cv-targeting" class="wide" hidden>
               <summary>Adapter le CV à une offre</summary>
               <p id="cv-target-context"></p>
