@@ -778,8 +778,14 @@
       const canonical = value => String(value || "").normalize("NFKC")
         .toLocaleLowerCase("fr").replace(/\s+/g, " ").trim();
       const name = canonical(company.name);
-      const place = canonical(company.address || company.city);
-      const key = name + "|" + place;
+      const address = canonical(company.address);
+      // City alone is not a unique location: several branches may share it.
+      // Without an address, only deduplicate when a stronger identifier exists.
+      const recordId = canonical(company.id);
+      const key = address
+        ? name + "|address|" + address
+        : recordId ? "record|" + recordId : "";
+      if (!key) return true;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
