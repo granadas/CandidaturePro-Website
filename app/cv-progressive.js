@@ -17,6 +17,22 @@
   });
   const buttons = Array.from(nav.querySelectorAll('a[href^="#cv-"]'));
   let active = 0;
+  const descriptions = [
+    "Choisissez la présentation qui vous correspond.",
+    "Ajoutez vos coordonnées et votre photo si vous le souhaitez.",
+    "Présentez vos expériences, formations et compétences.",
+    "Relisez votre CV et enregistrez-le avant l’export PDF."
+  ];
+  const progress = document.createElement("div");
+  progress.className = "cv-wizard-progress";
+  progress.setAttribute("role", "status");
+  progress.setAttribute("aria-live", "polite");
+  progress.innerHTML = '<div class="cv-wizard-progress-top"><strong></strong><span></span></div><div class="cv-wizard-progress-track"><div class="cv-wizard-progress-fill"></div></div><p class="cv-wizard-progress-description"></p>';
+  form.before(progress);
+  const progressLabel = progress.querySelector("strong");
+  const progressCount = progress.querySelector(".cv-wizard-progress-top span");
+  const progressFill = progress.querySelector(".cv-wizard-progress-fill");
+  const progressDescription = progress.querySelector(".cv-wizard-progress-description");
   const controls = sections.map((elements, index) => {
     const bar = document.createElement("div");
     bar.className = "wide cv-step-controls";
@@ -44,10 +60,21 @@
       for (const element of elements) element.hidden = step !== index;
       controls[step].hidden = step !== index;
     });
+    progressLabel.textContent = labels[index];
+    progressCount.textContent = "Étape " + (index + 1) + " sur " + sections.length;
+    progressFill.style.width = ((index + 1) / sections.length * 100) + "%";
+    progressDescription.textContent = descriptions[index];
     buttons.forEach((button, step) => {
       button.setAttribute("aria-current", step === index ? "step" : "false");
       button.classList.toggle("active", step === index);
-      button.textContent = (step + 1) + ". " + labels[step];
+      button.replaceChildren();
+      const number = document.createElement("span");
+      number.className = "cv-wizard-nav-number";
+      number.textContent = step < index ? "✓" : String(step + 1);
+      number.setAttribute("aria-hidden", "true");
+      const name = document.createElement("span");
+      name.textContent = labels[step];
+      button.append(number, name);
     });
     if (scroll) headings[index].scrollIntoView({ behavior: "smooth", block: "start" });
   }
