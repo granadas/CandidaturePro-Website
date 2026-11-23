@@ -793,6 +793,16 @@
     });
   }
 
+  function isSuspectCompanyWebsite(company) {
+    const name = String(company.name || "").trim().toLocaleLowerCase("fr");
+    const url = safeExternalUrl(company.website);
+    if (!url) return false;
+    // Confirmed directory mismatch to review: Proman listing points to BM Emploi.
+    // Do not silently change the source URL or the company's saved contacts.
+    const host = new URL(url).hostname.toLowerCase();
+    return name === "proman" && (host === "bm-emploi.ch" || host === "www.bm-emploi.ch");
+  }
+
   function renderCompanies() {
     const container = document.querySelector("#company-results");
     document.querySelector("#company-results-count").textContent =
@@ -806,7 +816,8 @@
     container.innerHTML = companyResults.map((company, index) => {
       const safeWebsite = safeExternalUrl(company.website);
       const website = safeWebsite
-        ? '<a href="' + escapeHtml(safeWebsite) + '" target="_blank" rel="noopener noreferrer">Site indiqué</a>'
+        ? '<a href="' + escapeHtml(safeWebsite) + '" target="_blank" rel="noopener noreferrer">' +
+          (isSuspectCompanyWebsite(company) ? 'Lien à vérifier (autre enseigne)' : 'Site indiqué') + '</a>'
         : "";
       return '<article class="company-card" data-company-index="' + index + '">' +
         '<div class="company-card-main"><strong>' + escapeHtml(company.name) + '</strong>' +
