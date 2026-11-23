@@ -779,11 +779,12 @@
         .toLocaleLowerCase("fr").replace(/\s+/g, " ").trim();
       const name = canonical(company.name);
       const address = canonical(company.address);
+      const city = canonical(company.city);
       // City alone is not a unique location: several branches may share it.
       // Without an address, only deduplicate when a stronger identifier exists.
       const recordId = canonical(company.id);
       const key = address
-        ? name + "|address|" + address
+        ? name + "|city|" + city + "|address|" + address
         : recordId ? "record|" + recordId : "";
       if (!key) return true;
       if (seen.has(key)) return false;
