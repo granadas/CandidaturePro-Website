@@ -26,6 +26,15 @@
     preview.id ||= "cv-live-preview";
     previewToggle.setAttribute("aria-controls", preview.id);
     form.before(previewToggle);
+    // Escape closes the mobile/tablet preview without losing the current CV step.
+    preview.addEventListener("keydown", event => {
+      if (event.key !== "Escape" || !layout?.classList.contains("cv-preview-expanded")) return;
+      event.preventDefault();
+      layout.classList.remove("cv-preview-expanded");
+      previewToggle.setAttribute("aria-expanded", "false");
+      previewToggle.textContent = "Voir l’aperçu de mon CV";
+      previewToggle.focus({ preventScroll: true });
+    });
     previewToggle.addEventListener("click", () => {
       const expanded = previewToggle.getAttribute("aria-expanded") !== "true";
       previewToggle.setAttribute("aria-expanded", String(expanded));
