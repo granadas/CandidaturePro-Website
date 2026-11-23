@@ -776,7 +776,7 @@
       if (!isSearchableCompany(company)) return false;
       // Preserve different branches of the same employer at distinct addresses.
       const canonical = value => String(value || "").normalize("NFKC")
-        .toLocaleLowerCase("fr").replace(/\\s+/g, " ").trim();
+        .toLocaleLowerCase("fr").replace(/\s+/g, " ").trim();
       const name = canonical(company.name);
       const place = canonical(company.address || company.city);
       const key = name + "|" + place;
