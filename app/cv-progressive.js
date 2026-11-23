@@ -47,7 +47,8 @@
   progress.setAttribute("role", "status");
   progress.setAttribute("aria-live", "polite");
   progress.innerHTML = '<div class="cv-wizard-progress-top"><strong></strong><span></span></div><div class="cv-wizard-progress-track"><div class="cv-wizard-progress-fill"></div></div><p class="cv-wizard-progress-description"></p>';
-  form.before(progress);
+  // Keep the two-column studio grid reserved for the form and live preview.
+  (layout || form).before(progress);
   const progressLabel = progress.querySelector("strong");
   const progressCount = progress.querySelector(".cv-wizard-progress-top span");
   const progressFill = progress.querySelector(".cv-wizard-progress-fill");
