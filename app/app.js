@@ -770,6 +770,22 @@
     return Boolean(name);
   }
 
+  function uniqueSearchableCompanies(companies) {
+    const seen = new Set();
+    return companies.filter(company => {
+      if (!isSearchableCompany(company)) return false;
+      // Preserve different branches of the same employer at distinct addresses.
+      const canonical = value => String(value || "").normalize("NFKC")
+        .toLocaleLowerCase("fr").replace(/\\s+/g, " ").trim();
+      const name = canonical(company.name);
+      const place = canonical(company.address || company.city);
+      const key = name + "|" + place;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
   function renderCompanies() {
     const container = document.querySelector("#company-results");
     document.querySelector("#company-results-count").textContent =
@@ -811,7 +827,7 @@
     });
     const cachedCompanies = Array.isArray(cached) ? cached.map(normalizeCompany) : [];
     if (cachedCompanies.length && cachedCompanies.some(company => company.isFresh)) {
-      companyResults = cachedCompanies.filter(isSearchableCompany);
+      companyResults = uniqueSearchableCompanies(cachedCompanies);
       renderCompanies();
       source.textContent = "Résultats récents";
       message.textContent = companyResults.length + " entreprise" + (companyResults.length > 1 ? "s trouvées." : " trouvée.");
@@ -841,7 +857,7 @@
       p_city: city,
       p_radius: radius
     }) : [];
-    companyResults = (Array.isArray(verified) ? verified : []).map(normalizeCompany).filter(isSearchableCompany);
+    companyResults = uniqueSearchableCompanies((Array.isArray(verified) ? verified : []).map(normalizeCompany));
     renderCompanies();
     source.textContent = quota.premium ? "Recherche Internet • Premium" : "Recherche Internet • " + (quota.used ?? "—") + "/" + (quota.limit ?? 5);
     message.textContent = companyResults.length
