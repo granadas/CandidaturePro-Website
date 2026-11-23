@@ -15,6 +15,25 @@
     }
     return elements;
   });
+  const layout = form.closest(".cv-studio-layout");
+  const preview = layout?.querySelector(".cv-live-aside");
+  const previewToggle = document.createElement("button");
+  previewToggle.type = "button";
+  previewToggle.className = "cv-mobile-preview-toggle secondary";
+  previewToggle.textContent = "Voir l’aperçu de mon CV";
+  previewToggle.setAttribute("aria-expanded", "false");
+  if (preview) {
+    preview.id ||= "cv-live-preview";
+    previewToggle.setAttribute("aria-controls", preview.id);
+    preview.before(previewToggle);
+    previewToggle.addEventListener("click", () => {
+      const expanded = previewToggle.getAttribute("aria-expanded") !== "true";
+      previewToggle.setAttribute("aria-expanded", String(expanded));
+      previewToggle.textContent = expanded ? "Masquer l’aperçu" : "Voir l’aperçu de mon CV";
+      layout?.classList.toggle("cv-preview-expanded", expanded);
+      if (expanded) preview.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
   const buttons = Array.from(nav.querySelectorAll('a[href^="#cv-"]'));
   let active = 0;
   const descriptions = [
@@ -65,6 +84,12 @@
   function show(index, scroll = true) {
     if (index < 0 || index >= sections.length) return;
     active = index;
+    if (layout) {
+      layout.dataset.cvStep = String(index + 1);
+      layout.classList.remove("cv-preview-expanded");
+      previewToggle.setAttribute("aria-expanded", "false");
+      previewToggle.textContent = "Voir l’aperçu de mon CV";
+    }
     sections.forEach((elements, step) => {
       for (const element of elements) element.hidden = step !== index;
       controls[step].hidden = step !== index;
