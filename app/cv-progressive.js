@@ -31,7 +31,14 @@
       previewToggle.setAttribute("aria-expanded", String(expanded));
       previewToggle.textContent = expanded ? "Masquer l’aperçu" : "Voir l’aperçu de mon CV";
       layout?.classList.toggle("cv-preview-expanded", expanded);
-      if (expanded) preview.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (expanded) {
+        preview.scrollIntoView({
+          behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+          block: "start"
+        });
+      } else {
+        previewToggle.focus({ preventScroll: true });
+      }
     });
   }
   const buttons = Array.from(nav.querySelectorAll('a[href^="#cv-"]'));
