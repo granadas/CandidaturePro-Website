@@ -833,8 +833,10 @@
       p_radius: radius
     });
     const cachedCompanies = Array.isArray(cached) ? cached.map(normalizeCompany) : [];
-    if (cachedCompanies.length && cachedCompanies.some(company => company.isFresh)) {
-      companyResults = uniqueSearchableCompanies(cachedCompanies);
+    const usableCachedCompanies = uniqueSearchableCompanies(cachedCompanies);
+    // A fresh cache containing only excluded/invalid entries must not block discovery.
+    if (usableCachedCompanies.length && usableCachedCompanies.some(company => company.isFresh)) {
+      companyResults = usableCachedCompanies;
       renderCompanies();
       source.textContent = "Résultats récents";
       message.textContent = companyResults.length + " entreprise" + (companyResults.length > 1 ? "s trouvées." : " trouvée.");
