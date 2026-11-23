@@ -26,8 +26,8 @@
     preview.id ||= "cv-live-preview";
     previewToggle.setAttribute("aria-controls", preview.id);
     form.before(previewToggle);
-    // Escape closes the mobile/tablet preview without losing the current CV step.
-    preview.addEventListener("keydown", event => {
+    // Escape closes the mobile/tablet preview even when focus remains on the form.
+    document.addEventListener("keydown", event => {
       if (event.key !== "Escape" || !layout?.classList.contains("cv-preview-expanded")) return;
       event.preventDefault();
       layout.classList.remove("cv-preview-expanded");
