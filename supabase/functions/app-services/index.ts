@@ -489,6 +489,8 @@ async function companySearch(p: any, key: string, webKey: string, userId: string
     companies.push({
       id: id++,
       name,
+      latitude: Number(x.lat),
+      longitude: Number(x.lon),
       city: String(
         x.city ||
         x.municipality ||
@@ -536,6 +538,8 @@ async function companySearch(p: any, key: string, webKey: string, userId: string
       companies.push({
         id: id++,
         name,
+        latitude: candidate?.latitude,
+        longitude: candidate?.longitude,
         city: String(candidate?.city || city),
         sector: profile.label,
         website,
@@ -610,6 +614,8 @@ async function companySearch(p: any, key: string, webKey: string, userId: string
         website: place?.website,
         address,
         city,
+        latitude: Number.isFinite(placeLat) ? placeLat : null,
+        longitude: Number.isFinite(placeLon) ? placeLon : null,
         phone: place?.phoneNumber || place?.phone
       });
     }
@@ -658,7 +664,7 @@ async function companySearch(p: any, key: string, webKey: string, userId: string
     `retenus=${companies.length}`
   );
 
-  return { companies: companies.slice(0, 120) };
+  return { companies: companies.slice(0, 120), center: { latitude: Number(lat), longitude: Number(lon) } };
 }
 
 /* ============================================================
