@@ -835,7 +835,7 @@
     const sector = document.querySelector("#company-sector").value.trim();
     const city = document.querySelector("#company-city").value.trim();
     const radius = document.querySelector("#company-radius").value;
-    message.textContent = "Recherche dans les résultats récents…";
+    message.textContent = "Recherche dans la base entreprises…";
     source.textContent = "";
 
     const cached = await supabaseRpc("get_cached_company_search", {
@@ -846,10 +846,10 @@
     const cachedCompanies = Array.isArray(cached) ? cached.map(normalizeCompany) : [];
     const usableCachedCompanies = uniqueSearchableCompanies(cachedCompanies);
     // A fresh cache containing only excluded/invalid entries must not block discovery.
-    if (usableCachedCompanies.length && usableCachedCompanies.some(company => company.isFresh)) {
+    if (usableCachedCompanies.length) {
       companyResults = usableCachedCompanies;
       renderCompanies();
-      source.textContent = "Résultats récents";
+      source.textContent = "Base entreprises • sans crédit API";
       message.textContent = companyResults.length + " entreprise" + (companyResults.length > 1 ? "s trouvées." : " trouvée.") +
         (cachedCompanies.length >= 100 ? " Au moins 100 fiches ont été récupérées : la liste peut être incomplète. Affinez la ville ou le rayon." : "");
       await supabaseRpc("record_company_search_event", { p_sector: sector || "Tous les secteurs", p_city: city });
