@@ -880,7 +880,7 @@
     }) : [];
     companyResults = uniqueSearchableCompanies((Array.isArray(verified) ? verified : []).map(normalizeCompany));
     renderCompanies();
-    source.textContent = quota.premium ? "Recherche Internet • Premium" : "Recherche Internet • " + (quota.used ?? "—") + "/" + (quota.limit ?? 5);
+    source.textContent = quota.premium ? "Recherche Internet • Premium" : "Recherche Internet • " + (quota.used ?? "—") + "/" + (quota.limit ?? 3);
     message.textContent = (companyResults.length
       ? companyResults.length + " entreprise" + (companyResults.length > 1 ? "s trouvées." : " trouvée.")
       : "Aucune entreprise trouvée pour ces critères.") +
