@@ -857,15 +857,19 @@
     }
 
     if (!complete) {
-      const reusable = await supabaseRpc("get_reusable_company_search", {
+      const geographic = await supabaseRpc("get_geocoded_company_search", {
         p_sector: sector, p_city: city, p_radius: radius
       });
+      const reusable = Array.isArray(geographic) && geographic.length ? geographic :
+        await supabaseRpc("get_reusable_company_search", {
+          p_sector: sector, p_city: city, p_radius: radius
+        });
       const known = uniqueSearchableCompanies((Array.isArray(reusable) ? reusable : []).map(normalizeCompany));
       if (known.length) {
         companyResults = known;
         renderCompanies();
         source.textContent = "Base entreprises • sans crédit API";
-        message.textContent = known.length + " entreprise(s) enregistrée(s) dans un rayon plus petit. " +
+        message.textContent = known.length + " entreprise(s) enregistrée(s) dans ce périmètre. " +
           "La liste peut être incomplète pour ce rayon. ";
         const completion = document.createElement("button");
         completion.type = "button";
@@ -894,11 +898,12 @@
     // The shared cache enforces admin-inactive exclusions and canonical contact
     // rules. Read it back before showing Internet results so both views agree.
     if (rawCompanies.length) {
-      await supabaseRpc("remember_company_search", {
+      await supabaseRpc("remember_geocoded_company_search", {
         p_sector: sector,
         p_city: city,
         p_radius: radius,
-        p_companies: rawCompanies
+        p_companies: rawCompanies,
+        p_center: result.center || null
       });
     }
     const verified = rawCompanies.length ? await supabaseRpc("get_cached_company_search", {
