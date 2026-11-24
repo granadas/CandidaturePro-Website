@@ -870,7 +870,7 @@
         const completion = document.createElement("button");
         completion.type = "button";
         completion.className = "secondary compact";
-        completion.textContent = "Compléter par une recherche Internet (1 crédit)";
+        completion.textContent = "Compléter par Internet (utilise le quota de recherche)";
         completion.addEventListener("click", async () => {
           if (companySearchRunning) return;
           companySearchRunning = completion.disabled = true;
