@@ -829,7 +829,7 @@
     }).join("");
   }
 
-  async function searchCompanies() {
+  async function searchCompanies({ complete = false } = {}) {
     const message = document.querySelector("#company-search-message");
     const source = document.querySelector("#company-search-source");
     const sector = document.querySelector("#company-sector").value.trim();
@@ -846,7 +846,7 @@
     const cachedCompanies = Array.isArray(cached) ? cached.map(normalizeCompany) : [];
     const usableCachedCompanies = uniqueSearchableCompanies(cachedCompanies);
     // A fresh cache containing only excluded/invalid entries must not block discovery.
-    if (usableCachedCompanies.length) {
+    if (usableCachedCompanies.length && !complete) {
       companyResults = usableCachedCompanies;
       renderCompanies();
       source.textContent = "Base entreprises • sans crédit API";
@@ -854,6 +854,34 @@
         (cachedCompanies.length >= 100 ? " Au moins 100 fiches ont été récupérées : la liste peut être incomplète. Affinez la ville ou le rayon." : "");
       await supabaseRpc("record_company_search_event", { p_sector: sector || "Tous les secteurs", p_city: city });
       return;
+    }
+
+    if (!complete) {
+      const reusable = await supabaseRpc("get_reusable_company_search", {
+        p_sector: sector, p_city: city, p_radius: radius
+      });
+      const known = uniqueSearchableCompanies((Array.isArray(reusable) ? reusable : []).map(normalizeCompany));
+      if (known.length) {
+        companyResults = known;
+        renderCompanies();
+        source.textContent = "Base entreprises • sans crédit API";
+        message.textContent = known.length + " entreprise(s) enregistrée(s) dans un rayon plus petit. " +
+          "La liste peut être incomplète pour ce rayon. ";
+        const completion = document.createElement("button");
+        completion.type = "button";
+        completion.className = "secondary compact";
+        completion.textContent = "Compléter par une recherche Internet (1 crédit)";
+        completion.addEventListener("click", async () => {
+          if (companySearchRunning) return;
+          companySearchRunning = completion.disabled = true;
+          try { await searchCompanies({ complete: true }); }
+          catch (error) { message.textContent = error.message; }
+          finally { companySearchRunning = completion.disabled = false; }
+        });
+        message.append(completion);
+        await supabaseRpc("record_company_search_event", { p_sector: sector || "Tous les secteurs", p_city: city });
+        return;
+      }
     }
 
     message.textContent = "Recherche Internet en cours…";
@@ -1938,6 +1966,72 @@
     adminResults.append(caption);
   }
 
+  function renderCreditAlert(stats) {
+    const used = stats?.[0]?.month_credits_used;
+    if (typeof used !== "number" || !Number.isSafeInteger(used) || used < 0) return;
+    const remaining = Math.max(0, 100 - used);
+    if (remaining >= 20) return;
+    const warning = document.createElement("p");
+    warning.className = "admin-credit-alert";
+    warning.setAttribute("role", "alert");
+    warning.textContent = "Attention : il reste " + remaining +
+      "/100 crédits Serper pour l’actualisation des offres ce mois. Seuil d’alerte : moins de 20 %.";
+    adminResults.prepend(warning);
+  }
+
+  function appendUserActivity(card, row, current) {
+    const actions = document.createElement("div");
+    actions.className = "batch-actions";
+    const history = document.createElement("button");
+    history.type = "button"; history.className = "secondary compact";
+    history.textContent = "Voir recherches et envois";
+    const output = document.createElement("div");
+    output.className = "admin-user-activity";
+    history.addEventListener("click", async () => {
+      if (!current() || history.disabled) return;
+      if (output.childElementCount) { output.replaceChildren(); return; }
+      history.disabled = true;
+      try {
+        const data = await supabaseRpc("admin_get_user_activity", { p_user_id: row.user_id });
+        if (!current()) return;
+        const summary = document.createElement("p");
+        summary.textContent = `${data.search_count} recherches au total (30 dernières ci-dessous) · ${data.internet_search_count} recherches Internet · ${data.sent_count} premiers e-mails confirmés · ${data.follow_up_count} suivis confirmés.`;
+        output.append(summary);
+        for (const search of data.searches || []) {
+          const item = document.createElement("p");
+          item.textContent = "Recherche · " + [search.sector, search.city, search.created_at ? trackingDateFormat.format(new Date(search.created_at)) : ""].filter(Boolean).join(" · ");
+          output.append(item);
+        }
+        for (const send of data.recent_sends || []) {
+          const item = document.createElement("p");
+          item.textContent = "Envoi confirmé · " + [send.company_name, send.company_city, send.sent_at ? trackingDateFormat.format(new Date(send.sent_at)) : ""].filter(Boolean).join(" · ");
+          output.append(item);
+        }
+      } catch (error) { if (current()) adminStatus.textContent = error.message; }
+      finally { history.disabled = false; }
+    });
+    const deletion = document.createElement("button");
+    deletion.type = "button"; deletion.className = "secondary compact";
+    deletion.textContent = "Supprimer le compte";
+    deletion.disabled = row.user_id === getSession()?.user?.id;
+    deletion.addEventListener("click", async () => {
+      if (!current() || deletion.disabled) return;
+      const typed = window.prompt("Suppression définitive du compte et de ses données. Saisissez l’e-mail complet du compte : " + row.email);
+      if (typed?.trim().toLowerCase() !== String(row.email || "").toLowerCase()) return;
+      if (!window.confirm("Supprimer définitivement le compte " + row.email + " ? Cette action est irréversible.")) return;
+      deletion.disabled = true;
+      try {
+        const result = await invokeEdgeFunction("admin-delete-user", {
+          user_id: row.user_id, email: row.email, confirmation: "SUPPRIMER"
+        }, false);
+        if (!result.deleted) throw new Error("Suppression non confirmée.");
+        if (current()) { await loadAdmin(); adminStatus.textContent = "Compte supprimé : " + row.email; }
+      } catch (error) { if (current()) adminStatus.textContent = error.message; }
+      finally { deletion.disabled = false; }
+    });
+    actions.append(history, deletion); card.append(actions, output);
+  }
+
   async function touchWebPresence() {
     const userId = getSession()?.user?.id;
     if (!userId || !profile || document.hidden || webPresenceInFlight) return;
@@ -2202,7 +2296,14 @@
       adminUpdated.textContent = "Actualisé à " + new Intl.DateTimeFormat("fr-CH", { timeZone: "Europe/Zurich", timeStyle: "short" }).format(new Date());
       if (["statistics", "credits"].includes(mode)) {
         adminStatus.textContent = rows.length ? "" : "Aucune donnée pour cette période.";
-        renderAdminMetrics(rows, mode === "credits"); return;
+        renderAdminMetrics(rows, mode === "credits");
+        if (mode === "credits") {
+          try {
+            const stats = await supabaseRpc("admin_job_market_refresh_statistics", {});
+            if (current()) renderCreditAlert(stats);
+          } catch { /* The normal credit breakdown stays available. */ }
+        }
+        return;
       }
       if (mode === "online") {
         rows = window.CP_ADMIN_TOOLS.onlineUsers(rows);
@@ -2229,6 +2330,7 @@
           mode === "reports" ? [row.category, row.description, row.steps, row.status].filter(Boolean).join(" · ") :
           [row.plan === "premium" ? "Premium" : "Gratuit", row.is_admin ? "Administrateur" : "", mode === "online" ? "Actif récemment" : "", row.last_seen_at ? "Dernière activité : " + new Intl.DateTimeFormat("fr-CH", { timeZone: "Europe/Zurich", dateStyle: "medium", timeStyle: "short" }).format(new Date(row.last_seen_at)) : "Aucune activité enregistrée"].filter(Boolean).join(" · ");
         card.append(title, details);
+        if (mode === "users") appendUserActivity(card, row, current);
         if (mode === "verification") appendVerificationDetails(card, row, current);
         if (mode === "blacklist") {
           const restore = document.createElement("form");
