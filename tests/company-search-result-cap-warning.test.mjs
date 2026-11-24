@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 
 const js = readFileSync(new URL("../app/app.js", import.meta.url), "utf8");
 test("company searches warn about possible incomplete coverage at 100 source records", () => {
-  const start = js.indexOf("async function searchCompanies()");
+  const start = js.indexOf("async function searchCompanies({ complete = false } = {})");
   const end = js.indexOf("function renderJobs()", start);
   assert.ok(start >= 0 && end > start);
   const search = js.slice(start, end);
