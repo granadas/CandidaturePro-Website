@@ -43,8 +43,14 @@ Deno.serve(async (request: Request) => {
   const targetProfileResponse = await fetch(url + "/rest/v1/profiles?id=eq." + encodeURIComponent(body.user_id) + "&select=is_admin", {
     headers: { Authorization: "Bearer " + serviceKey, apikey: serviceKey },
   });
-  const targetProfiles = targetProfileResponse.ok ? await targetProfileResponse.json().catch(() => []) : [];
-  if (targetProfiles?.[0]?.is_admin === true)
+  if (!targetProfileResponse.ok) {
+    console.error("Admin target profile lookup failed", targetProfileResponse.status);
+    return reply("Impossible de vérifier le rôle de ce compte. Réessayez plus tard.", 503);
+  }
+  const targetProfiles = await targetProfileResponse.json().catch(() => null);
+  if (!Array.isArray(targetProfiles))
+    return reply("Impossible de vérifier le rôle de ce compte. Réessayez plus tard.", 503);
+  if (targetProfiles.some((profile: { is_admin?: unknown }) => profile?.is_admin === true))
     return reply("La suppression d’un compte administrateur est bloquée.", 403);
   const deleted = await fetch(url + "/auth/v1/admin/users/" + encodeURIComponent(body.user_id), {
     method: "DELETE", headers: { Authorization: "Bearer " + serviceKey, apikey: serviceKey },
