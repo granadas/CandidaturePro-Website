@@ -2336,7 +2336,7 @@
           mode === "invalid" ? [row.email, row.reason, row.reply_subject, row.reply_body].filter(Boolean).join(" · ") :
           mode === "verification" ? [row.city, row.address, row.website, row.status].filter(Boolean).join(" · ") :
           mode === "reports" ? [row.category, row.description, row.steps, row.status].filter(Boolean).join(" · ") :
-          [row.plan === "premium" ? "Premium" : "Gratuit", row.is_admin ? "Administrateur" : "", mode === "online" ? "Actif récemment" : "", row.last_seen_at ? "Dernière activité : " + new Intl.DateTimeFormat("fr-CH", { timeZone: "Europe/Zurich", dateStyle: "medium", timeStyle: "short" }).format(new Date(row.last_seen_at)) : "Aucune activité enregistrée"].filter(Boolean).join(" · ");
+          [row.plan === "premium" ? "Premium" : "Gratuit", row.is_admin ? "Administrateur" : "", mode === "online" ? "Actif récemment" : "", row.last_seen_at && Number.isFinite(new Date(row.last_seen_at).getTime()) ? "Dernière activité : " + new Intl.DateTimeFormat("fr-CH", { timeZone: "Europe/Zurich", dateStyle: "medium", timeStyle: "short" }).format(new Date(row.last_seen_at)) : "Aucune activité valide enregistrée"].filter(Boolean).join(" · ");
         card.append(title, details);
         if (mode === "users") appendUserActivity(card, row, current);
         if (mode === "verification") appendVerificationDetails(card, row, current);
