@@ -40,6 +40,12 @@ Deno.serve(async (request: Request) => {
   const target = targetResponse.ok ? await targetResponse.json().catch(() => null) : null;
   if (!target?.id || String(target.email || "").toLowerCase() !== body.email.trim().toLowerCase())
     return reply("Le compte ou l’e-mail ne correspond plus. Actualisez la liste.", 409);
+  const targetProfileResponse = await fetch(url + "/rest/v1/profiles?id=eq." + encodeURIComponent(body.user_id) + "&select=is_admin", {
+    headers: { Authorization: "Bearer " + serviceKey, apikey: serviceKey },
+  });
+  const targetProfiles = targetProfileResponse.ok ? await targetProfileResponse.json().catch(() => []) : [];
+  if (targetProfiles?.[0]?.is_admin === true)
+    return reply("La suppression d’un compte administrateur est bloquée.", 403);
   const deleted = await fetch(url + "/auth/v1/admin/users/" + encodeURIComponent(body.user_id), {
     method: "DELETE", headers: { Authorization: "Bearer " + serviceKey, apikey: serviceKey },
   });
@@ -47,5 +53,23 @@ Deno.serve(async (request: Request) => {
     console.error("Admin account deletion failed", deleted.status);
     return reply("La suppression n’a pas abouti.", 500);
   }
+  const audit = await fetch(url + "/rest/v1/admin_audit_log", {
+    method: "POST",
+    headers: {
+      Authorization: "Bearer " + serviceKey,
+      apikey: serviceKey,
+      "Content-Type": "application/json",
+      Prefer: "return=minimal",
+    },
+    body: JSON.stringify({
+      action: "account_deleted",
+      entity_type: "user",
+      entity_key: body.user_id,
+      summary: "Compte utilisateur supprimé par un administrateur.",
+      old_values: { email: target.email },
+      actor_id: admin.id,
+    }),
+  });
+  if (!audit.ok) console.error("Admin account deletion audit failed", audit.status);
   return new Response(JSON.stringify({ deleted: true }), { headers });
 });

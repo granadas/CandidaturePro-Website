@@ -177,9 +177,14 @@ function getSearchProfile(sectorRaw: string) {
   if (/\b(garage|garages|automobile|carrosserie|concessionnaire)\b/.test(s)) {
     return {
       type: "vehicle",
-      categories: "service.vehicle",
+      categories: "service.vehicle.repair,service.vehicle.repair.car,service.vehicle.repair.motorcycle,commercial.vehicle",
       label: "Automobile",
-      requiredCategories: ["service.vehicle"],
+      requiredCategories: [
+        "service.vehicle.repair",
+        "service.vehicle.repair.car",
+        "service.vehicle.repair.motorcycle",
+        "commercial.vehicle"
+      ],
       keywords: [
         "garage", "automobile", "auto",
         "carrosserie", "concession"

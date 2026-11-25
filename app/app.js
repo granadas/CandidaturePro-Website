@@ -767,6 +767,8 @@
     // A geocoded street or building address is not the name of an employer.
     if (/^(?:rue|route|avenue|chemin|boulevard|passage|place|quai|sentier|impasse)\s+/i.test(name)) return false;
     if (company.sector === "Immobilier" && /^(?:gare de |metro shopping$)/i.test(name)) return false;
+    // Fuel stations and convenience stores are not automotive employers for this search.
+    if (company.sector === "Automobile" && /^(?:avia|bp|shell|tamoil|migrolino|coop\s+pronto)(?:\b.*)?$/i.test(name)) return false;
     return Boolean(name);
   }
 
@@ -2018,7 +2020,8 @@
     const deletion = document.createElement("button");
     deletion.type = "button"; deletion.className = "secondary compact";
     deletion.textContent = "Supprimer le compte";
-    deletion.disabled = row.user_id === getSession()?.user?.id;
+    deletion.disabled = row.user_id === getSession()?.user?.id || row.is_admin === true;
+    if (row.is_admin === true) deletion.title = "Les comptes administrateurs sont protégés contre la suppression.";
     deletion.addEventListener("click", async () => {
       if (!current() || deletion.disabled) return;
       const typed = window.prompt("Suppression définitive du compte et de ses données. Saisissez l’e-mail complet du compte : " + row.email);
