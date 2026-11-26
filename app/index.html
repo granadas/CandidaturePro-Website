@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#5b21b6">
   <meta name="description" content="Candidature Pro en ligne : recherchez, préparez, envoyez et suivez vos candidatures.">
   <title>Candidature Pro — Espace en ligne</title>
-  <link rel="stylesheet" href="app.css?v=20261126-cv-density">
+  <link rel="stylesheet" href="app.css?v=20261126-cv-premium-identity">
 </head>
 <body>
   <main id="guest-home" class="guest-home">
@@ -357,7 +357,7 @@
             <button type="button" class="secondary" id="cv-delete">Supprimer ce CV</button>
               <button type="button" class="secondary" id="cv-new">Créer un nouveau CV</button></div>
             <div class="wide cv-model-choice"><label for="cv-template-select">Modèle de CV</label><select id="cv-template-select" name="template"><option value="classic">Classique · inclus</option>
-              <option value="modern">Contemporain · Premium</option><option value="compact">Compact · Premium</option></select>
+              <option value="elegance">Élégance · Premium</option><option value="prestige">Prestige · Premium</option><option value="signature">Signature · Premium</option></select>
               <p id="cv-template-description">Sobre et facile à lire.</p>
               <a class="cv-template-demo-link" href="cv-modeles.html" target="_blank" rel="noopener">Comparer les modèles en grand ↗</a>
             </div>
@@ -366,6 +366,7 @@
             <div class="wide cv-studio-heading" id="cv-identity"><span>ÉTAPE 2 SUR 4 · INFORMATIONS</span><h3>2. Vos informations personnelles</h3><p>Indiquez votre nom, votre métier et vos coordonnées. La photo est facultative.</p></div>
             <label class="wide">Nom pour retrouver ce CV dans vos documents<input id="cv-label" maxlength="120" placeholder="Ex. CV assistant administratif"></label>
             <fieldset class="wide cv-photo-field"><legend>Photo du CV (facultative)</legend>
+              <label>Signature visuelle<select name="identityMark"><option value="initials">Afficher mes initiales</option><option value="photo">Afficher ma photo si ajoutée</option><option value="none">Ne rien afficher</option></select></label>
               <label>Image JPG ou PNG (5 Mo maximum)<input id="cv-photo-file" type="file" accept="image/jpeg,image/png"></label>
               <textarea name="photo" maxlength="100000" hidden></textarea>
               <img id="cv-photo-thumbnail" alt="Photo du CV affiché" hidden>
@@ -430,7 +431,7 @@
                 </div>
               </section>
             </div>
-          </form><aside class="cv-live-aside" aria-label="Aperçu instantané du CV"><div class="cv-live-top"><span>APERÇU EN DIRECT</span><span id="cv-live-style">Classique</span></div><div id="cv-live-paper" class="cv-live-paper"></div><p id="cv-live-length" class="cv-live-note" role="status" aria-live="polite"></p><p class="cv-live-note">Le même modèle est utilisé pour l’aperçu et l’impression PDF. Le PDF Premium est limité à une page A4. Si le contenu dépasse, raccourcissez-le : aucun texte ne sera supprimé automatiquement.</p></aside></div>
+          </form><aside class="cv-live-aside" aria-label="Aperçu instantané du CV"><div class="cv-live-top"><span>APERÇU EN DIRECT</span><span id="cv-live-style">Classique</span></div><div id="cv-live-paper" class="cv-live-paper"></div><p id="cv-live-length" class="cv-live-note" role="status" aria-live="polite"></p><p class="cv-live-note">Le PDF Premium est limité à une page A4. Si le contenu dépasse, raccourcissez-le : aucun texte ne sera supprimé automatiquement.</p></aside></div>
         </article>
 
         </div>
@@ -748,10 +749,10 @@
   <script src="pdf-import.js?v=20261118"></script>
   <script src="cv-import.js?v=20261118"></script>
   <script src="admin-tools.js?v=20261118"></script>
-  <script src="cv-word.js?v=20261121-gallery"></script>
-  <script src="cv-render.js?v=20261121-gallery"></script>
+  <script src="cv-word.js?v=20261126-cv-studio"></script>
+  <script src="cv-render.js?v=20261126-cv-studio"></script>
   <script src="account-signup.js?v=20261118"></script>
-  <script src="app.js?v=20261126-cv-capacity"></script>
+  <script src="app.js?v=20261126-cv-premium-identity"></script>
 <script src="documents-navigation.js?v=20261122"></script>
 <script src="cv-progressive.js?v=20261123-escape-scope"></script>
 </body>
