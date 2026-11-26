@@ -2465,10 +2465,18 @@
     document.querySelector("#cv-live-style").textContent = cvTemplateNames[template] || "Classique";
     const fields = Object.fromEntries(cvFieldNames.map(name => [name, form.elements.namedItem(name).value]));
     window.CP_CV_RENDER.render(document.querySelector("#cv-live-paper"), fields, { placeholder: true });
-    const written = ["summary", "experience", "education", "skills"].map(key => fields[key] || "").join(" ").trim();
-    const wordCount = written ? written.split(/\s+/u).length : 0;
     const lengthLabel = document.querySelector("#cv-live-length");
-    lengthLabel.textContent = wordCount + " mots de contenu · " + (wordCount > 650 ? "CV long : contrôlez les sauts de page et envisagez deux pages." : wordCount > 400 ? "CV détaillé : vérifiez la lisibilité et la pagination avant l'export." : "Vérifiez le rendu final avant l'export PDF.");
+    const sheet = document.querySelector("#cv-live-paper .cv-sheet");
+    if (template === "classic") {
+      lengthLabel.textContent = "Vérifiez le rendu final avant l’export PDF.";
+      return;
+    }
+    const fit = measureCvA4(sheet);
+    sheet.dataset.density = fit.density;
+    lengthLabel.textContent = fit.fits
+      ? "Page A4 : " + Math.min(100, Math.ceil(fit.ratio * 100)) + " % remplie" + (fit.density !== "normal" ? " · Mise en page ajustée automatiquement." : ".")
+      : "Page A4 dépassée : raccourcissez le contenu avant l’export PDF.";
+
   }
   cvForm.elements.template.addEventListener("change", () => {
     if (cvForm.elements.template.value !== "classic" && !hasPremiumCv()) {
@@ -3087,13 +3095,7 @@
     window.CP_CV_RENDER.render(document.querySelector("#cv-preview"), fields);
     cvDialog.showModal();
   });
-  document.querySelector("#cv-print").addEventListener("click", async () => {
-    const preview = document.querySelector("#cv-preview");
-    const sheet = preview.querySelector(".cv-sheet");
-    if (!sheet) return;
-    if (sheet.dataset.template === "classic") { window.print(); return; }
-    if (document.fonts?.ready) await document.fonts.ready;
-    if (!cvDialog.open || !sheet.isConnected) return;
+  function measureCvA4(sheet) {
     const probe = document.createElement("div");
     probe.style.cssText = "position:fixed;left:-10000px;top:0;width:210mm;container-type:inline-size;visibility:hidden;pointer-events:none;";
     const clone = sheet.cloneNode(true);
@@ -3102,7 +3104,7 @@
     clone.style.overflow = "visible";
     probe.append(clone);
     document.body.append(probe);
-    let fits;
+    let result = { fits: false, density: "dense", ratio: 1 };
     try {
       const limit = document.createElement("div");
       limit.style.height = "297mm";
@@ -3110,11 +3112,22 @@
       const maxHeight = limit.getBoundingClientRect().height - 2;
       for (const density of ["normal", "compact", "dense"]) {
         clone.dataset.density = density;
-        fits = Math.max(clone.getBoundingClientRect().height, clone.scrollHeight) <= maxHeight;
-        if (fits) { sheet.dataset.density = density; break; }
+        const height = Math.max(clone.getBoundingClientRect().height, clone.scrollHeight);
+        result = { fits: height <= maxHeight, density, ratio: height / maxHeight };
+        if (result.fits) break;
       }
     } finally { probe.remove(); }
-    if (!fits) {
+    return result;
+  }
+  document.querySelector("#cv-print").addEventListener("click", async () => {
+    const sheet = document.querySelector("#cv-preview .cv-sheet");
+    if (!sheet) return;
+    if (sheet.dataset.template === "classic") { window.print(); return; }
+    if (document.fonts?.ready) await document.fonts.ready;
+    if (!cvDialog.open || !sheet.isConnected) return;
+    const fit = measureCvA4(sheet);
+    sheet.dataset.density = fit.density;
+    if (!fit.fits) {
       window.alert("Votre CV dépasse une page A4. Raccourcissez les descriptions ou les rubriques avant l’export PDF. Aucun contenu n’a été supprimé.");
       return;
     }
