@@ -42,3 +42,11 @@ test("the live CV word counter separates spaces and line breaks", () => {
   assert.equal(count({ summary: "Deux mots", experience: "Une\nautre ligne", education: "", skills: "" }), 5);
   assert.equal(count({ summary: "", experience: "", education: "", skills: "" }), 0);
 });
+
+test("premium A4 status explains the one-page limit without implying a page break is acceptable", () => {
+  assert.match(source, /Page A4 dépassée : export bloqué\\. Raccourcissez le contenu ; aucun texte ne sera supprimé\\./);
+  assert.match(source, /Page A4 : .* % remplie/);
+  const html = readFileSync(new URL("../app/index.html", import.meta.url), "utf8");
+  assert.match(html, /Le PDF Premium est limité à une page A4/);
+  assert.doesNotMatch(html, /Vérifiez les éventuels sauts de page/);
+});
