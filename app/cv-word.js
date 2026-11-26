@@ -54,7 +54,7 @@
     if (!['classic', 'elegance', 'prestige', 'signature'].includes(fields.template)) throw Error('Le modèle de CV n’est pas reconnu.');
     const palettes = { copper: 'A85D3A', jade: '147C75', plum: '754A7D', blue: '305E9C', gold: 'F5B800' };
     const color = palettes[fields.accent] || 'A85D3A';
-    const compact = fields.template === 'elegance', split = fields.template === 'signature';
+    const compact = fields.template === 'elegance', split = fields.template === 'signature' || fields.template === 'elegance';
     const identityMark = ['initials', 'photo', 'none'].includes(fields.identityMark) ? fields.identityMark : (fields.photo ? 'photo' : 'initials');
     const image = identityMark === 'photo' ? imageEntry(fields.photo) : null;
     const fontName = fields.font === 'editorial' ? 'Georgia' : 'Aptos';
