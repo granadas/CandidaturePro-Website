@@ -3107,7 +3107,12 @@
       const limit = document.createElement("div");
       limit.style.height = "297mm";
       probe.append(limit);
-      fits = Math.max(clone.getBoundingClientRect().height, clone.scrollHeight) <= limit.getBoundingClientRect().height - 2;
+      const maxHeight = limit.getBoundingClientRect().height - 2;
+      for (const density of ["normal", "compact", "dense"]) {
+        clone.dataset.density = density;
+        fits = Math.max(clone.getBoundingClientRect().height, clone.scrollHeight) <= maxHeight;
+        if (fits) { sheet.dataset.density = density; break; }
+      }
     } finally { probe.remove(); }
     if (!fits) {
       window.alert("Votre CV dépasse une page A4. Raccourcissez les descriptions ou les rubriques avant l’export PDF. Aucun contenu n’a été supprimé.");
