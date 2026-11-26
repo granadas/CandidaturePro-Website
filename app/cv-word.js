@@ -49,12 +49,17 @@
       if (typeof fields[key] !== 'string' || fields[key].length > maximum) throw Error('Un champ du CV est absent ou dépasse sa limite.');
     }
     if (!fields.name.trim() || !fields.title.trim()) throw Error('Complétez le nom et le titre professionnel avant d’exporter le CV.');
-    if (!['classic', 'modern', 'compact'].includes(fields.template)) throw Error('Le modèle de CV n’est pas reconnu.');
+    const legacyTemplate = { modern: 'signature', compact: 'elegance' };
+    fields = { ...fields, template: legacyTemplate[fields.template] || fields.template };
+    if (!['classic', 'elegance', 'prestige', 'signature'].includes(fields.template)) throw Error('Le modèle de CV n’est pas reconnu.');
     const palettes = { copper: 'A85D3A', jade: '147C75', plum: '754A7D', blue: '305E9C', gold: 'F5B800' };
     const color = palettes[fields.accent] || 'A85D3A';
-    const compact = fields.template === 'compact', image = imageEntry(fields.photo);
+    const compact = fields.template === 'elegance', split = fields.template === 'signature' || fields.template === 'elegance';
+    const identityMark = ['initials', 'photo', 'none'].includes(fields.identityMark) ? fields.identityMark : (fields.photo ? 'photo' : 'initials');
+    const image = identityMark === 'photo' ? imageEntry(fields.photo) : null;
     const fontName = fields.font === 'editorial' ? 'Georgia' : 'Aptos';
     let body = paragraph(fields.name.trim(), 'CandidateName') + paragraph(fields.title.trim(), 'CandidateTitle');
+    if (identityMark === 'initials') body += paragraph(fields.name.trim().split(/\s+/u).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toLocaleUpperCase('fr-CH'), 'CandidateMark');
     if (fields.contact.trim()) body += paragraph(fields.contact.trim(), 'Contact');
     if (image) body += '<w:p><w:pPr><w:jc w:val="right"/></w:pPr><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="' + image.cx + '" cy="' + image.cy + '"/><wp:docPr id="1" name="Photo du candidat"/><wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="1" name="Photo"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="photo"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="' + image.cx + '" cy="' + image.cy + '"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>';
     let mainSections = '', sideSections = '';
@@ -72,12 +77,12 @@
       } else if (key === 'skills') {
         for (const line of value.split(/\r?\n/).flatMap(item => item.split(/\s*[;|]\s*/)).map(item => item.trim()).filter(Boolean)) sectionBody += paragraph(line, 'EntryDetail');
       } else sectionBody += paragraph(value);
-      if (fields.template === 'modern') {
+      if (split) {
         if (key === 'education' || key === 'skills') sideSections += sectionBody;
         else mainSections += sectionBody;
       } else body += sectionBody;
     }
-    if (fields.template === 'modern' && (mainSections || sideSections)) {
+    if (split && (mainSections || sideSections)) {
       const cell = (content, width, shade) => '<w:tc><w:tcPr><w:tcW w:w="' + width + '" w:type="dxa"/><w:shd w:fill="' + shade + '"/><w:tcMar><w:top w:w="140" w:type="dxa"/><w:left w:w="160" w:type="dxa"/><w:bottom w:w="140" w:type="dxa"/><w:right w:w="160" w:type="dxa"/></w:tcMar></w:tcPr>' + (content || paragraph('', 'Normal')) + '</w:tc>';
       body += '<w:tbl><w:tblPr><w:tblW w:w="9706" w:type="dxa"/><w:tblBorders><w:top w:val="nil"/><w:bottom w:val="nil"/><w:left w:val="nil"/><w:right w:val="nil"/><w:insideH w:val="nil"/><w:insideV w:val="nil"/></w:tblBorders></w:tblPr><w:tblGrid><w:gridCol w:w="6500"/><w:gridCol w:w="3206"/></w:tblGrid><w:tr>' + cell(mainSections, 6500, 'FFFFFF') + cell(sideSections, 3206, 'F1F5F9') + '</w:tr></w:tbl>';
     }
@@ -86,6 +91,7 @@
     const styles = header + '<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="' + fontName + '" w:hAnsi="' + fontName + '"/><w:sz w:val="' + (compact ? '20' : '22') + '"/><w:lang w:val="fr-CH"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="' + (compact ? '80' : '140') + '" w:line="260" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style>' +
       '<w:style w:type="paragraph" w:styleId="CandidateName"><w:name w:val="Nom du candidat"/><w:basedOn w:val="Normal"/><w:pPr><w:keepNext/></w:pPr><w:rPr><w:b/><w:color w:val="' + color + '"/><w:sz w:val="40"/></w:rPr></w:style>' +
       '<w:style w:type="paragraph" w:styleId="CandidateTitle"><w:name w:val="Titre professionnel"/><w:basedOn w:val="Normal"/><w:pPr><w:keepNext/></w:pPr><w:rPr><w:b/><w:sz w:val="26"/></w:rPr></w:style>' +
+      '<w:style w:type="paragraph" w:styleId="CandidateMark"><w:name w:val="Initiales du candidat"/><w:basedOn w:val="Normal"/><w:pPr><w:keepNext/></w:pPr><w:rPr><w:b/><w:color w:val="' + color + '"/><w:sz w:val="30"/></w:rPr></w:style>' +
       '<w:style w:type="paragraph" w:styleId="Contact"><w:name w:val="Coordonnées"/><w:basedOn w:val="Normal"/><w:rPr><w:color w:val="52617A"/><w:sz w:val="20"/></w:rPr></w:style>' +
       '<w:style w:type="paragraph" w:styleId="SectionHeading"><w:name w:val="Titre de rubrique"/><w:basedOn w:val="Normal"/><w:pPr><w:keepNext/><w:spacing w:before="240" w:after="100"/><w:outlineLvl w:val="0"/></w:pPr><w:rPr><w:b/><w:color w:val="' + color + '"/><w:sz w:val="24"/></w:rPr></w:style>' +
       '<w:style w:type="paragraph" w:styleId="EntryHeading"><w:name w:val="Fonction ou diplôme"/><w:basedOn w:val="Normal"/><w:pPr><w:keepNext/><w:spacing w:before="140" w:after="40"/></w:pPr><w:rPr><w:b/><w:sz w:val="22"/></w:rPr></w:style>' +

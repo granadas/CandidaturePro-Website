@@ -20,7 +20,7 @@ test("CV Premium entitlement checks plan and expiry", () => {
 });
 
 test("CV model options and access status are visible in the editor", () => {
-  for (const model of ["classic", "modern", "compact"]) {
+  for (const model of ["classic", "elegance", "prestige", "signature"]) {
     assert.ok(html.includes('<option value="' + model + '">'));
   }
   assert.match(html, /id="cv-premium-access-status"/);
@@ -52,7 +52,7 @@ test("CV editor and example page use the same renderer", () => {
   assert.match(html, /cv-render\.js/);
   assert.match(html, /href="cv-modeles\.html"/);
   assert.match(demo, /cv-render\.js/);
-  for (const model of ["classic", "modern", "compact"]) {
+  for (const model of ["classic", "elegance", "prestige", "signature"]) {
     assert.match(renderer, new RegExp(model));
     assert.match(demo, new RegExp('"' + model + '"'));
   }

@@ -2451,12 +2451,12 @@
   const cvVariants = document.querySelector("#cv-variants");
   const cvLabel = document.querySelector("#cv-label");
   const cvSaveStatus = document.querySelector("#cv-save-status");
-  const cvFieldNames = ["name", "title", "contact", "summary", "experience", "education", "skills", "target", "offer", "template", "photo", "accent", "font"];
+  const cvFieldNames = ["name", "title", "contact", "summary", "experience", "education", "skills", "target", "offer", "template", "photo", "identityMark", "accent", "font"];
   let savedCvVariants = [];
   let editingCvId = null;
 
-  const cvTemplateNames = { classic: "Classique", modern: "Contemporain", compact: "Compact" };
-  const cvTemplateDescriptions = { classic: "Sobre et facile à lire.", modern: "Une présentation éditoriale avec une colonne distinctive.", compact: "Une mise en page structurée pour un parcours détaillé." };
+  const cvTemplateNames = { classic: "Classique", elegance: "Élégance", prestige: "Prestige", signature: "Signature" };
+  const cvTemplateDescriptions = { classic: "Sobre et facile à lire.", elegance: "Tons ivoire et sable, mise en page douce et équilibrée, photo facultative.", prestige: "Anthracite et or, hiérarchie marquée et parcours professionnel mis en valeur.", signature: "Noir, blanc et or, composition graphique en colonnes, sans symbole lié à un métier." };
   function syncCvStudio() {
     const form = document.querySelector("#cv-form");
     if (!form) return;
@@ -2470,14 +2470,14 @@
     const lengthLabel = document.querySelector("#cv-live-length");
     const sheet = document.querySelector("#cv-live-paper .cv-sheet");
     if (template === "classic") {
-      lengthLabel.textContent = wordCount + " mots de contenu · Vérifiez le rendu final avant l’export PDF.";
+      lengthLabel.textContent = wordCount + " mots de contenu · Modèle Classique : vérifiez le PDF avant de l’envoyer.";
       return;
     }
     const fit = measureCvA4(sheet);
     sheet.dataset.density = fit.density;
     lengthLabel.textContent = wordCount + " mots · " + (fit.fits
       ? "Page A4 : " + Math.min(100, Math.ceil(fit.ratio * 100)) + " % remplie" + (fit.density !== "normal" ? " · Mise en page ajustée automatiquement." : ".")
-      : "Page A4 dépassée : raccourcissez le contenu avant l’export PDF.");
+      : "Page A4 dépassée : export bloqué. Raccourcissez le contenu ; aucun texte ne sera supprimé.");
 
   }
   cvForm.elements.template.addEventListener("change", () => {
@@ -2824,6 +2824,8 @@
       if (!variant) throw new Error("Cette variante n’est plus disponible.");
       if (beforeLabel !== cvLabel.value || beforeVariant !== editingCvId || before !== JSON.stringify(cvFieldNames.map(name => cvForm.elements.namedItem(name).value))) throw new Error("Vos modifications ont été conservées. Rouvrez le CV lorsque vous êtes prêt à remplacer le formulaire.");
       for (const name of cvFieldNames) cvForm.elements.namedItem(name).value = typeof variant.fields[name] === "string" ? variant.fields[name] : "";
+      if (cvForm.elements.template.value === "modern") cvForm.elements.template.value = "signature";
+      if (cvForm.elements.template.value === "compact") cvForm.elements.template.value = "elegance";
       if (!cvForm.elements.template.value || (!hasPremiumCv() && cvForm.elements.template.value !== "classic")) {
         cvForm.elements.template.value = "classic";
       }
@@ -3398,7 +3400,7 @@
       seenVariants.add(row.id);
       const fields = {};
       for (const key of cvFieldNames) fields[key] = backupString(row.fields[key] ?? "", key === "photo" ? 100000 : 16000) || "";
-      if (!fields.name || !fields.title || !["classic", "modern", "compact"].includes(fields.template) || (fields.photo && !validCvPhoto(fields.photo)) ||
+      if (!fields.name || !fields.title || !["classic", "modern", "compact", "elegance", "prestige", "signature"].includes(fields.template) || (fields.photo && !validCvPhoto(fields.photo)) ||
           new TextEncoder().encode(JSON.stringify(fields)).length > 150000) throw new Error("Le contenu d’un CV est invalide.");
       const clean = { id: row.id, label: backupString(row.label, 120, true), fields };
       if (typeof row.updated_at === "string" && row.updated_at.length <= 40 && Number.isFinite(Date.parse(row.updated_at))) clean.updated_at = row.updated_at;

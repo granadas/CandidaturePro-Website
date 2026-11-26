@@ -44,7 +44,9 @@
     return wrap;
   }
   function render(target, fields, options = {}) {
-    const template = ["classic", "modern", "compact"].includes(fields.template) ? fields.template : "classic";
+    const legacyTemplate = { modern: "signature", compact: "elegance" };
+    const requestedTemplate = legacyTemplate[fields.template] || fields.template;
+    const template = ["classic", "elegance", "prestige", "signature"].includes(requestedTemplate) ? requestedTemplate : "classic";
     const accent = accents[fields.accent] ? fields.accent : "copper";
     const paper = node("article", "cv-sheet cv-sheet-" + template + " cv-font-" + (fields.font === "sans" ? "sans" : "editorial"));
     paper.dataset.template = template;
@@ -56,18 +58,24 @@
     identity.append(node("h1", "", fields.name?.trim() || (options.placeholder ? "Votre nom" : "")));
     identity.append(node("p", "cv-sheet-role", fields.title?.trim() || (options.placeholder ? "Votre métier" : "")));
     head.append(identity);
-    if (/^data:image\/(?:png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(fields.photo || "") && fields.photo.length < 100000) {
+    const hasPhoto = /^data:image\/(?:png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(fields.photo || "") && fields.photo.length < 100000;
+    const identityMark = ["initials", "photo", "none"].includes(fields.identityMark) ? fields.identityMark : (hasPhoto ? "photo" : "initials");
+    if (identityMark === "photo" && hasPhoto) {
       const portrait = node("img", "cv-sheet-photo");
       portrait.alt = "Photo du candidat";
       portrait.src = fields.photo;
       head.append(portrait);
+    } else if (identityMark === "initials" && (fields.name?.trim() || options.placeholder)) {
+      const initials = fields.name?.trim().split(/\s+/u).filter(Boolean).slice(0, 2).map(part => part[0]).join("").toLocaleUpperCase("fr-CH") || "CV";
+      head.append(node("span", "cv-sheet-monogram", initials));
     }
     const contact = fields.contact?.trim();
     const contactBlock = contact ? node("div", "cv-sheet-contact") : null;
     if (contactBlock) lines(contact).forEach(item => contactBlock.append(node("span", "", item)));
     const content = node("div", "cv-sheet-content");
-    const mainColumn = template === "modern" ? node("div", "cv-sheet-main") : null;
-    const sideColumn = template === "modern" ? node("div", "cv-sheet-side") : null;
+    const splitTemplate = template === "signature" || template === "elegance";
+    const mainColumn = splitTemplate ? node("div", "cv-sheet-main") : null;
+    const sideColumn = splitTemplate ? node("div", "cv-sheet-side") : null;
     for (const [key, label] of Object.entries(sections)) {
       const value = fields[key]?.trim();
       if (!value && !options.placeholder) continue;
@@ -76,9 +84,9 @@
       const sample = { summary: "Une présentation de votre parcours.", experience: "Votre poste · 2022–2026\nEntreprise, ville\n• Un résultat concret et mesurable.", education: "Votre diplôme · 2022\nÉtablissement", skills: "Une compétence\nUne langue" };
       const text = value || sample[key];
       section.append(key === "experience" || key === "education" ? renderEntries(text) : key === "skills" ? renderSkills(text) : node("p", "cv-sheet-prose", text));
-      (template === "modern" ? (key === "education" || key === "skills" ? sideColumn : mainColumn) : content).append(section);
+      (splitTemplate ? (key === "education" || key === "skills" ? sideColumn : mainColumn) : content).append(section);
     }
-    if (template === "modern") content.append(mainColumn, sideColumn);
+    if (splitTemplate) content.append(mainColumn, sideColumn);
     paper.append(head);
     if (contactBlock) paper.append(contactBlock);
     paper.append(content);
