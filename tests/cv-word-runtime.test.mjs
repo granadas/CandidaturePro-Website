@@ -21,7 +21,7 @@ const fields = {
   education: "Bachelor · 2020\\nUniversité", skills: "Français\\nAnglais",
   template: "classic", accent: "jade", font: "sans", photo: ""
 };
-for (const template of ["classic", "modern", "compact"]) {
+for (const template of ["classic", "elegance", "prestige", "signature"]) {
   test("Word export builds a valid package structure for " + template, () => {
     const { blob, files } = generate({ ...fields, template });
     assert.equal(blob.type, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
@@ -50,8 +50,15 @@ test("Word export respects editorial and sans-serif font choices", () => {
   assert.ok(sans.includes('w:ascii="Aptos"'));
 });
 
-test("modern Word CV places education and skills in a distinct sidebar cell", () => {
-  const document = generate({ ...fields, template: "modern" }).files["word/document.xml"];
+test("Word export respects initials, photo and no-mark identity choices", () => {
+  const initials = generate({ ...fields, identityMark: "initials" }).files["word/document.xml"];
+  const none = generate({ ...fields, identityMark: "none" }).files["word/document.xml"];
+  assert.match(initials, /<w:pStyle w:val="CandidateMark"\/>/);
+  assert.doesNotMatch(none, /<w:pStyle w:val="CandidateMark"\/>/);
+});
+
+test("Signature Word CV places education and skills in a distinct sidebar cell", () => {
+  const document = generate({ ...fields, template: "signature" }).files["word/document.xml"];
   assert.ok(document.includes("<w:tbl>"));
   const cells = document.split("<w:tc>").slice(1);
   assert.equal(cells.length, 2);
@@ -61,9 +68,15 @@ test("modern Word CV places education and skills in a distinct sidebar cell", ()
   assert.ok(cells[1].includes("Formation"));
   assert.ok(cells[1].includes("Compétences et langues"));
 });
-test("classic and compact Word CV remain single-column", () => {
-  for (const template of ["classic", "compact"]) {
+test("classic and Elegance Word CV remain single-column", () => {
+  for (const template of ["classic", "elegance"]) {
     assert.ok(!generate({ ...fields, template }).files["word/document.xml"].includes("<w:tbl>"));
+  }
+});
+
+test("legacy premium Word template names migrate to supported designs", () => {
+  for (const template of ["modern", "compact"]) {
+    assert.ok(generate({ ...fields, template }).files["word/document.xml"].includes("Camille Exemple"));
   }
 });
 
