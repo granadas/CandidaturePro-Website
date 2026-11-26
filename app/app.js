@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 70037)
-Total output lines: 5172
-
 (() => {
   "use strict";
 
@@ -2215,7 +2212,676 @@ Total output lines: 5172
       '<label class="wide">Métier ou mot-clé<input name="query" maxlength="120"></label>' +
       '<div class="wide"><button type="submit" class="primary">Actualiser les postes maintenant</button> ' +
       '<button type="button" data-action="refresh-job-stats" class="secondary">Rafraîchir les statistiques (gratuit)</button></div>' +
-   …10037 tokens truncated… [buttonId, copy] of [["cv-save", false], ["cv-save-copy", true]]) {
+      '<p class="wide" role="status"></p>';
+    const usedCredits = row?.month_credits_used;
+    // Do not coerce null, missing or malformed statistics to a false zero.
+    const knownBudget = typeof usedCredits === "number" &&
+      Number.isSafeInteger(usedCredits) && usedCredits >= 0;
+    const remainingCredits = knownBudget ? Math.max(0, 100 - usedCredits) : null;
+    const serverRefreshRunning = row?.last_status === "running";
+    const refreshBlocked = remainingCredits === null || remainingCredits === 0 || serverRefreshRunning;
+    form.querySelector("#job-market-summary").textContent = knownBudget
+      ? usedCredits + "/100 crédits Serper ce mois · " + remainingCredits + " restant(s) · " +
+        (row.month_runs ?? 0) + " actualisation(s)" +
+        (row.last_started_at ? " · Dernière exécution le " + trackingDateFormat.format(new Date(row.last_started_at)) : "")
+      : "Budget Serper indisponible. Actualisation désactivée par précaution.";
+    const button = form.querySelector('button[type="submit"]');
+    const statsButton = form.querySelector('[data-action="refresh-job-stats"]');
+    const status = form.querySelector("[role=status]");
+    statsButton.addEventListener("click", () => {
+      if (!current() || profile?.is_admin !== true) return;
+      void loadAdmin();
+    });
+    if (refreshBlocked) {
+      button.disabled = true;
+      status.textContent = serverRefreshRunning
+        ? "Une actualisation est déjà en cours sur le serveur. Rechargez les statistiques pour suivre son état."
+        : remainingCredits === 0
+          ? "Plafond mensuel atteint : aucune nouvelle recherche payante."
+          : "Impossible de vérifier les crédits restants.";
+    } else if (row?.last_status === "failed") {
+      status.textContent = "La dernière actualisation a échoué. Vous pouvez réessayer.";
+    } else if (row?.last_status === "completed") {
+      status.textContent = "Dernière actualisation terminée : " +
+        (row.last_offers_added ?? 0) + " offre(s) ajoutée(s), " +
+        (row.last_credits_used ?? 0) + " crédit(s) réservé(s).";
+    }
+    form.addEventListener("submit", async event => {
+      event.preventDefault();
+      if (!current() || profile?.is_admin !== true || adminJobRefreshRunning || refreshBlocked) return;
+      const city = form.elements.city.value.trim();
+      if (!city) { status.textContent = "Indiquez une ville suisse."; return; }
+      if (!window.confirm("Actualiser les offres pour " + city + " ? Cette recherche utilise des crédits Serper.")) return;
+      adminJobRefreshRunning = button.disabled = true;
+      status.textContent = "Actualisation en cours…";
+      try {
+        const result = await invokeEdgeFunction("job-market-refresh", {
+          city, query: form.elements.query.value.trim()
+        }, false);
+        if (!current()) return;
+        const outcome = result.status === "completed"
+          ? (result.added ?? 0) + " offre(s) ajoutée(s) · " + (result.credits ?? 0) + " crédit(s) utilisé(s)."
+          : result.message || "Actualisation interrompue.";
+        await loadAdmin();
+        if (adminMode.value === "job-market" && profile?.is_admin === true) adminStatus.textContent = outcome;
+      } catch (error) {
+        if (current()) status.textContent = error.message;
+      } finally {
+        adminJobRefreshRunning = false;
+        // Do not re-enable a budget-blocked action, even after a failed request.
+        button.disabled = refreshBlocked;
+      }
+    });
+    adminResults.append(form);
+  }
+
+  let adminJobRefreshRunning = false;
+
+  async function loadAdmin({ quiet = false } = {}) {
+    if (profile?.is_admin !== true) return;
+    const userId = getSession()?.user?.id;
+    const mode = adminMode.value;
+    if (!userId || !Object.hasOwn(adminViews, mode)) return;
+    if (quiet && adminInFlight?.userId === userId && adminInFlight?.mode === mode) return;
+    const request = ++adminRequest;
+    adminInFlight = { userId, mode, request };
+    adminUserControls.hidden = mode !== "users";
+    adminCreditControls.hidden = mode !== "credits";
+    const [rpc, defaults] = adminViews[mode];
+    const args = { ...defaults };
+    if (mode === "users") args.p_search = adminUserSearch.value.trim();
+    if (mode === "credits") {
+      try { args.p_month = window.CP_ADMIN_TOOLS.monthParameter(adminCreditMonth.value, adminCurrentMonth); }
+      catch (error) { adminStatus.textContent = error.message; adminInFlight = null; return; }
+    }
+    if (!quiet) { adminResults.replaceChildren(); adminUpdated.textContent = ""; adminStatus.textContent = "Chargement…"; }
+    const current = () => request === adminRequest && getSession()?.user?.id === userId && profile?.is_admin === true && adminMode.value === mode;
+    try {
+      let rows = await supabaseRpc(rpc, args);
+      if (!current()) return;
+      if (!Array.isArray(rows)) throw new Error("La réponse d’administration est invalide.");
+      adminResults.replaceChildren();
+      adminUpdated.textContent = "Actualisé à " + new Intl.DateTimeFormat("fr-CH", { timeZone: "Europe/Zurich", timeStyle: "short" }).format(new Date());
+      if (["statistics", "credits"].includes(mode)) {
+        adminStatus.textContent = rows.length ? "" : "Aucune donnée pour cette période.";
+        renderAdminMetrics(rows, mode === "credits");
+        if (mode === "credits") {
+          try {
+            const stats = await supabaseRpc("admin_job_market_refresh_statistics", {});
+            if (current()) renderCreditAlert(stats);
+          } catch { /* The normal credit breakdown stays available. */ }
+        }
+        return;
+      }
+      if (mode === "online") {
+        rows = window.CP_ADMIN_TOOLS.onlineUsers(rows);
+        adminStatus.textContent = rows.length + " utilisateur(s) actif(s) au cours des 2 dernières minutes, parmi les 100 comptes les plus récents. Actualisation toutes les 30 secondes lorsque cette vue est visible.";
+      }
+      if (mode === "job-market") {
+        adminStatus.textContent = "";
+        renderAdminJobMarket(rows[0], current);
+        return;
+      }
+      if (mode !== "online") adminStatus.textContent = rows.length ? (mode === "users" ? rows.length + " compte(s) affiché(s), au maximum 100. Affinez la recherche pour retrouver un compte plus ancien." : "") : "Aucun résultat.";
+      for (const row of rows) {
+        const card = document.createElement("article");
+        card.className = "application-row";
+        const title = document.createElement("strong");
+        title.textContent = mode === "identity" ? [row.current_first_name, row.current_last_name, row.current_email].filter(Boolean).join(" · ") : row.company_name || row.label || row.title || row.email || row.action || "";
+        const details = document.createElement("p");
+        details.textContent = mode === "identity" ? "Identité demandée : " + [row.requested_first_name, row.requested_last_name, row.requested_email].filter(Boolean).join(" · ") + " — Motif : " + row.reason : mode === "blacklist" ? [row.city, row.sector, row.inactive_reason, row.inactive_at ? trackingDateFormat.format(new Date(row.inactive_at)) : ""].filter(Boolean).join(" · ") :
+          mode === "audit" ? [row.summary, row.created_at].filter(Boolean).join(" · ") :
+          mode === "credits" ? [row.category, row.credits + " crédits", row.estimated_cost_chf + " CHF", row.detail].filter(Boolean).join(" · ") :
+          mode === "contacts" ? [row.city, row.current_email, row.proposed_email, row.reply_subject, row.reply_body].filter(Boolean).join(" · ") :
+          mode === "invalid" ? [row.email, row.reason, row.reply_subject, row.reply_body].filter(Boolean).join(" · ") :
+          mode === "verification" ? [row.city, row.address, row.website, row.status].filter(Boolean).join(" · ") :
+          mode === "reports" ? [row.category, row.description, row.steps, row.status].filter(Boolean).join(" · ") :
+          [row.plan === "premium" ? "Premium" : "Gratuit", row.is_admin ? "Administrateur" : "", mode === "online" ? "Actif récemment" : "", row.last_seen_at && Number.isFinite(new Date(row.last_seen_at).getTime()) ? "Dernière activité : " + new Intl.DateTimeFormat("fr-CH", { timeZone: "Europe/Zurich", dateStyle: "medium", timeStyle: "short" }).format(new Date(row.last_seen_at)) : "Aucune activité valide enregistrée"].filter(Boolean).join(" · ");
+        card.append(title, details);
+        if (mode === "users") appendUserActivity(card, row, current);
+        if (mode === "verification") appendVerificationDetails(card, row, current);
+        if (mode === "blacklist") {
+          const restore = document.createElement("form");
+          restore.innerHTML = '<label>Contact vérifié<input required type="email" name="email" maxlength="254"></label>' +
+            '<label>Type de contact<select name="type"><option value="general">Général</option><option value="hr">RH</option></select></label>' +
+            '<label>Note<input name="note" maxlength="2000"></label>' +
+            '<button class="secondary" type="submit">Retirer de la liste noire</button>';
+          restore.addEventListener("submit", async event => {
+            event.preventDefault();
+            if (!current() || profile?.is_admin !== true) return;
+            const data = new FormData(restore);
+            const button = restore.querySelector("button");
+            button.disabled = true;
+            try {
+              await supabaseRpc("admin_restore_blacklisted_company", {
+                p_company_key: row.company_key, p_company_name: row.company_name, p_sector: row.sector || "",
+                p_email: String(data.get("email")).trim(), p_contact_type: data.get("type"), p_admin_note: data.get("note")
+              });
+              if (current()) await loadAdmin();
+            } catch (error) {
+              if (current()) adminStatus.textContent = error.message;
+            } finally {
+              button.disabled = false;
+            }
+          });
+          card.append(restore);
+        }
+        if (mode === "contacts" || mode === "invalid" || mode === "identity") {
+          const review = document.createElement("form");
+          review.innerHTML = '<label>Note administrateur<input name="note" maxlength="2000"></label>' +
+            '<button type="submit" class="primary" value="approve">' +
+            (mode === "identity" ? "Approuver la correction d’identité" : mode === "contacts" ? "Approuver le changement" : "Confirmer l’adresse invalide") +
+            '</button> <button type="submit" class="secondary" value="reject">Refuser</button>';
+          review.addEventListener("submit", async event => {
+            event.preventDefault();
+            if (!event.submitter || !current() || profile?.is_admin !== true) return;
+            const approved = event.submitter.value === "approve";
+            if (mode === "identity" && approved && !window.confirm("Approuver cette correction d’identité pour " + (row.current_email || row.user_id) + " ? Nouvelle identité : " + [row.requested_first_name, row.requested_last_name, row.requested_email].join(" · "))) return;
+            const note = new FormData(review).get("note");
+            const buttons = review.querySelectorAll("button");
+            buttons.forEach(button => button.disabled = true);
+            try {
+              const done = mode === "identity" ? await supabaseRpc("admin_review_web_identity_request", { p_request_id: row.id, p_approve: approved, p_note: note }) : mode === "contacts"
+                ? await supabaseRpc("admin_review_company_email_change_request", { p_request_id: row.id, p_approve: approved, p_admin_note: note })
+                : await supabaseRpc("admin_review_invalid_company_email_report", { p_report_id: row.id, p_confirm_invalid: approved, p_admin_note: note });
+              if (done !== true) throw new Error("La décision n’a pas été enregistrée.");
+              if (current()) await loadAdmin();
+            } catch (error) {
+              if (current()) adminStatus.textContent = error.message;
+            } finally {
+              buttons.forEach(button => button.disabled = false);
+            }
+          });
+          card.append(review);
+        }
+        if (["verification", "reports", "users"].includes(mode)) {
+          card.append(administrativeActions(mode, row, current));
+        }
+        adminResults.append(card);
+      }
+    } catch (error) {
+      if (current()) adminStatus.textContent = error.message;
+    } finally { if (adminInFlight?.request === request) adminInFlight = null; }
+  }
+
+  adminMode.addEventListener("change", loadAdmin);
+  document.querySelector("#admin-refresh").addEventListener("click", loadAdmin);
+  adminUserSearch.addEventListener("input", () => {
+    clearTimeout(adminSearchTimer);
+    adminSearchTimer = setTimeout(() => { if (adminMode.value === "users" && document.querySelector("#admin-view").classList.contains("active")) void loadAdmin(); }, 350);
+  });
+  adminCreditMonth.addEventListener("change", loadAdmin);
+  document.querySelector("#admin-credit-current").addEventListener("click", () => { adminCreditMonth.value = adminCurrentMonth; void loadAdmin(); });
+  document.querySelector("#admin-credit-all").addEventListener("click", () => { adminCreditMonth.value = ""; void loadAdmin(); });
+
+  const supportForm = document.querySelector("#support-report");
+  supportForm.addEventListener("submit", async event => {
+    event.preventDefault();
+    const userId = getSession()?.user?.id;
+    if (!userId) return;
+    const button = supportForm.querySelector("button");
+    if (button.disabled) return;
+    const message = document.querySelector("#support-report-status");
+    const data = new FormData(supportForm);
+    const title = String(data.get("title")).trim();
+    const description = String(data.get("description")).trim();
+    if (!title || !description) {
+      message.textContent = "Renseignez le titre et la description.";
+      return;
+    }
+    button.disabled = true;
+    message.textContent = "Enregistrement…";
+    try {
+      const receipt = await supabaseRpc("submit_support_report", {
+        p_category: data.get("category"), p_title: title, p_description: description,
+        p_steps: String(data.get("steps")).trim(), p_app_version: "Web", p_os_version: ""
+      });
+      if (getSession()?.user?.id !== userId) return;
+      supportForm.reset();
+      message.textContent = "Signalement reçu. Référence · " + receipt;
+    } catch (error) {
+      if (getSession()?.user?.id === userId) message.textContent = error.message;
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  const cvDialog = document.querySelector("#cv-dialog");
+  const cvForm = document.querySelector("#cv-form");
+  const cvVariants = document.querySelector("#cv-variants");
+  const cvLabel = document.querySelector("#cv-label");
+  const cvSaveStatus = document.querySelector("#cv-save-status");
+  const cvFieldNames = ["name", "title", "contact", "summary", "experience", "education", "skills", "target", "offer", "template", "photo", "identityMark", "accent", "font"];
+  let savedCvVariants = [];
+  let editingCvId = null;
+
+  const cvTemplateNames = { classic: "Classique", elegance: "Élégance", prestige: "Prestige", signature: "Signature" };
+  const cvTemplateDescriptions = { classic: "Sobre et facile à lire.", elegance: "Tons ivoire et sable, mise en page douce et équilibrée, photo facultative.", prestige: "Anthracite et or, hiérarchie marquée et parcours professionnel mis en valeur.", signature: "Noir, blanc et or, composition graphique en colonnes, sans symbole lié à un métier." };
+  function syncCvStudio() {
+    const form = document.querySelector("#cv-form");
+    if (!form) return;
+    const template = form.elements.template.value || "classic";
+    document.querySelector("#cv-template-description").textContent = cvTemplateDescriptions[template] || cvTemplateDescriptions.classic;
+    document.querySelector("#cv-live-style").textContent = cvTemplateNames[template] || "Classique";
+    const fields = Object.fromEntries(cvFieldNames.map(name => [name, form.elements.namedItem(name).value]));
+    window.CP_CV_RENDER.render(document.querySelector("#cv-live-paper"), fields, { placeholder: true });
+    const written = ["summary", "experience", "education", "skills"].map(key => fields[key] || "").join(" ").trim();
+    const wordCount = written ? written.split(/\s+/u).length : 0;
+    const lengthLabel = document.querySelector("#cv-live-length");
+    const sheet = document.querySelector("#cv-live-paper .cv-sheet");
+    if (template === "classic") {
+      lengthLabel.textContent = wordCount + " mots de contenu · Modèle Classique : vérifiez le PDF avant de l’envoyer.";
+      return;
+    }
+    const fit = measureCvA4(sheet);
+    sheet.dataset.density = fit.density;
+    lengthLabel.textContent = wordCount + " mots · " + (fit.fits
+      ? "Page A4 : " + Math.min(100, Math.ceil(fit.ratio * 100)) + " % remplie" + (fit.density !== "normal" ? " · Mise en page ajustée automatiquement." : ".")
+      : "Page A4 dépassée : export bloqué. Raccourcissez le contenu ; aucun texte ne sera supprimé.");
+
+  }
+  cvForm.elements.template.addEventListener("change", () => {
+    if (cvForm.elements.template.value !== "classic" && !hasPremiumCv()) {
+      cvForm.elements.template.value = "classic";
+      cvSaveStatus.textContent = "Ce modèle nécessite Premium. Vous pouvez continuer avec le modèle Classique.";
+      document.querySelector("#cv-premium-access-status").scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+    syncCvStudio();
+  });
+  cvForm.addEventListener("input", syncCvStudio);
+  cvForm.addEventListener("change", syncCvStudio);
+
+  function appendCvEntry(targetName, values, feedbackId, clearIds) {
+    const target = cvForm.elements.namedItem(targetName);
+    const feedback = document.querySelector(feedbackId);
+    const block = values.join("\n").trim();
+    const updated = [target.value.trim(), block].filter(Boolean).join("\n\n");
+    if (updated.length > target.maxLength) {
+      feedback.textContent = "Ce champ est plein. Raccourcissez une entrée avant d’en ajouter une autre.";
+      return;
+    }
+    target.value = updated;
+    clearIds.forEach(id => { document.querySelector(id).value = ""; });
+    feedback.textContent = "Ajouté au CV. Vous pouvez modifier le texte directement dans la rubrique ci-dessus.";
+    syncCvStudio();
+  }
+  document.querySelector("#cv-add-job").addEventListener("click", () => {
+    const role = document.querySelector("#cv-job-role").value.trim();
+    const company = document.querySelector("#cv-job-company").value.trim();
+    const dates = document.querySelector("#cv-job-dates").value.trim();
+    const results = document.querySelector("#cv-job-results").value.trim().split(/\r?\n/).map(line => line.replace(/^[•●\-*]\s*/, "").trim()).filter(Boolean);
+    if (!role || !company) {
+      document.querySelector("#cv-job-feedback").textContent = "Indiquez la fonction et l’entreprise.";
+      return;
+    }
+    appendCvEntry("experience", [role + (dates ? " · " + dates : ""), company, ...results.map(line => "• " + line)], "#cv-job-feedback",
+      ["#cv-job-role", "#cv-job-company", "#cv-job-dates", "#cv-job-results"]);
+  });
+  document.querySelector("#cv-add-degree").addEventListener("click", () => {
+    const degree = document.querySelector("#cv-degree").value.trim();
+    const school = document.querySelector("#cv-school").value.trim();
+    const dates = document.querySelector("#cv-degree-dates").value.trim();
+    if (!degree || !school) {
+      document.querySelector("#cv-degree-feedback").textContent = "Indiquez le diplôme et l’établissement.";
+      return;
+    }
+    appendCvEntry("education", [degree + (dates ? " · " + dates : ""), school], "#cv-degree-feedback",
+      ["#cv-degree", "#cv-school", "#cv-degree-dates"]);
+  });
+
+  // Guided career inputs: Enter adds an item instead of submitting the entire CV.
+  // Keep multiline achievements as a textarea, where Enter must create a new line.
+  [
+    { fields: ["#cv-job-role", "#cv-job-company", "#cv-job-dates"], action: "#cv-add-job", feedback: "#cv-job-feedback" },
+    { fields: ["#cv-degree", "#cv-school", "#cv-degree-dates"], action: "#cv-add-degree", feedback: "#cv-degree-feedback" }
+  ].forEach(group => {
+    const button = document.querySelector(group.action);
+    const feedback = document.querySelector(group.feedback);
+    group.fields.forEach(selector => {
+      const field = document.querySelector(selector);
+      field.addEventListener("input", () => { feedback.textContent = ""; });
+      field.addEventListener("keydown", event => {
+        if (event.key !== "Enter" || event.isComposing) return;
+        event.preventDefault();
+        button.click();
+      });
+    });
+  });
+
+  const cvSkillKind = document.querySelector("#cv-skill-kind");
+  const cvSkillName = document.querySelector("#cv-skill-name");
+  const cvSkillLevel = document.querySelector("#cv-skill-level");
+  const cvSkillFeedback = document.querySelector("#cv-skill-feedback");
+  const cvAddSkill = document.querySelector("#cv-add-skill");
+  cvSkillKind.addEventListener("change", () => {
+    const language = cvSkillKind.value === "language";
+    cvSkillName.placeholder = language ? "Ex. français, anglais" : "Ex. Excel, gestion de projet";
+    cvSkillLevel.placeholder = language ? "Ex. B2, langue maternelle" : "Ex. avancé, 5 ans";
+    cvSkillFeedback.textContent = "";
+  });
+  [cvSkillName, cvSkillLevel].forEach(field => {
+    field.addEventListener("input", () => { cvSkillFeedback.textContent = ""; });
+    field.addEventListener("keydown", event => {
+      if (event.key !== "Enter" || event.isComposing) return;
+      event.preventDefault();
+      cvAddSkill.click();
+    });
+  });
+  cvAddSkill.addEventListener("click", () => {
+    const kind = document.querySelector("#cv-skill-kind").value;
+    const nameField = document.querySelector("#cv-skill-name");
+    const levelField = document.querySelector("#cv-skill-level");
+    const feedback = document.querySelector("#cv-skill-feedback");
+    const target = cvForm.elements.skills;
+    const name = nameField.value.trim().replace(/\s+/g, " ");
+    const level = levelField.value.trim().replace(/\s+/g, " ");
+    if (!name) {
+      feedback.textContent = "Indiquez une compétence ou une langue.";
+      nameField.focus();
+      return;
+    }
+    const entry = (kind === "language" ? "Langue : " : "") + name + (level ? " · " + level : "");
+    const lines = target.value.split(/\r?\n/).map(line => line.trim().toLocaleLowerCase("fr"));
+    if (lines.includes(entry.toLocaleLowerCase("fr"))) {
+      feedback.textContent = "Cette entrée figure déjà dans votre CV.";
+      return;
+    }
+    const updated = [target.value.trim(), entry].filter(Boolean).join("\n");
+    if (updated.length > target.maxLength) {
+      feedback.textContent = "La rubrique est pleine. Raccourcissez une entrée.";
+      return;
+    }
+    target.value = updated;
+    nameField.value = "";
+    levelField.value = "";
+    feedback.textContent = "Ajouté au CV.";
+    syncCvStudio();
+    nameField.focus();
+  });
+
+  const cvPdfFile = document.querySelector("#cv-pdf-file"), cvPdfStatus = document.querySelector("#cv-pdf-status");
+  const cvPdfText = document.querySelector("#cv-pdf-text"), cvPdfReview = document.querySelector("#cv-pdf-review");
+  const cvPdfCancel = document.querySelector("#cv-pdf-cancel");
+  const cvImportSections = document.querySelector("#cv-import-sections"), cvImportDetectStatus = document.querySelector("#cv-import-detect-status");
+  const cvImportKeys = ["summary", "experience", "education", "skills"];
+  let cvImportContext = null;
+  function resetCvImportSections() {
+    cvImportContext = null; cvImportSections.hidden = true; cvImportDetectStatus.textContent = "";
+    for (const key of cvImportKeys) {
+      document.querySelector("#cv-import-" + key).value = "";
+      document.querySelector("#cv-import-" + key + "-check").checked = false;
+    }
+  }
+  let cvPdfRequest = 0, cvPdfAbort = null;
+  function clearCvPdfImport() {
+    ++cvPdfRequest; cvPdfAbort?.abort(); cvPdfAbort = null; resetCvImportSections();
+    cvPdfFile.value = cvPdfText.value = cvPdfStatus.textContent = "";
+    cvPdfReview.hidden = cvPdfCancel.hidden = true; cvPdfFile.disabled = false;
+  }
+  cvPdfCancel.addEventListener("click", () => { clearCvPdfImport(); cvPdfStatus.textContent = "Lecture annulée."; });
+  cvPdfFile.addEventListener("change", async () => {
+    const file = cvPdfFile.files?.[0], userId = getSession()?.user?.id;
+    if (!file || !userId) return;
+    resetCvImportSections();
+    cvPdfAbort?.abort(); const controller = new AbortController(); cvPdfAbort = controller;
+    const request = ++cvPdfRequest;
+    const current = () => request === cvPdfRequest && getSession()?.user?.id === userId;
+    cvPdfFile.disabled = true; cvPdfCancel.hidden = false; cvPdfReview.hidden = true;
+    cvPdfText.value = ""; cvPdfStatus.textContent = "Lecture du CV sur cet appareil…";
+    try {
+      const result = await window.CP_CV_IMPORT.extract(file, (page, total) => {
+        if (current()) cvPdfStatus.textContent = "Lecture de la page " + page + " sur " + total + "…";
+      }, controller.signal);
+      if (!current()) return;
+      cvPdfText.value = result.text; cvPdfReview.hidden = false;
+      cvPdfStatus.textContent = (result.pages ? result.pages + " page(s) lue(s). " : "CV " + result.format + " lu. ") + "Relisez le texte avant de l’ajouter au formulaire. Aucun CV enregistré n’a été modifié.";
+    } catch (error) { if (current()) cvPdfStatus.textContent = error.name === "AbortError" ? "Lecture annulée." : error.message; }
+    finally { if (current()) { cvPdfFile.disabled = false; cvPdfCancel.hidden = true; cvPdfAbort = null; } }
+  });
+  document.querySelector("#cv-pdf-insert").addEventListener("click", () => {
+    if (!getSession()?.user?.id || cvPdfReview.hidden || cvForm.dataset.saving) return;
+    const name = document.querySelector("#cv-pdf-target").value;
+    if (!["summary", "experience", "education", "skills", "contact"].includes(name)) return;
+    const field = cvForm.elements.namedItem(name), text = cvPdfText.value.trim();
+    if (!text) { cvPdfStatus.textContent = "Gardez le texte à ajouter dans la zone de relecture."; return; }
+    const value = [field.value.trim(), text].filter(Boolean).join("\n\n");
+    if (value.length > field.maxLength) { cvPdfStatus.textContent = "Cette rubrique accepte " + field.maxLength + " caractères. Réduisez le texte à insérer ; votre formulaire a été conservé."; return; }
+    field.value = value;
+    syncCvStudio();
+    cvPdfStatus.textContent = "Texte ajouté au formulaire. Vérifiez la mise en page, puis enregistrez la variante pour conserver la modification.";
+  });
+
+  document.querySelector("#cv-import-detect").addEventListener("click", () => {
+    const userId = getSession()?.user?.id;
+    if (!userId || cvPdfReview.hidden) return;
+    const result = window.CP_CV_IMPORT.partition(cvPdfText.value);
+    resetCvImportSections();
+    cvImportContext = { userId, variant: editingCvId, loadRequest: cvLoadRequest,
+      fields: Object.fromEntries(cvImportKeys.map(key => [key, cvForm.elements.namedItem(key).value])) };
+    const available = [];
+    for (const key of cvImportKeys) {
+      const text = result.fields[key], proposal = document.querySelector("#cv-import-" + key);
+      proposal.value = text;
+      const fits = text.length <= cvForm.elements.namedItem(key).maxLength;
+      document.querySelector("#cv-import-" + key + "-check").checked = Boolean(text) && fits;
+      if (text) available.push(key);
+    }
+    cvImportSections.hidden = false;
+    cvImportDetectStatus.textContent = available.length
+      ? available.length + " rubrique(s) reconnue(s). Relisez les propositions ; réduisez les textes trop longs avant de les cocher." + (result.unassigned ? " Certaines lignes restent à répartir manuellement depuis le texte source." : "")
+      : "Aucune rubrique reconnue. Utilisez l’ajout manuel ci-dessous, ou ajoutez des titres tels que Expériences, Formation et Compétences dans le texte source.";
+  });
+  document.querySelector("#cv-import-apply").addEventListener("click", () => {
+    const context = cvImportContext;
+    if (!context || cvImportSections.hidden || cvForm.dataset.saving) return;
+    if (context.userId !== getSession()?.user?.id || context.variant !== editingCvId || context.loadRequest !== cvLoadRequest) {
+      cvImportDetectStatus.textContent = "Le CV affiché a changé. Détectez à nouveau les rubriques avant de les ajouter."; return;
+    }
+    const selected = cvImportKeys.filter(key => document.querySelector("#cv-import-" + key + "-check").checked);
+    if (!selected.length) { cvImportDetectStatus.textContent = "Cochez au moins une rubrique à ajouter."; return; }
+    const updates = [];
+    for (const key of selected) {
+      const field = cvForm.elements.namedItem(key), proposal = document.querySelector("#cv-import-" + key).value.trim();
+      if (field.value !== context.fields[key]) { cvImportDetectStatus.textContent = "Le formulaire a été modifié. Vos changements sont conservés ; détectez à nouveau les rubriques."; return; }
+      if (!proposal) { cvImportDetectStatus.textContent = "Une rubrique cochée est vide. Complétez-la ou décochez-la."; return; }
+      const value = [field.value.trim(), proposal].filter(Boolean).join("\n\n");
+      if (value.length > field.maxLength) { cvImportDetectStatus.textContent = "Une rubrique dépasse sa limite de " + field.maxLength + " caractères avec le contenu actuel. Réduisez la proposition ; aucun champ n’a été modifié."; return; }
+      updates.push([field, value]);
+    }
+    for (const [field, value] of updates) field.value = value;
+    syncCvStudio();
+    resetCvImportSections();
+    cvPdfStatus.textContent = updates.length + " rubrique(s) ajoutée(s) au formulaire. Relisez le CV puis enregistrez la variante pour conserver ces modifications.";
+  });
+
+  const cvPhotoFile = document.querySelector("#cv-photo-file");
+  const cvPhotoThumbnail = document.querySelector("#cv-photo-thumbnail");
+  const cvPhotoStatus = document.querySelector("#cv-photo-status");
+  const cvPhotoRemove = document.querySelector("#cv-photo-remove");
+  let cvPhotoRequest = 0, cvPhotoPreparing = false;
+  function cvPhotoReady() {
+    if (!cvPhotoPreparing) return true;
+    cvSaveStatus.textContent = "Attendez la fin de la préparation de la photo avant d’enregistrer ou d’exporter le CV.";
+    return false;
+  }
+
+  function validCvPhoto(value) {
+    return typeof value === "string" && value.length <= 100000 &&
+      /^data:image\/(?:jpeg|png);base64,(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value) &&
+      (value.startsWith("data:image/jpeg;base64,/9j/") || value.startsWith("data:image/png;base64,iVBORw0KGgo"));
+  }
+
+  function renderCvPhoto() {
+    const photo = cvForm.elements.namedItem("photo");
+    const visible = validCvPhoto(photo.value);
+    if (visible) cvPhotoThumbnail.src = photo.value;
+    else { photo.value = ""; cvPhotoThumbnail.removeAttribute("src"); }
+    cvPhotoThumbnail.hidden = cvPhotoRemove.hidden = !visible;
+  }
+
+  cvPhotoRemove.addEventListener("click", () => {
+    ++cvPhotoRequest; cvPhotoPreparing = false;
+    cvForm.elements.namedItem("photo").value = ""; cvPhotoFile.value = "";
+    renderCvPhoto();
+    cvPhotoStatus.textContent = "Photo retirée du formulaire. Enregistrez la variante pour conserver cette modification.";
+  });
+
+  cvPhotoFile.addEventListener("change", async () => {
+    const file = cvPhotoFile.files?.[0];
+    const userId = getSession()?.user?.id;
+    if (!file || !userId) return;
+    const request = ++cvPhotoRequest; cvPhotoPreparing = false;
+    if (!["image/jpeg", "image/png"].includes(file.type) || file.size > 5 * 1024 * 1024) {
+      cvPhotoStatus.textContent = "Choisissez une image JPG ou PNG de 5 Mo maximum."; cvPhotoFile.value = ""; return;
+    }
+    cvPhotoPreparing = true; cvPhotoStatus.textContent = "Préparation de la photo…";
+    let bitmap;
+    try {
+      bitmap = await createImageBitmap(file);
+      if (!bitmap.width || !bitmap.height || bitmap.width * bitmap.height > 25000000) throw new Error("Choisissez une photo de 25 mégapixels maximum.");
+      const ratio = Math.min(256 / bitmap.width, 320 / bitmap.height, 1);
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(bitmap.width * ratio));
+      canvas.height = Math.max(1, Math.round(bitmap.height * ratio));
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("Le navigateur ne peut pas préparer cette photo.");
+      context.fillStyle = "#ffffff"; context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      const photo = canvas.toDataURL("image/jpeg", .82);
+      if (!validCvPhoto(photo)) throw new Error("La photo reste trop volumineuse. Choisissez une image plus simple.");
+      if (request !== cvPhotoRequest || getSession()?.user?.id !== userId) return;
+      cvForm.elements.namedItem("photo").value = photo; renderCvPhoto();
+      cvPhotoStatus.textContent = "Photo prête. Elle sera conservée lorsque vous enregistrerez la variante.";
+    } catch (error) {
+      if (request === cvPhotoRequest && getSession()?.user?.id === userId) cvPhotoStatus.textContent = error.message || "Impossible de lire cette photo.";
+    } finally {
+      bitmap?.close();
+      if (request === cvPhotoRequest) { cvPhotoFile.value = ""; cvPhotoPreparing = false; }
+    }
+  });
+
+  document.querySelector("#cv-use-profile").addEventListener("click", async event => {
+    const button = event.currentTarget;
+    const userId = getSession()?.user?.id;
+    if (!userId || button.disabled) return;
+    const variant = editingCvId;
+    button.disabled = true;
+    try {
+      const details = await fetchProfileDetails(userId);
+      if (getSession()?.user?.id !== userId || editingCvId !== variant) return;
+      const suggestions = {
+        name: [profile?.candidate_first_name, profile?.candidate_last_name].filter(Boolean).join(" "),
+        title: (details.desired_jobs || "").split(/[;\n]/)[0].trim(),
+        contact: [profile?.candidate_email || getSession().user.email, details.phone, details.city].filter(Boolean).join(" · "),
+        skills: [details.skills, details.languages].filter(Boolean).join("\n")
+      };
+      let filled = 0;
+      for (const [name, value] of Object.entries(suggestions)) {
+        const input = cvForm.elements.namedItem(name);
+        if (!input.value.trim() && value) {
+          input.value = value.slice(0, input.maxLength);
+          filled++;
+        }
+      }
+      syncCvStudio();
+      cvSaveStatus.textContent = filled ? "Champs vides complétés avec le profil." : "Aucun champ vide à compléter avec le profil.";
+    } catch (error) {
+      if (getSession()?.user?.id === userId) cvSaveStatus.textContent = error.message;
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  async function loadCvVariants() {
+    const userId = getSession()?.user?.id;
+    if (!userId) return;
+    try {
+      const rows = await supabaseFetch("web_cv_variants?select=id,label&order=updated_at.desc&limit=200");
+      if (getSession()?.user?.id !== userId) return;
+      savedCvVariants = rows;
+      cvVariants.length = 1;
+      for (const row of rows) cvVariants.add(new Option(row.label, row.id));
+      cvVariants.value = editingCvId || "";
+    } catch (error) {
+      if (getSession()?.user?.id === userId) cvSaveStatus.textContent = error.message;
+    }
+  }
+
+  let cvLoadRequest = 0;
+  document.querySelector("#cv-load").addEventListener("click", async event => {
+    const selected = savedCvVariants.find(row => row.id === cvVariants.value);
+    const userId = getSession()?.user?.id;
+    const button = event.currentTarget;
+    if (!selected || !userId || button.disabled || cvForm.dataset.saving) return;
+    const request = ++cvLoadRequest;
+    const before = JSON.stringify(cvFieldNames.map(name => cvForm.elements.namedItem(name).value));
+    const beforeLabel = cvLabel.value;
+    const beforeVariant = editingCvId;
+    button.disabled = true;
+    try {
+      const [variant] = await supabaseFetch("web_cv_variants?id=eq." + encodeURIComponent(selected.id) + "&select=id,label,fields");
+      if (request !== cvLoadRequest || getSession()?.user?.id !== userId || cvVariants.value !== selected.id) return;
+      if (!variant) throw new Error("Cette variante n’est plus disponible.");
+      if (beforeLabel !== cvLabel.value || beforeVariant !== editingCvId || before !== JSON.stringify(cvFieldNames.map(name => cvForm.elements.namedItem(name).value))) throw new Error("Vos modifications ont été conservées. Rouvrez le CV lorsque vous êtes prêt à remplacer le formulaire.");
+      for (const name of cvFieldNames) cvForm.elements.namedItem(name).value = typeof variant.fields[name] === "string" ? variant.fields[name] : "";
+      if (cvForm.elements.template.value === "modern") cvForm.elements.template.value = "signature";
+      if (cvForm.elements.template.value === "compact") cvForm.elements.template.value = "elegance";
+      if (!cvForm.elements.template.value || (!hasPremiumCv() && cvForm.elements.template.value !== "classic")) {
+        cvForm.elements.template.value = "classic";
+      }
+      syncCvStudio();
+      ++cvPhotoRequest; cvPhotoPreparing = false; cvPhotoFile.value = ""; renderCvPhoto();
+      cvPhotoStatus.textContent = "La photo affichée appartient à cette variante.";
+      cvLabel.value = variant.label;
+      editingCvId = variant.id;
+      document.querySelector("#cv-target-context").textContent = "";
+      cvSaveStatus.textContent = "Variante ouverte.";
+      document.querySelector("#cv-analysis-target").value = variant.fields.target || "";
+      cvAnalysisResults.hidden = true; cvAnalysisStatus.textContent = "";
+    } catch (error) {
+      if (request === cvLoadRequest && getSession()?.user?.id === userId) cvSaveStatus.textContent = error.message;
+    } finally { button.disabled = false; }
+  });
+
+  document.querySelector("#cv-new").addEventListener("click", () => {
+    ++cvLoadRequest; ++cvPhotoRequest; cvPhotoPreparing = false; clearCvPdfImport();
+    cvForm.reset(); cvForm.elements.namedItem("photo").value = ""; renderCvPhoto();
+    syncCvStudio();
+    cvPhotoStatus.textContent = "La photo sera conservée avec la variante lorsque vous l’enregistrez.";
+    editingCvId = null;
+    document.querySelector("#cv-target-context").textContent = "";
+    document.querySelector("#cv-adapt-status").textContent = "";
+    cvSaveStatus.textContent = "";
+    document.querySelector("#cv-analysis-target").value = "";
+    cvAnalysisResults.hidden = true; cvAnalysisStatus.textContent = "";
+  });
+
+  const cvDelete = document.querySelector("#cv-delete");
+  cvDelete.addEventListener("click", async () => {
+    const userId = getSession()?.user?.id;
+    const variant = savedCvVariants.find(row => row.id === cvVariants.value);
+    if (!userId || cvForm.dataset.saving || cvDelete.disabled) return;
+    if (!variant) { cvSaveStatus.textContent = "Sélectionnez la variante à supprimer."; return; }
+    if (!window.confirm("Supprimer définitivement la variante « " + variant.label + " » ?")) return;
+    cvDelete.disabled = true;
+    try {
+      const removed = await supabaseWrite("web_cv_variants?id=eq." + encodeURIComponent(variant.id) + "&select=id", "DELETE");
+      if (getSession()?.user?.id !== userId) return;
+      if (editingCvId === variant.id) editingCvId = null;
+      await loadCvVariants();
+      if (getSession()?.user?.id === userId) {
+        cvSaveStatus.textContent = removed.length
+          ? "Variante supprimée. Le formulaire conserve le texte affiché."
+          : "Cette variante avait déjà été retirée.";
+      }
+    } catch (error) {
+      if (getSession()?.user?.id === userId) cvSaveStatus.textContent = error.message;
+    } finally {
+      cvDelete.disabled = false;
+    }
+  });
+
+  for (const [buttonId, copy] of [["cv-save", false], ["cv-save-copy", true]]) {
     document.querySelector("#" + buttonId).addEventListener("click", async () => {
       const userId = getSession()?.user?.id;
       if (!userId || cvForm.dataset.saving || cvDelete.disabled || !cvForm.reportValidity() || !cvPhotoReady()) return;
