@@ -566,3 +566,15 @@
   .cv-studio-layout.cv-preview-expanded .cv-mobile-preview-toggle{order:1}
   .cv-studio-layout.cv-preview-expanded .cv-studio-form{order:2}
 }
+
+/* Bounded A4 density adjustment; preserve text and readable font sizes. */
+.cv-sheet:is([data-density="compact"],[data-density="dense"]) .cv-sheet-head{padding-top:4%;padding-bottom:2%;min-height:0}
+.cv-sheet:is([data-density="compact"],[data-density="dense"]) .cv-sheet-contact{padding-bottom:2%;margin-bottom:1%}
+.cv-sheet:is([data-density="compact"],[data-density="dense"]) .cv-sheet-content{gap:2cqi;padding-bottom:4%}
+.cv-sheet:is([data-density="compact"],[data-density="dense"]) :is(.cv-sheet-main,.cv-sheet-side){gap:2cqi;padding-top:3%;padding-bottom:4%}
+.cv-sheet:is([data-density="compact"],[data-density="dense"]) .cv-entry-list{gap:1.2cqi}
+.cv-sheet:is([data-density="compact"],[data-density="dense"]) .cv-sheet-section h2{margin-bottom:.8cqi}
+.cv-sheet[data-density="dense"]{font-size:clamp(10px,1.55cqi,14px);line-height:1.35}
+.cv-sheet[data-density="dense"] :is(.cv-sheet-prose,.cv-entry-bullets li,.cv-sheet-section p){line-height:1.35}
+.cv-sheet[data-density="dense"] .cv-sheet-photo{max-width:13%}
+.cv-sheet[data-density="dense"] .cv-entry-heading strong{font-size:clamp(10px,1.55cqi,14px)}
