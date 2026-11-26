@@ -2465,17 +2465,19 @@
     document.querySelector("#cv-live-style").textContent = cvTemplateNames[template] || "Classique";
     const fields = Object.fromEntries(cvFieldNames.map(name => [name, form.elements.namedItem(name).value]));
     window.CP_CV_RENDER.render(document.querySelector("#cv-live-paper"), fields, { placeholder: true });
+    const written = ["summary", "experience", "education", "skills"].map(key => fields[key] || "").join(" ").trim();
+    const wordCount = written ? written.split(/\s+/u).length : 0;
     const lengthLabel = document.querySelector("#cv-live-length");
     const sheet = document.querySelector("#cv-live-paper .cv-sheet");
     if (template === "classic") {
-      lengthLabel.textContent = "Vérifiez le rendu final avant l’export PDF.";
+      lengthLabel.textContent = wordCount + " mots de contenu · Vérifiez le rendu final avant l’export PDF.";
       return;
     }
     const fit = measureCvA4(sheet);
     sheet.dataset.density = fit.density;
-    lengthLabel.textContent = fit.fits
+    lengthLabel.textContent = wordCount + " mots · " + (fit.fits
       ? "Page A4 : " + Math.min(100, Math.ceil(fit.ratio * 100)) + " % remplie" + (fit.density !== "normal" ? " · Mise en page ajustée automatiquement." : ".")
-      : "Page A4 dépassée : raccourcissez le contenu avant l’export PDF.";
+      : "Page A4 dépassée : raccourcissez le contenu avant l’export PDF.");
 
   }
   cvForm.elements.template.addEventListener("change", () => {
