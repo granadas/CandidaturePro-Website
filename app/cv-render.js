@@ -58,8 +58,8 @@
     identity.append(node("h1", "", fields.name?.trim() || (options.placeholder ? "Votre nom" : "")));
     identity.append(node("p", "cv-sheet-role", fields.title?.trim() || (options.placeholder ? "Votre métier" : "")));
     head.append(identity);
-    const identityMark = ["initials", "photo", "none"].includes(fields.identityMark) ? fields.identityMark : "initials";
     const hasPhoto = /^data:image\/(?:png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(fields.photo || "") && fields.photo.length < 100000;
+    const identityMark = ["initials", "photo", "none"].includes(fields.identityMark) ? fields.identityMark : (hasPhoto ? "photo" : "initials");
     if (identityMark === "photo" && hasPhoto) {
       const portrait = node("img", "cv-sheet-photo");
       portrait.alt = "Photo du candidat";
