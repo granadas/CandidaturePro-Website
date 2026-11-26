@@ -44,7 +44,7 @@ test("the live CV word counter separates spaces and line breaks", () => {
 });
 
 test("premium A4 status explains the one-page limit without implying a page break is acceptable", () => {
-  assert.match(source, /Page A4 dépassée : export bloqué\\. Raccourcissez le contenu ; aucun texte ne sera supprimé\\./);
+  assert.match(source, /Page A4 dépassée : export bloqué\. Raccourcissez le contenu ; aucun texte ne sera supprimé\./);
   assert.match(source, /Page A4 : .* % remplie/);
   const html = readFileSync(new URL("../app/index.html", import.meta.url), "utf8");
   assert.match(html, /Le PDF Premium est limité à une page A4/);
