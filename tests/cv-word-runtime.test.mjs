@@ -57,21 +57,21 @@ test("Word export respects initials, photo and no-mark identity choices", () => 
   assert.doesNotMatch(none, /<w:pStyle w:val="CandidateMark"\/>/);
 });
 
-test("Signature Word CV places education and skills in a distinct sidebar cell", () => {
-  const document = generate({ ...fields, template: "signature" }).files["word/document.xml"];
-  assert.ok(document.includes("<w:tbl>"));
-  const cells = document.split("<w:tc>").slice(1);
-  assert.equal(cells.length, 2);
-  assert.ok(cells[0].includes("Profil"));
-  assert.ok(cells[0].includes("Expériences"));
-  assert.ok(!cells[0].includes("Compétences et langues"));
-  assert.ok(cells[1].includes("Formation"));
-  assert.ok(cells[1].includes("Compétences et langues"));
-});
-test("classic and Elegance Word CV remain single-column", () => {
-  for (const template of ["classic", "elegance"]) {
-    assert.ok(!generate({ ...fields, template }).files["word/document.xml"].includes("<w:tbl>"));
+test("Signature and Elegance Word CVs place education and skills in a sidebar cell", () => {
+  for (const template of ["signature", "elegance"]) {
+    const document = generate({ ...fields, template }).files["word/document.xml"];
+    assert.ok(document.includes("<w:tbl>"));
+    const cells = document.split("<w:tc>").slice(1);
+    assert.equal(cells.length, 2);
+    assert.ok(cells[0].includes("Profil"));
+    assert.ok(cells[0].includes("Expériences"));
+    assert.ok(!cells[0].includes("Compétences et langues"));
+    assert.ok(cells[1].includes("Formation"));
+    assert.ok(cells[1].includes("Compétences et langues"));
   }
+});
+test("classic Word CV remains single-column", () => {
+  assert.ok(!generate({ ...fields, template: "classic" }).files["word/document.xml"].includes("<w:tbl>"));
 });
 
 test("legacy premium Word template names migrate to supported designs", () => {
