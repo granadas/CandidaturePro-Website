@@ -23,6 +23,8 @@ test("the public premium CV gallery is indexable and has its own search snippet"
   assert.doesNotMatch(cvModels, /<meta name="robots" content="noindex/i);
   assert.match(cvModels, /<meta name="description" content="[^"]{70,160}"/i);
   assert.match(cvModels, /<link rel="canonical" href="https:\/\/candidaturepro\.ch\/app\/cv-modeles">/i);
+  assert.match(cvModels, /href="cv-gallery\.css\?/i);
+  assert.doesNotMatch(cvModels, /href="app\.css\?/i);
 });
 
 test("robots.txt advertises a sitemap containing public pages only", () => {
