@@ -331,6 +331,43 @@
 .cv-sheet-compact .cv-sheet-education{grid-column:2;grid-row:2}.cv-sheet-compact .cv-sheet-skills{grid-column:2;grid-row:3}
 .cv-sheet-compact .cv-sheet-section h2{color:#156b72;margin-bottom:1.5cqi}
 .cv-sheet-compact .cv-sheet-section p{line-height:1.5}
+/* Premium CV identities: profession-neutral initials, or the candidate photo when supplied. */
+.cv-sheet-monogram{display:grid;place-items:center;width:17%;aspect-ratio:1;border-radius:50%;flex:none;background:var(--cv-deep);color:#fff;font:700 clamp(15px,3.4cqi,30px)/1 Arial,sans-serif;letter-spacing:.06em}
+.cv-sheet-elegance{--cv-deep:#433d37;--cv-accent:#9c7658;--cv-soft:#e9ddcd;background:#fffdf9;font-family:Georgia,'Times New Roman',serif}
+.cv-sheet-elegance .cv-sheet-head{padding:7% 8% 3%;border-bottom:1px solid #e8dfd5}
+.cv-sheet-elegance .cv-sheet-role{color:#92785f}
+.cv-sheet-elegance .cv-sheet-photo,.cv-sheet-elegance .cv-sheet-monogram{width:14%;border-radius:50%}
+.cv-sheet-elegance .cv-sheet-content{display:grid;grid-template-columns:1.55fr 1fr;gap:0;padding:5% 8% 7%;align-content:start}
+.cv-sheet-elegance .cv-sheet-main{grid-column:1;grid-row:1;display:grid;align-content:start;gap:3cqi;padding-right:6%}
+.cv-sheet-elegance .cv-sheet-side{grid-column:2;grid-row:1;display:grid;align-content:start;gap:3cqi;padding:5% 0 5% 7%;border-left:1px solid #e8dfd5}
+.cv-sheet-elegance .cv-sheet-section h2{color:#876d54;border-bottom:1px solid #e3d8ca;padding-bottom:1cqi;margin-bottom:1.4cqi}
+.cv-sheet-elegance .cv-sheet-main>.cv-sheet-section,.cv-sheet-elegance .cv-sheet-side>.cv-sheet-section{padding:0;grid-column:auto;grid-row:auto}
+.cv-sheet-prestige{--cv-deep:#28282b;--cv-accent:#b08b46;--cv-soft:#e6cf91;background:#fff;color:#27272a;font-family:Arial,Helvetica,sans-serif;border:1px solid #dedbd4}
+.cv-sheet-prestige .cv-sheet-head{background:#29292c;color:#fff;padding:7% 8% 5%;border-bottom:1cqi solid #b08b46}
+.cv-sheet-prestige .cv-sheet-identity{flex:1}
+.cv-sheet-prestige h1{color:#fff;font-family:Georgia,'Times New Roman',serif;letter-spacing:.01em}
+.cv-sheet-prestige .cv-sheet-role{color:#e6cf91;text-transform:uppercase;letter-spacing:.12em;font-size:clamp(10px,1.55cqi,14px)}
+.cv-sheet-prestige .cv-sheet-photo,.cv-sheet-prestige .cv-sheet-monogram{width:15%;border:2px solid #b08b46;border-radius:50%}
+.cv-sheet-prestige .cv-sheet-contact{padding:3% 8%;margin:0;background:#f2f0eb;border-bottom:1px solid #dedbd4;color:#55545a}
+.cv-sheet-prestige .cv-sheet-content{padding:4% 8% 7%;gap:2.8cqi}
+.cv-sheet-prestige .cv-sheet-section h2{color:#9a7738;letter-spacing:.16em;border-bottom:1px solid #d7c49a!important;padding-bottom:.8cqi}
+.cv-sheet-prestige .cv-entry-list{gap:1.5cqi}
+.cv-sheet-prestige .cv-entry{border-left:2px solid #d4c19a;padding-left:2cqi}
+.cv-sheet-signature{--cv-deep:#171719;--cv-accent:#b69552;--cv-soft:#e1cb93;display:grid;grid-template-columns:31% 69%;grid-template-rows:auto auto 1fr;align-content:start;background:linear-gradient(90deg,#1b1b1e 31%,#fff 31%);font-family:Arial,Helvetica,sans-serif}
+.cv-sheet-signature .cv-sheet-head{grid-column:2;grid-row:1;align-items:center;padding:8% 8% 4%;min-height:18cqi}
+.cv-sheet-signature h1{font-family:Georgia,'Times New Roman',serif;color:#171719}
+.cv-sheet-signature .cv-sheet-role{color:#92763d;text-transform:uppercase;letter-spacing:.1em;font-weight:700;font-size:clamp(10px,1.45cqi,14px)}
+.cv-sheet-signature .cv-sheet-photo,.cv-sheet-signature .cv-sheet-monogram{width:18%;border-radius:0;border:1px solid #b69552}
+.cv-sheet-signature .cv-sheet-contact{grid-column:1;grid-row:1;align-self:end;padding:8% 10%;color:#f5f2ea;font-size:clamp(9px,1.3cqi,12px);line-height:1.65;overflow-wrap:anywhere}
+.cv-sheet-signature .cv-sheet-content{grid-column:1/-1;grid-row:2;display:grid;grid-template-columns:31% 69%;gap:0;padding:0}
+.cv-sheet-signature .cv-sheet-main{grid-column:2;grid-row:1;display:grid;align-content:start;gap:3.2cqi;padding:4% 8% 8%}
+.cv-sheet-signature .cv-sheet-side{grid-column:1;grid-row:1;display:grid;align-content:start;gap:3cqi;padding:8% 9% 8% 10%;color:white}
+.cv-sheet-signature .cv-sheet-section h2{color:#a98743;margin-bottom:1.5cqi;letter-spacing:.15em}
+.cv-sheet-signature .cv-sheet-side .cv-sheet-section h2{color:#dfc77f}
+.cv-sheet-signature .cv-sheet-side .cv-sheet-section p,.cv-sheet-signature .cv-skill{color:#f5f2ea}
+.cv-sheet-signature .cv-sheet-main>.cv-sheet-section,.cv-sheet-signature .cv-sheet-side>.cv-sheet-section{padding:0;grid-column:auto;grid-row:auto}
+.cv-sheet-signature .cv-skill{background:transparent;border-left:1px solid #b69552;border-radius:0;padding:.4cqi 1cqi}
+@media print{.cv-sheet-elegance,.cv-sheet-prestige,.cv-sheet-signature{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 @media print{ @page{size:A4;margin:0} body:has(#cv-dialog[open]) #cv-dialog{background:#fff;padding:0} #cv-preview{width:210mm;container-type:inline-size} #cv-preview .cv-sheet{min-height:297mm;box-shadow:none;-webkit-print-color-adjust:exact;print-color-adjust:exact} }
 
 /* CV studio: shared on-screen and printed composition. */
