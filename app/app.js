@@ -2470,14 +2470,14 @@
     const lengthLabel = document.querySelector("#cv-live-length");
     const sheet = document.querySelector("#cv-live-paper .cv-sheet");
     if (template === "classic") {
-      lengthLabel.textContent = wordCount + " mots de contenu · Vérifiez le rendu final avant l’export PDF.";
+      lengthLabel.textContent = wordCount + " mots de contenu · Modèle Classique : vérifiez le PDF avant de l’envoyer.";
       return;
     }
     const fit = measureCvA4(sheet);
     sheet.dataset.density = fit.density;
     lengthLabel.textContent = wordCount + " mots · " + (fit.fits
       ? "Page A4 : " + Math.min(100, Math.ceil(fit.ratio * 100)) + " % remplie" + (fit.density !== "normal" ? " · Mise en page ajustée automatiquement." : ".")
-      : "Page A4 dépassée : raccourcissez le contenu avant l’export PDF.");
+      : "Page A4 dépassée : export bloqué. Raccourcissez le contenu ; aucun texte ne sera supprimé.");
 
   }
   cvForm.elements.template.addEventListener("change", () => {
