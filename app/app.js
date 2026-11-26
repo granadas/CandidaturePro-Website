@@ -3087,7 +3087,34 @@
     window.CP_CV_RENDER.render(document.querySelector("#cv-preview"), fields);
     cvDialog.showModal();
   });
-  document.querySelector("#cv-print").addEventListener("click", () => window.print());
+  document.querySelector("#cv-print").addEventListener("click", async () => {
+    const preview = document.querySelector("#cv-preview");
+    const sheet = preview.querySelector(".cv-sheet");
+    if (!sheet) return;
+    if (sheet.dataset.template === "classic") { window.print(); return; }
+    if (document.fonts?.ready) await document.fonts.ready;
+    if (!cvDialog.open || !sheet.isConnected) return;
+    const probe = document.createElement("div");
+    probe.style.cssText = "position:fixed;left:-10000px;top:0;width:210mm;container-type:inline-size;visibility:hidden;pointer-events:none;";
+    const clone = sheet.cloneNode(true);
+    clone.style.minHeight = "0";
+    clone.style.height = "auto";
+    clone.style.overflow = "visible";
+    probe.append(clone);
+    document.body.append(probe);
+    let fits;
+    try {
+      const limit = document.createElement("div");
+      limit.style.height = "297mm";
+      probe.append(limit);
+      fits = Math.max(clone.getBoundingClientRect().height, clone.scrollHeight) <= limit.getBoundingClientRect().height - 2;
+    } finally { probe.remove(); }
+    if (!fits) {
+      window.alert("Votre CV dépasse une page A4. Raccourcissez les descriptions ou les rubriques avant l’export PDF. Aucun contenu n’a été supprimé.");
+      return;
+    }
+    window.print();
+  });
 
   const documentsBucket = "candidature-documents";
   const documentKinds = { cv: "CV", lettre: "Lettre de motivation", certificat: "Certificat / attestation", diplome: "Diplôme", autre: "Autre document" };
