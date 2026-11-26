@@ -68,9 +68,11 @@ test("legacy premium template names migrate to the new profession-neutral design
 test("the identity mark can be initials, an uploaded photo, or hidden", () => {
   const render = createRenderer();
   const initials = render(new Element("div"), { ...sample, identityMark: "initials" });
+  const legacyPhoto = render(new Element("div"), { ...sample, photo: "data:image/png;base64,abc" });
   const photo = render(new Element("div"), { ...sample, identityMark: "photo", photo: "data:image/png;base64,abc" });
   const none = render(new Element("div"), { ...sample, identityMark: "none", photo: "data:image/png;base64,abc" });
   assert.equal(initials.findClass("cv-sheet-monogram").length, 1);
+  assert.equal(legacyPhoto.findClass("cv-sheet-photo").length, 1);
   assert.equal(photo.findClass("cv-sheet-photo").length, 1);
   assert.equal(photo.findClass("cv-sheet-monogram").length, 0);
   assert.equal(none.findClass("cv-sheet-photo").length, 0);
