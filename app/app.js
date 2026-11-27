@@ -209,10 +209,12 @@
       ? email + (profile ? " · " + (isPremium ? "Premium" : "Free") : "")
       : "Connectez-vous pour accéder à votre compte.";
     document.querySelector("#premium-plan").textContent = "Formule actuelle · " + planLabel;
-    document.querySelector("#plan-detail").textContent = !profile ? "Vérification des droits du compte" : isPremium ? "Candidatures illimitées" : "5 candidatures par mois";
+    document.querySelector("#plan-detail").textContent = !profile ? "Vérification des droits du compte" : isPremium ? "Candidatures illimitées" : "3 recherches par mois";
     document.querySelector("#premium-checkout").hidden = !profile?.is_admin || isPremium;
     document.querySelector("#premium-portal").hidden = true;
     document.querySelector("#premium-billing-note").hidden = !profile?.is_admin;
+    document.querySelector("#premium-checkout").dataset.billingMode = "sandbox";
+    document.querySelector("#premium-portal").dataset.billingMode = "sandbox";
   }
 
   async function refreshPremiumBillingStatus() {
@@ -220,13 +222,26 @@
     const session = getSession();
     if (!session?.user?.id) { status.textContent = "Connectez-vous pour consulter votre formule."; return false; }
     try {
-      const result = await invokeEdgeFunction("stripe-sandbox-billing", { action: "status" });
+      let result;
+      try {
+        result = await invokeEdgeFunction("stripe-live-billing", { action: "status" });
+      } catch {
+        result = await invokeEdgeFunction("stripe-sandbox-billing", { action: "status" });
+      }
       if (getSession()?.user?.id !== session.user.id) return false;
+      const liveAvailable = result.mode === "live" && result.available === true;
+      const checkoutButton = document.querySelector("#premium-checkout");
+      const portalButton = document.querySelector("#premium-portal");
+      checkoutButton.dataset.billingMode = liveAvailable ? "live" : "sandbox";
+      portalButton.dataset.billingMode = result.mode === "live" && result.portal_available ? "live" : "sandbox";
+      document.querySelector("#premium-billing-note").hidden = liveAvailable || !profile?.is_admin;
       if (result.subscription) {
         const active = ["active", "trialing", "past_due"].includes(result.subscription.status) &&
           (!result.subscription.current_period_end || Date.parse(result.subscription.current_period_end) > Date.now());
-        document.querySelector("#premium-checkout").hidden = !profile?.is_admin || active || hasPremiumCv();
-        document.querySelector("#premium-portal").hidden = !profile?.is_admin || !result.subscription.customer_id;
+        checkoutButton.hidden = (!liveAvailable && !profile?.is_admin) || active || hasPremiumCv();
+        portalButton.hidden = result.mode === "live"
+          ? !result.portal_available
+          : (!profile?.is_admin || !result.subscription.customer_id);
         const expiry = result.subscription.current_period_end
           ? new Intl.DateTimeFormat("fr-CH", { dateStyle: "long", timeZone: "Europe/Zurich" }).format(new Date(result.subscription.current_period_end))
           : null;
@@ -237,8 +252,8 @@
             ? "Un paiement est en attente. Votre accès reste disponible pendant la période déjà réglée" + suffix + "."
             : "Abonnement Premium actif · 14,99 CHF par mois" + suffix + ".";
       } else {
-        document.querySelector("#premium-checkout").hidden = !profile?.is_admin || hasPremiumCv();
-        document.querySelector("#premium-portal").hidden = true;
+        checkoutButton.hidden = (!liveAvailable && !profile?.is_admin) || hasPremiumCv();
+        portalButton.hidden = true;
         status.textContent = "Formule actuelle · " + (hasPremiumCv() ? "Premium (activation manuelle)" : "Free");
       }
       return Boolean(result.subscription);
@@ -255,7 +270,8 @@
     const status = document.querySelector("#premium-billing-status");
     status.textContent = action === "checkout" ? "Ouverture du paiement sécurisé…" : "Ouverture de la gestion de l’abonnement…";
     try {
-      const result = await invokeEdgeFunction("stripe-sandbox-billing", { action });
+      const mode = button.dataset.billingMode === "live" ? "live" : "sandbox";
+      const result = await invokeEdgeFunction(mode === "live" ? "stripe-live-billing" : "stripe-sandbox-billing", { action });
       const destination = new URL(result.url);
       const allowed = action === "checkout"
         ? destination.origin === "https://checkout.stripe.com"
