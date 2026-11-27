@@ -4,7 +4,9 @@ import { readFileSync } from "node:fs";
 
 const read = path => readFileSync(new URL(path, import.meta.url), "utf8");
 const source = read("../supabase/functions/stripe-live-webhook/index.ts");
+const billing = read("../supabase/functions/stripe-live-billing/index.ts");
 const migration = read("../supabase/migrations/20261127230000_stripe_live_billing_storage.sql");
+const app = read("../app/app.js");
 const has = (text, pattern, label) => assert.ok(pattern.test(text), `Missing live billing guard: ${label}`);
 
 test("live webhook requires a dedicated signing secret and rejects test events", () => {
@@ -26,4 +28,19 @@ test("live subscription storage stays isolated, private, and service-role-only",
   has(migration, /on conflict\(event_id\) do nothing/i, "event idempotency");
   has(migration, /to service_role/i, "service role only");
   has(migration, /last_event_created_at/i, "out-of-order protection");
+});
+
+test("live checkout stays gated until explicitly enabled and Stripe is ready", () => {
+  has(billing, /STRIPE_LIVE_BILLING_ENABLED[\s\S]*?===\s*"true"/, "explicit live-payment switch");
+  has(billing, /key\.startsWith\("sk_live_"\)/, "live-only secret key");
+  has(billing, /account\.charges_enabled !== true/, "Stripe charge activation");
+  has(billing, /price\.currency !== "chf".*price\.unit_amount !== 1499/, "CHF 14.99 amount guard");
+  has(billing, /portal_available: portalReady/, "subscription portal remains separately available");
+});
+
+test("Premium UI selects live billing only after the server marks it available", () => {
+  has(app, /invokeEdgeFunction\("stripe-live-billing", \{ action: "status" \}\)/, "live billing status");
+  has(app, /result\.mode === "live" && result\.available === true/, "server-controlled live checkout gate");
+  has(app, /mode === "live" \? "stripe-live-billing" : "stripe-sandbox-billing"/, "mode-specific checkout endpoint");
+  has(app, /3 recherches par mois/, "Free tier monthly search limit");
 });
