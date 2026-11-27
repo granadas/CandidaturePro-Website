@@ -210,11 +210,72 @@
       : "Connectez-vous pour accéder à votre compte.";
     document.querySelector("#premium-plan").textContent = "Formule actuelle · " + planLabel;
     document.querySelector("#plan-detail").textContent = !profile ? "Vérification des droits du compte" : isPremium ? "Candidatures illimitées" : "5 candidatures par mois";
+    document.querySelector("#premium-checkout").hidden = !profile?.is_admin || isPremium;
+    document.querySelector("#premium-portal").hidden = true;
+    document.querySelector("#premium-billing-note").hidden = !profile?.is_admin;
   }
+
+  async function refreshPremiumBillingStatus() {
+    const status = document.querySelector("#premium-billing-status");
+    const session = getSession();
+    if (!session?.user?.id) { status.textContent = "Connectez-vous pour consulter votre formule."; return false; }
+    try {
+      const result = await invokeEdgeFunction("stripe-sandbox-billing", { action: "status" });
+      if (getSession()?.user?.id !== session.user.id) return false;
+      if (result.subscription) {
+        const active = ["active", "trialing", "past_due"].includes(result.subscription.status) &&
+          (!result.subscription.current_period_end || Date.parse(result.subscription.current_period_end) > Date.now());
+        document.querySelector("#premium-checkout").hidden = !profile?.is_admin || active || hasPremiumCv();
+        document.querySelector("#premium-portal").hidden = !profile?.is_admin || !result.subscription.customer_id;
+        const expiry = result.subscription.current_period_end
+          ? new Intl.DateTimeFormat("fr-CH", { dateStyle: "long", timeZone: "Europe/Zurich" }).format(new Date(result.subscription.current_period_end))
+          : null;
+        const suffix = expiry ? " jusqu’au " + expiry : "";
+        status.textContent = result.subscription.cancel_at_period_end
+          ? "Votre Premium reste actif" + suffix + " puis ne sera pas renouvelé."
+          : result.subscription.status === "past_due"
+            ? "Un paiement est en attente. Votre accès reste disponible pendant la période déjà réglée" + suffix + "."
+            : "Abonnement Premium actif · 14,99 CHF par mois" + suffix + ".";
+      } else {
+        document.querySelector("#premium-checkout").hidden = !profile?.is_admin || hasPremiumCv();
+        document.querySelector("#premium-portal").hidden = true;
+        status.textContent = "Formule actuelle · " + (hasPremiumCv() ? "Premium (activation manuelle)" : "Free");
+      }
+      return Boolean(result.subscription);
+    } catch (error) {
+      document.querySelector("#premium-checkout").hidden = !profile?.is_admin || hasPremiumCv();
+      document.querySelector("#premium-portal").hidden = true;
+      status.textContent = "État de l’abonnement momentanément indisponible. Votre formule actuelle reste inchangée.";
+      return false;
+    }
+  }
+
+  async function openPremiumBilling(action, button) {
+    button.disabled = true;
+    const status = document.querySelector("#premium-billing-status");
+    status.textContent = action === "checkout" ? "Ouverture du paiement sécurisé…" : "Ouverture de la gestion de l’abonnement…";
+    try {
+      const result = await invokeEdgeFunction("stripe-sandbox-billing", { action });
+      const destination = new URL(result.url);
+      const allowed = action === "checkout"
+        ? destination.origin === "https://checkout.stripe.com"
+        : destination.origin === "https://billing.stripe.com";
+      if (!allowed) throw new Error("Adresse de paiement inattendue.");
+      location.assign(destination.href);
+    } catch (error) {
+      status.textContent = error.message || "Le service de paiement est momentanément indisponible.";
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  document.querySelector("#premium-checkout").addEventListener("click", event => openPremiumBilling("checkout", event.currentTarget));
+  document.querySelector("#premium-portal").addEventListener("click", event => openPremiumBilling("portal", event.currentTarget));
 
   function showView(name, syncReplies = true) {
     if (appShell.hidden || (name === "admin" && profile?.is_admin !== true)) return;
     if (profile) refreshAccountRights();
+    if (name === "premium") void refreshPremiumBillingStatus();
     const isDashboard = name === "dashboard";
     const isProfile = name === "profile";
     const isApplications = name === "applications";
@@ -5165,6 +5226,17 @@
     try { await loadDashboard(); }
     catch (error) {
       document.querySelector("#account-label").textContent = error.message;
+    }
+    const billingResult = url.searchParams.get("billing");
+    if (["success", "cancelled", "returned"].includes(billingResult)) {
+      url.searchParams.delete("billing");
+      history.replaceState(null, "", url.pathname + url.search + url.hash);
+      if (billingResult === "success") document.querySelector("#premium-billing-status").textContent = "Paiement transmis. Votre formule sera activée après confirmation sécurisée par Stripe.";
+      else if (billingResult === "cancelled") document.querySelector("#premium-billing-status").textContent = "Paiement annulé. Aucun abonnement n’a été créé.";
+      const hasBillingRecord = await refreshPremiumBillingStatus();
+      if (billingResult === "success" && !hasBillingRecord) {
+        document.querySelector("#premium-billing-status").textContent = "Paiement transmis. L’accès Premium sera activé uniquement après réception et validation de l’événement Stripe.";
+      }
     }
   }
 
